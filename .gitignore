@@ -1,0 +1,20 @@
+# dependencies and builds
+node_modules/
+dist/
+*.tsbuildinfo
+build.log
+.expo/
+
+# secrets: copy server/.env.example to server/.env
+.env
+.env.*
+!.env.example
+
+# runtime data
+server/uploads/
+
+# native build output and binaries
+mobile/android/
+mobile/ios/
+*.apk
+*.aab

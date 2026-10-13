@@ -1,0 +1,92 @@
+import { serviceByKey } from './data/catalog.js';
+import { LAST_STEP, stepsFor } from './data/timelines.js';
+
+/* Shapes returned to the client. Keeps Mongo internals (_id, __v, hashes) out of responses */
+
+export const publicAgent = (a: any) => ({
+  id: String(a._id),
+  name: a.name,
+  email: a.email,
+  phone: a.phone,
+  agency: a.agency,
+  zone: a.zone,
+  city: a.city,
+  verified: a.verified,
+  rm: { name: a.rm?.name, email: a.rm?.email, phone: a.rm?.phone },
+  bankAccount: a.bankAccount ?? '',
+  agreement: {
+    number: a.agreement?.number ?? '',
+    signedAt: a.agreement?.signedAt ?? a.createdAt,
+    validTill: a.agreement?.validTill ?? null,
+    autoRenew: a.agreement?.autoRenew ?? true,
+  },
+  partnerSince: a.createdAt,
+});
+
+export const publicStudent = (s: any, requests: any[] = []) => ({
+  id: String(s._id),
+  code: s.code,
+  name: s.name,
+  email: s.email,
+  phone: s.phone,
+  country: s.country,
+  createdAt: s.createdAt,
+  requests: requests.map((r) => ({ id: String(r._id), ref: r.ref, service: r.service, status: r.status, progress: r.progress })),
+});
+
+export const publicTeamMember = (m: any) => ({
+  id: String(m._id), name: m.name, email: m.email, role: m.role, status: m.status, menus: m.menus, perms: m.perms,
+  lastLoginAt: m.lastLoginAt ?? null,
+});
+
+/** The case's stages with the date each one was reached. */
+export const caseTimeline = (r: any) => {
+  const step = r.step ?? 0;
+  const done = r.status === 'Completed' ? LAST_STEP : step;
+  const dates = new Map<number, Date>();
+  for (const l of r.stepLog ?? []) dates.set(l.step, l.at);
+  if (!dates.has(0)) dates.set(0, r.createdAt);
+  return stepsFor(r.service).map(([title, sub], i) => ({
+    title, sub,
+    done: i <= done,
+    now: i === done + 1 && r.status !== 'Completed',
+    at: i <= done ? dates.get(i) ?? null : null,
+  }));
+};
+
+export const publicRequest = (r: any) => {
+  const s = r.student ?? {};
+  return {
+    id: String(r._id),
+    ref: r.ref,
+    service: r.service,
+    serviceName: serviceByKey(r.service)?.name ?? r.service,
+    status: r.status,
+    progress: r.progress,
+    step: r.step ?? 0,
+    timeline: caseTimeline(r),
+    note: r.note,
+    createdAt: r.createdAt,
+    student: { id: String(s._id ?? ''), code: s.code, name: s.name, email: s.email, phone: s.phone, country: s.country },
+    docs: (r.docs ?? []).map((d: any) => ({
+      id: String(d._id), name: d.name, size: d.size, status: d.status, hasFile: !!d.file, updatedAt: d.updatedAt,
+    })),
+  };
+};
+
+export const publicMessage = (m: any) => ({
+  id: String(m._id),
+  from: m.from,
+  author: m.author ?? '',
+  text: m.text,
+  createdAt: m.createdAt,
+});
+
+export const publicTx = (t: any) => ({
+  id: String(t._id),
+  description: t.description,
+  type: t.type,
+  amount: t.amount,
+  status: t.status,
+  date: t.date,
+});

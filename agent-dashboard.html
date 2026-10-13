@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Dashboard | UniVerse</title>
+  <meta name="description" content="UniVerse partner dashboard — referrals, tracking, wallet and commissions.">
+  <link rel="icon" type="image/png" href="assets/img/universe-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  <div class="dash" id="dashRoot">
+
+    <!-- ===== SIDEBAR ===== -->
+    <aside class="dash-side" id="dashSide">
+      <div class="s-brand">
+        <a href="index.html"><img src="assets/img/universe-logo.png" alt="UniVerse"><span class="portal-tag">Partner Portal</span></a>
+      </div>
+      <nav class="s-nav">
+        <span class="lbl">Workspace</span>
+        <button class="s-link active" data-view="overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Overview</button>
+        <button class="s-link" data-view="students"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Students</button>
+        <button class="s-link" data-view="requests"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Requests</button>
+        <span class="lbl">Marketplace</span>
+        <button class="s-link" data-view="services"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>Services</button>
+        <span class="lbl">Money</span>
+        <button class="s-link" data-view="wallet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>Wallet</button>
+        <button class="s-link" data-view="commissions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Commissions</button>
+        <span class="lbl">Account</span>
+        <button class="s-link" data-view="profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Profile</button>
+      </nav>
+      <div class="s-foot">
+        <button class="s-rm" id="rmOpen" type="button" aria-label="Chat with your Relationship Manager">
+          <span class="av">DA</span>
+          <div><b>Diya Amin</b><span>Relationship Manager · Chat</span></div>
+          <svg class="chat-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- ===== TOPBAR ===== -->
+    <header class="dash-top">
+      <button class="icon-btn menu-fab" id="menuFab" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+      <span class="page-ttl" id="pageTitle">Overview</span>
+      <span class="sp"></span>
+      <div class="dash-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="search" id="globalSearch" placeholder="Search students…" aria-label="Search students">
+      </div>
+      <button class="icon-btn" id="notifBtn" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="dot-n"></span></button>
+      <div class="user-chip" id="userMenuBtn" role="button" tabindex="0">
+        <span class="av" id="userAv">AP</span><b id="userNameChip">Amit Patel</b>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+    </header>
+    <div class="user-menu" id="userMenu">
+      <button data-goto="profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>My profile</button>
+      <button data-goto="wallet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>My wallet</button>
+      <button id="logoutBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Log out</button>
+    </div>
+
+    <!-- ===== MAIN ===== -->
+    <main class="dash-main">
+
+      <!-- OVERVIEW -->
+      <section class="view active" id="view-overview">
+        <div class="d-cards">
+          <div class="d-card"><div class="dc-top"><span class="dc-ic b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span><span class="trend up">+12%</span></div><span class="num" id="statActive">0</span><span class="lbl">Active Cases</span></div>
+          <div class="d-card"><div class="dc-top"><span class="dc-ic g"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="trend up">+8</span></div><span class="num" id="statStudents">0</span><span class="lbl">Students Served</span></div>
+          <div class="d-card"><div class="dc-top"><span class="dc-ic n"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg></span></div><span class="num" id="statWallet">₹0</span><span class="lbl">Wallet Balance</span></div>
+          <div class="d-card"><div class="dc-top"><span class="dc-ic a"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span><span class="trend up">+18%</span></div><span class="num" id="statEarnings">₹0</span><span class="lbl">Earnings · Sep</span></div>
+        </div>
+
+        <div class="d-grid">
+          <div class="panel">
+            <div class="panel-h"><h3>Recent students</h3><button class="btn btn-primary btn-sm" id="qaAddStudent">+ Add student</button></div>
+            <table class="tbl">
+              <thead><tr><th>Student</th><th>Country</th><th>Service</th><th>Status</th></tr></thead>
+              <tbody id="recentTbody"></tbody>
+            </table>
+          </div>
+          <div class="panel">
+            <div class="panel-h"><h3>Service mix</h3><button class="btn btn-ghost btn-sm" data-goto="requests">View all</button></div>
+            <div class="donut-wrap">
+              <div class="donut">
+                <svg id="donutSvg" width="168" height="168" viewBox="0 0 42 42"></svg>
+                <div class="hole"><div><b id="donutTotal">0</b><br><span>cases</span></div></div>
+              </div>
+              <div class="legend" id="donutLegend"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-h"><h3>Quick launch</h3><span class="link" style="font-size:.8rem;color:var(--ink-soft)">Refer a student into any service</span></div>
+          <div class="comm-grid" style="padding:1.2rem" id="quickLaunch"></div>
+        </div>
+      </section>
+
+      <!-- STUDENTS -->
+      <section class="view" id="view-students">
+        <div class="panel">
+          <div class="panel-h" style="flex-wrap:wrap;gap:.8rem">
+            <h3>All students</h3>
+            <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
+              <select id="studentStatusFilter" class="field" style="font:500 .84rem var(--font);padding:.55rem .8rem;border:1px solid var(--line-strong);border-radius:999px;background:var(--surface);color:var(--navy)">
+                <option value="">All statuses</option><option>In Progress</option><option>Pending</option><option>Completed</option><option>On Hold</option>
+              </select>
+              <button class="btn btn-primary btn-sm" id="openAddStudent">+ Add New Student</button>
+            </div>
+          </div>
+          <div style="overflow-x:auto">
+          <table class="tbl">
+            <thead><tr><th>ID</th><th>Student</th><th>Country</th><th>Service</th><th>Status</th><th>Progress</th><th>Referred</th></tr></thead>
+            <tbody id="studentsTbody"></tbody>
+          </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- REQUESTS -->
+      <section class="view" id="view-requests">
+        <div class="d-grid" style="grid-template-columns:1.15fr .85fr">
+          <div class="panel">
+            <div class="panel-h"><h3>Service requests</h3></div>
+            <table class="tbl">
+              <thead><tr><th>Ref</th><th>Student</th><th>Service</th><th>Status</th><th>Progress</th><th></th></tr></thead>
+              <tbody id="requestsTbody"></tbody>
+            </table>
+          </div>
+          <div class="panel" id="latestCase" style="cursor:pointer" title="Open case REQ-1187">
+            <div class="panel-h"><h3>Latest case — REQ-1187</h3><span class="status prog">In Progress</span></div>
+            <div class="panel-b">
+              <p style="font-size:.88rem;color:var(--ink-soft);margin-bottom:1.2rem">Canada GIC · <b style="color:var(--navy)">Sneha Gupta</b> · CIBC</p>
+              <div class="req-timeline">
+                <div class="tl-item done"><span class="tl-dot"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><div><b>Case submitted</b><span>24 Sep, 11:20 · by you</span></div></div>
+                <div class="tl-item done"><span class="tl-dot"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><div><b>Documents verified</b><span>24 Sep, 16:05 · UniVerse GIC desk</span></div></div>
+                <div class="tl-item done"><span class="tl-dot"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span><div><b>Bank account opened</b><span>26 Sep · CIBC wiring details shared</span></div></div>
+                <div class="tl-item now"><span class="tl-dot">…</span><div><b>Awaiting CAD 23,448 transfer</b><span>In progress · student confirmation due</span></div></div>
+                <div class="tl-item"><span class="tl-dot"></span><div><b>GIC certificate issued</b><span>₹12,200 (CAD 200) commission credited on this step</span></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SERVICES -->
+      <section class="view" id="view-services">
+        <div class="sec-head" style="margin-bottom:2rem;text-align:left">
+          <span class="eyebrow">Marketplace</span>
+          <h2 style="font-size:1.5rem">Refer into any service</h2>
+          <p style="margin-top:.4rem">Pick a service, submit the student's basics and our specialist desks take over.</p>
+        </div>
+        <div class="comm-grid" id="svcCatalog"></div>
+      </section>
+
+      <!-- WALLET -->
+      <section class="view" id="view-wallet">
+        <div class="wallet-hero">
+          <div>
+            <div class="wh-lbl">Available Balance</div>
+            <div class="wh-amt" id="walletBalance">₹0</div>
+          </div>
+          <div class="wh-meta">
+            <div class="wh-m"><b id="walletPending">₹0</b><span>Pending clearance</span></div>
+            <div class="wh-m"><b id="walletLifetime">₹0</b><span>Lifetime earnings</span></div>
+          </div>
+          <button class="btn btn-green btn-lg" id="openWithdraw">Withdraw Funds</button>
+        </div>
+        <div class="panel">
+          <div class="panel-h"><h3>Transaction history</h3></div>
+          <table class="tbl">
+            <thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Amount</th><th>Status</th></tr></thead>
+            <tbody id="walletTxTbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- COMMISSIONS -->
+      <section class="view" id="view-commissions">
+        <div class="sec-head" style="text-align:left;margin-bottom:1.6rem">
+          <span class="eyebrow">Payouts</span>
+          <h2 style="font-size:1.5rem">Commission structure — effective July 2026</h2>
+          <p style="margin-top:.4rem">Credited automatically to your wallet on the payout trigger.</p>
+        </div>
+        <div class="comm-grid" id="commGrid"></div>
+        <div class="panel" style="margin-top:1.4rem">
+          <div class="panel-h"><h3>Commission Structure History</h3><span class="link" style="font-size:.8rem;color:var(--ink-soft)">Current vs previous</span></div>
+          <div class="panel-b comm-history" id="commHistory"></div>
+        </div>
+      </section>
+
+      <!-- PROFILE -->
+      <section class="view" id="view-profile">
+        <div class="d-grid" style="grid-template-columns:1fr 1fr">
+          <div class="panel">
+            <div class="panel-h"><h3>Agent profile</h3><button class="btn btn-ghost btn-sm" id="editProfile">Edit</button></div>
+            <div class="panel-b">
+              <div style="display:flex;gap:1.1rem;align-items:center;margin-bottom:1.4rem">
+                <span class="av" id="profileAv" style="width:58px;height:58px;border-radius:16px;background:linear-gradient(135deg,var(--blue),var(--blue-deep));color:#fff;display:grid;place-items:center;font:800 1.2rem var(--font)">AP</span>
+                <div><h3 id="profileName" style="font-size:1.2rem">Amit Patel</h3><p style="font-size:.85rem;color:var(--ink-soft)">Partner since Aug 2025 · <span class="status done">Verified</span></p></div>
+              </div>
+              <div class="form-grid" style="gap:.9rem 1.2rem">
+                <div><div style="font:700 .7rem var(--font);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft)">Agency</div><p style="font-weight:600;color:var(--navy)">Horizon Overseas Consultancy</p></div>
+                <div><div style="font:700 .7rem var(--font);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft)">Zone</div><p style="font-weight:600;color:var(--navy)">West — Vadodara, Gujarat</p></div>
+                <div><div style="font:700 .7rem var(--font);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft)">Email</div><p style="font-weight:600;color:var(--navy)" id="profileEmail">amit@horizonoverseas.in</p></div>
+                <div><div style="font:700 .7rem var(--font);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft)">Phone</div><p style="font-weight:600;color:var(--navy)">+91 98765 43210</p></div>
+              </div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-h"><h3>Data protection</h3></div>
+            <div class="panel-b" style="display:flex;flex-direction:column;gap:1rem">
+              <div style="display:flex;gap:.9rem"><span class="dc-ic g" style="width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:0 0 auto"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span><div><b style="color:var(--navy)">Ring-fenced records</b><p style="font-size:.85rem;color:var(--ink-soft)">Your student data is visible only to you and the service desk working your case — never to another consultant.</p></div></div>
+              <div style="display:flex;gap:.9rem"><span class="dc-ic b" style="width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:0 0 auto"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span><div><b style="color:var(--navy)">Bank-grade encryption</b><p style="font-size:.85rem;color:var(--ink-soft)">AES-256 at rest, TLS 1.3 in transit, with full audit trails on every record access.</p></div></div>
+              <div style="display:flex;gap:.9rem"><span class="dc-ic n" style="width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:0 0 auto"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span><div><b style="color:var(--navy)">Dedicated RM</b><p style="font-size:.85rem;color:var(--ink-soft)">Diya Amin · diya.a@universe.com · replies within one business day.</p></div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ===== ADD STUDENT MODAL ===== -->
+  <div class="modal-veil" id="addStudentModal" role="dialog" aria-modal="true">
+    <div class="modal">
+      <div class="modal-hero">
+        <button class="modal-close" aria-label="Close">✕</button>
+        <h3 style="position:relative;z-index:1">Refer a student</h3>
+        <p style="position:relative;z-index:1">Ring-fenced to your account — never shared with another consultant.</p>
+      </div>
+      <div class="modal-body">
+        <form id="addStudentForm" class="form-grid">
+          <div class="field"><label for="sName">Student name *</label><input id="sName" required placeholder="e.g. Riya Shah"></div>
+          <div class="field"><label for="sEmail">Student email *</label><input id="sEmail" type="email" required placeholder="student@gmail.com"></div>
+          <div class="field"><label for="sPhone">Phone *</label><input id="sPhone" type="tel" required placeholder="+91 98XXX XXXXX"></div>
+          <div class="field"><label for="sCountry">Destination *</label>
+            <select id="sCountry" required>
+              <option value="">Select destination</option>
+              <option>Canada</option><option>United Kingdom</option><option>United States</option><option>Germany</option><option>Australia</option><option>UAE</option><option>France</option><option>Ireland</option><option>Hungary</option><option>New Zealand</option>
+            </select>
+          </div>
+          <div class="field full"><label for="sService">Service required *</label>
+            <select id="sService" required>
+              <option value="">Select service</option>
+            </select>
+          </div>
+          <div class="field full"><label for="sNote">Notes for the service desk <span style="color:var(--ink-soft);font-weight:400">(optional)</span></label><input id="sNote" placeholder="e.g. Visa interview on 18 Oct — needs GIC before 10 Oct"></div>
+          <div class="full m-cta" style="margin-top:.4rem">
+            <button type="submit" class="btn btn-primary btn-lg">Submit Referral</button>
+            <button type="button" class="btn btn-ghost btn-lg" data-close-modal="addStudentModal">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== WITHDRAW MODAL ===== -->
+  <div class="modal-veil" id="withdrawModal" role="dialog" aria-modal="true">
+    <div class="modal">
+      <div class="modal-hero">
+        <button class="modal-close" aria-label="Close">✕</button>
+        <h3 style="position:relative;z-index:1">Withdraw funds</h3>
+        <p style="position:relative;z-index:1">To your registered bank account · processed within 1 working day.</p>
+      </div>
+      <div class="modal-body">
+        <form id="withdrawForm">
+          <div class="field"><label for="wdAmount">Amount (₹) *</label><input id="wdAmount" type="number" min="500" step="100" required placeholder="Minimum ₹500"></div>
+          <div class="field"><label for="wdAccount">Bank account</label>
+            <select id="wdAccount"><option>HDFC Bank •••• 4821 (primary)</option><option>Add a new account…</option></select>
+          </div>
+          <p style="font-size:.8rem;color:var(--ink-soft);margin:.4rem 0 1.1rem">Available: <b id="wdAvail" style="color:var(--navy)">₹0</b></p>
+          <div class="m-cta">
+            <button type="submit" class="btn btn-green btn-lg">Request Withdrawal</button>
+            <button type="button" class="btn btn-ghost btn-lg" data-close-modal="withdrawModal">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== REQUEST DIALOG (case detail: docs + chat + RM) ===== -->
+  <div class="modal-veil" id="reqModal" role="dialog" aria-modal="true">
+    <div class="modal">
+      <div class="modal-hero">
+        <button class="modal-close" aria-label="Close">✕</button>
+        <div class="req-head-row">
+          <div>
+            <h3 id="reqTitle" style="position:relative;z-index:1"></h3>
+            <p id="reqMeta" style="position:relative;z-index:1"></p>
+          </div>
+          <span class="status" id="reqStatusChip">In Progress</span>
+        </div>
+        <div class="reqprog">
+          <div class="prog-track"><div class="prog-fill" id="reqProgFill"></div></div>
+          <span id="reqProgPct" style="color:#B9CBE0">0%</span>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="m-sec">
+          <h4>Documents <span class="hint">uploads sync with the service desk</span></h4>
+          <div class="docs-grid" id="reqDocs"></div>
+          <input type="file" id="reqFileInput" hidden>
+        </div>
+        <div class="m-sec">
+          <h4>Case chat <span class="hint">history specific to this request</span></h4>
+          <div class="chat-scroll" id="reqChat"></div>
+          <div class="composer">
+            <input id="reqMsgInput" placeholder="Write a message…" autocomplete="off">
+            <button class="icon-btn" id="reqAttachBtn" aria-label="Attach a file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+            <button class="btn btn-primary btn-sm" id="reqSendBtn">Send</button>
+          </div>
+        </div>
+        <div class="rm-cta">
+          <span class="av">DA</span>
+          <div><b>Diya Amin</b><span>Your Relationship Manager · replies within a day</span></div>
+          <button class="btn btn-green btn-sm" id="reqRmBtn">Chat with RM</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== COMMISSION STRUCTURE DETAIL MODAL ===== -->
+  <div class="modal-veil" id="commModal" role="dialog" aria-modal="true">
+    <div class="modal">
+      <div class="modal-hero">
+        <button class="modal-close" aria-label="Close">✕</button>
+        <h3 id="commModalTitle" style="position:relative;z-index:1">Commission Structure</h3>
+        <p id="commModalSub" style="position:relative;z-index:1"></p>
+      </div>
+      <div class="modal-body">
+        <table class="tbl" id="commModalTable"></table>
+        <button class="btn btn-ghost" data-close-modal="commModal">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== FLOATING RM CHAT ===== -->
+  <div class="rm-drawer" id="rmDrawer" role="dialog" aria-modal="false" aria-label="Chat with Relationship Manager">
+    <div class="rm-head">
+      <span class="av">DA</span>
+      <div><b>Diya Amin</b><i>Online · Relationship Manager</i></div>
+      <button class="x" id="rmClose" aria-label="Close chat">✕</button>
+    </div>
+    <div class="rm-body" id="rmBody"></div>
+    <div class="rm-foot">
+      <input id="rmInput" placeholder="Message Diya…" autocomplete="off">
+      <button class="btn btn-primary btn-sm" id="rmSend">Send</button>
+    </div>
+  </div>
+
+  <script src="assets/js/main.js"></script>
+  <script src="assets/js/dashboard.js"></script>
+</body>
+</html>

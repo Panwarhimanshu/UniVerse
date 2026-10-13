@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Portal — Login & Sign Up | UniVerse</title>
+  <meta name="description" content="Join UniVerse as a partner agent — sign in or create your partner account.">
+  <link rel="icon" type="image/png" href="assets/img/universe-logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <style>
+    .auth-pane{display:none;animation:viewin .35s var(--ease)}
+    .auth-pane.active{display:block}
+    .field-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 .9rem}
+    @media(max-width:520px){.field-grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="auth-page">
+    <a href="index.html" class="back-home">← Back to home</a>
+
+    <aside class="auth-brand">
+      <div class="logo-box"><img src="assets/img/universe-logo.png" alt="UniVerse logo"></div>
+      <h1>Your student's journey, our universe.</h1>
+      <p class="sub">Join 500+ consultants across India earning on nine study-abroad services — from loans to landing kits.</p>
+      <ul class="auth-points">
+        <li><span class="pt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>Same-day partner verification</li>
+        <li><span class="pt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>Dedicated relationship manager</li>
+        <li><span class="pt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>Commission on every completed service</li>
+      </ul>
+    </aside>
+
+    <main class="auth-form-side">
+      <div class="auth-card">
+        <div class="top"><img src="assets/img/universe-logo.png" alt="UniVerse"></div>
+        <div class="auth-tabs" role="tablist">
+          <button class="auth-tab active" data-tab="login" type="button">Sign In</button>
+          <button class="auth-tab" data-tab="signup" type="button">Sign Up</button>
+        </div>
+
+        <!-- LOGIN -->
+        <div class="auth-pane active" data-pane="login">
+          <h2>Agent Login</h2>
+          <p class="muted">Access your referrals, tracking & wallet</p>
+          <form id="agentLoginForm" novalidate>
+            <div class="field">
+              <label for="agentEmail">Email address</label>
+              <div class="ctl">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                <input type="email" id="agentEmail" placeholder="you@agency.com" required autocomplete="email">
+              </div>
+            </div>
+            <div class="field">
+              <label for="agentPassword">Password</label>
+              <div class="ctl">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <input type="password" id="agentPassword" placeholder="••••••••" required autocomplete="current-password">
+              </div>
+            </div>
+            <div class="field">
+              <label for="agentZone">Zone</label>
+              <select id="agentZone" required>
+                <option value="">Select your zone</option>
+                <option value="NORTH">North</option>
+                <option value="SOUTH">South</option>
+                <option value="EAST">East</option>
+                <option value="WEST">West</option>
+              </select>
+            </div>
+            <div class="auth-row">
+              <label class="remember"><input type="checkbox" checked> Remember me</label>
+              <a href="#">Forgot password?</a>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block btn-lg">Sign In to Dashboard</button>
+          </form>
+          <div class="demo-note">Demo build — any details will sign you in.</div>
+        </div>
+
+        <!-- SIGNUP -->
+        <div class="auth-pane" data-pane="signup">
+          <h2>Agent Registration</h2>
+          <p class="muted">Create your partner account in a minute</p>
+          <form id="agentSignupForm" novalidate>
+            <div class="field">
+              <label for="signupName">Full name / agency name *</label>
+              <div class="ctl">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <input type="text" id="signupName" placeholder="e.g. Horizon Overseas" required>
+              </div>
+            </div>
+            <div class="field-grid">
+              <div class="field">
+                <label for="signupEmail">Email address *</label>
+                <input type="email" id="signupEmail" placeholder="you@agency.com" required autocomplete="email">
+              </div>
+              <div class="field">
+                <label for="signupPhone">Phone number *</label>
+                <input type="tel" id="signupPhone" placeholder="+91 98XXX XXXXX" required autocomplete="tel">
+              </div>
+              <div class="field">
+                <label for="signupZone">Zone *</label>
+                <select id="signupZone" required>
+                  <option value="">Select zone</option>
+                  <option value="NORTH">North</option>
+                  <option value="SOUTH">South</option>
+                  <option value="EAST">East</option>
+                  <option value="WEST">West</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="signupCity">City</label>
+                <input type="text" id="signupCity" placeholder="e.g. Vadodara">
+              </div>
+              <div class="field">
+                <label for="signupPassword">Create password *</label>
+                <input type="password" id="signupPassword" placeholder="Min. 8 characters" required minlength="8" autocomplete="new-password">
+              </div>
+              <div class="field">
+                <label for="signupConfirmPassword">Confirm password *</label>
+                <input type="password" id="signupConfirmPassword" placeholder="Repeat password" required minlength="8" autocomplete="new-password">
+              </div>
+            </div>
+            <button type="submit" class="btn btn-green btn-block btn-lg" style="margin-top:.4rem">Create Account</button>
+          </form>
+          <p class="auth-alt">By signing up you agree to our partner terms &amp; data policy.</p>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="assets/js/main.js"></script>
+  <script src="assets/js/auth.js"></script>
+</body>
+</html>
