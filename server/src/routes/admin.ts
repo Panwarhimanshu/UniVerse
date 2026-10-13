@@ -8,7 +8,7 @@ import masterRoutes from './master.js';
 import { serviceByKey } from '../data/catalog.js';
 import { LAST_STEP, progressFor, stepsFor } from '../data/timelines.js';
 import { publicAgent, publicMessage, publicRequest, publicTx } from '../serialize.js';
-import { sendDocFile } from './requests.js';
+import { deleteFile, sendDocFile } from '../files.js';
 
 /* Back office for the UniVerse service desk and relationship managers. */
 const router = Router();
@@ -233,6 +233,7 @@ router.patch('/cases/:id/docs/:docId', async (req, res) => {
     res.locals.audit = `${r.ref}: verified “${d.name}”`;
   } else if (status === 'missing') {
     const reason = String(req.body?.reason ?? '').trim();
+    if (d.file) await deleteFile(d.file);
     d.set({ status: 'missing', file: '', size: 0 });
     await r.save();
     await Message.create({
@@ -250,7 +251,7 @@ router.get('/cases/:id/docs/:docId/file', async (req, res) => {
   const r = await loadCase(req.params.id);
   const d = r.docs.id(String(req.params.docId));
   if (!d?.file) throw new HttpError(404, 'File not found');
-  sendDocFile(res, d.file, d.name);
+  await sendDocFile(res, d.file, d.name);
 });
 
 /* Credit a commission to the partner's wallet for this case */

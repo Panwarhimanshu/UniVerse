@@ -1,34 +1,16 @@
 import { Router } from 'express';
 import multer from 'multer';
-import path from 'node:path';
-import fs from 'node:fs';
 import { Types } from 'mongoose';
 import { ServiceRequest, Student, Message, STATUSES } from '../models/index.js';
 import { accessOf, agentIdOf, HttpError, need } from '../middleware/auth.js';
 import { SERVICES, serviceByKey, DESTINATIONS } from '../data/catalog.js';
 import { publicRequest, publicMessage } from '../serialize.js';
 import { isServiceHidden } from '../content.js';
+import { deleteFile, MAX_UPLOAD_BYTES, saveFile, sendDocFile } from '../files.js';
 
 const router = Router();
 
-export const UPLOAD_DIR = path.resolve(process.cwd(), 'uploads');
-fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: UPLOAD_DIR,
-    filename: (_req, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/[^\w.\-]+/g, '_')}`),
-  }),
-  limits: { fileSize: 10 * 1024 * 1024 },
-});
-
-/** Streams a stored upload, keeping the original extension in the download name. */
-export function sendDocFile(res: import('express').Response, stored: string, label: string) {
-  const full = path.join(UPLOAD_DIR, path.basename(stored));
-  if (!fs.existsSync(full)) throw new HttpError(404, 'File not found');
-  const ext = path.extname(stored);
-  const name = label.toLowerCase().endsWith(ext.toLowerCase()) ? label : label + ext;
-  res.download(full, name.replace(/[^\w.\- ]+/g, '_'));
-}
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_UPLOAD_BYTES } });
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -115,11 +97,13 @@ router.post('/:id/documents', need('upload'), upload.single('file'), async (req,
   const file = req.file;
   if (!file) throw new HttpError(400, 'No file received');
 
+  const fileId = await saveFile(file.buffer, file.originalname, file.mimetype);
   const slot = req.body?.docId ? r.docs.id(req.body.docId) : null;
   if (slot) {
-    slot.set({ file: file.filename, size: file.size, status: 'review' });
+    if (slot.file) await deleteFile(slot.file);
+    slot.set({ file: fileId, size: file.size, status: 'review' });
   } else {
-    r.docs.push({ name: file.originalname, file: file.filename, size: file.size, status: 'review' });
+    r.docs.push({ name: file.originalname, file: fileId, size: file.size, status: 'review' });
   }
   await r.save();
   const by = accessOf(req).name;
@@ -132,7 +116,7 @@ router.get('/:id/documents/:docId/file', async (req, res) => {
   const r = await loadOwned(agentIdOf(req), String(req.params.id));
   const d = r.docs.id(String(req.params.docId));
   if (!d?.file) throw new HttpError(404, 'File not found');
-  sendDocFile(res, d.file, d.name);
+  await sendDocFile(res, d.file, d.name);
 });
 
 export default router;

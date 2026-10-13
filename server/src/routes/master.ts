@@ -1,7 +1,5 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
-import fs from 'node:fs';
-import path from 'node:path';
 import { Types } from 'mongoose';
 import {
   Admin, Agent, AgreementRequest, Article, AuditLog, Message, ServiceContent, ServiceRequest, Setting,
@@ -12,7 +10,7 @@ import { SERVICES, serviceByKey, ZONES } from '../data/catalog.js';
 import { getSettings, loadServiceContent, loadSettings, serviceOverrides } from '../content.js';
 import { publicAgent, publicTeamMember, publicTx } from '../serialize.js';
 import { publicArticle } from './content.js';
-import { UPLOAD_DIR } from './requests.js';
+import { deleteFile } from '../files.js';
 import { EMAIL_RE } from './auth.js';
 
 /* Master admin only (mounted behind masterOnly in admin.ts). */
@@ -169,7 +167,7 @@ router.delete('/partners/:id', async (req, res) => {
   if (String(req.body?.confirm ?? '').trim().toLowerCase() !== a.email) throw new HttpError(400, "Type the partner's email to confirm");
   const reqs = await ServiceRequest.find({ agent: a._id }).select('docs');
   for (const r of reqs) for (const d of r.docs) {
-    if (d.file) fs.rm(path.join(UPLOAD_DIR, path.basename(d.file)), { force: true }, () => {});
+    if (d.file) await deleteFile(d.file);
   }
   await Promise.all([
     Student.deleteMany({ agent: a._id }), ServiceRequest.deleteMany({ agent: a._id }), Message.deleteMany({ agent: a._id }),

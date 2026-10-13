@@ -67,7 +67,14 @@ export async function loadServiceContent() {
   });
 }
 
+let loadedAt = 0;
 export async function loadContent() {
   await loadSettings();
   await loadServiceContent();
+  loadedAt = Date.now();
+}
+
+/** On serverless hosting several copies of the API run at once; re-read edits made through another copy. */
+export async function refreshContentIfStale(maxAgeMs = 30_000) {
+  if (Date.now() - loadedAt > maxAgeMs) await loadContent();
 }
