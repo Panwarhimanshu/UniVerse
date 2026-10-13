@@ -14,6 +14,22 @@ export interface PartnerFull extends Omit<Agent, 'member'> {
   suspended: boolean; wallet: { balance: number; pending: number; lifetime: number }; students: number;
   team: TeamMember[]; transactions: Transaction[];
 }
+export interface Stats {
+  partners: { total: number; newThisMonth: number; suspended: number };
+  students: number;
+  cases: {
+    total: number; byStatus: Record<CaseStatus, number>;
+    byService: { key: string; name: string; count: number }[];
+    monthly: { month: string; count: number }[];
+  };
+  recent: { id: string; ref: string; service: string; status: CaseStatus; createdAt: string; student: string; country: string; partner: string }[];
+  topPartners: { id: string; name: string; verified: boolean; cases: number; open: number; balance: number | null }[];
+  money: {
+    creditedThisMonth: number; paidThisMonth: number; pendingWithdrawals: number; pendingWithdrawalCount: number;
+    monthly: { month: string; amount: number }[];
+  } | null;
+  activity: { id: string; name: string; action: string; at: string }[] | null;
+}
 export interface Activity { id: string; admin: string | null; name: string; action: string; at: string }
 export interface Overview {
   partners: number; unverified: number; openCases: number; docsToReview: number; pendingPayouts: number;
@@ -56,6 +72,7 @@ export const adminApi = {
   me: () => request<StaffUser>('/admin/me'),
   changePassword: (current: string, next: string) => request<{ ok: boolean }>('/admin/password', json('POST', { current, next })),
   overview: () => request<Overview>('/admin/overview'),
+  stats: () => request<Stats>('/admin/stats'),
 
   cases: (f: { status?: string; q?: string; queue?: string; partner?: string }) => request<AdminCase[]>(`/admin/cases${qs(f)}`),
   case: (id: string) => request<CaseDetail>(`/admin/cases/${id}`),

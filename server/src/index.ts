@@ -1,11 +1,11 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import express from 'express';
-import app, { init, useErrorHandler } from './app.js';
+import app, { init } from './app.js';
 
 /*
- * On Vercel the exported app handles requests as a serverless function.
- * Locally it also serves the built website (web/dist) and listens on PORT.
+ * Local entry point: serves the built website (web/dist) and listens on PORT.
+ * On Vercel, app.ts is loaded directly as a serverless function.
  */
 if (!process.env.VERCEL) {
   const webDist = path.resolve(process.cwd(), '../web/dist');
@@ -14,7 +14,6 @@ if (!process.env.VERCEL) {
     app.get(/^(?!\/api\/).*/, (_req, res) => res.sendFile(path.join(webDist, 'index.html')));
   }
 }
-useErrorHandler(app);
 
 if (!process.env.VERCEL) {
   init()

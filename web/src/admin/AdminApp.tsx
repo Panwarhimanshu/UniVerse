@@ -8,6 +8,7 @@ import { useToast } from '../lib/toast';
 import { Bubbles, DOC_ICON, DOC_LABEL, errMsg, Hero, Modal, PasswordModal, useAutoScroll } from '../dashboard/modals';
 import { adminApi, adminToken, setAdminUnauthorized } from './api';
 import type { AdminPartner, AdminTx, AgreementReq, CaseDetail, Section, StaffUser, Thread } from './api';
+import AdminDashboard from './AdminDashboard';
 import { ActivityView, InsightsView, PartnerManageModal, ServicesView, SettingsView, StaffView } from './MasterViews';
 
 const ICON = {
@@ -30,7 +31,7 @@ const ICON = {
 
 type View = 'overview' | Section | 'staff' | 'services' | 'insights' | 'settings' | 'activity';
 const TITLES: Record<View, string> = {
-  overview: 'Overview', cases: 'Cases', partners: 'Partners', messages: 'RM messages', payouts: 'Payouts', agreements: 'Agreement requests',
+  overview: 'Dashboard', cases: 'Cases', partners: 'Partners', messages: 'RM messages', payouts: 'Payouts', agreements: 'Agreement requests',
   staff: 'Staff accounts', services: 'Services', insights: 'Insights', settings: 'Settings', activity: 'Activity log',
 };
 const DESK: View[] = ['overview', 'cases', 'partners', 'messages', 'payouts', 'agreements'];
@@ -160,7 +161,7 @@ function Console({ staff, signOut }: { staff: StaffUser; signOut: () => void }) 
           <button onClick={() => { signOut(); toast("You've been signed out."); }}><Svg html={ICON.logout} />Log out</button>
         </div>
         <main className="dash-main">
-          {view === 'overview' && <OverviewView go={go} data={o} canUse={canUse} />}
+          {view === 'overview' && <AdminDashboard go={(v, f) => go(v as View, f)} canUse={(v) => canUse(v as View)} isMaster={isMaster} name={staff.name} overview={o ?? null} />}
           {view === 'cases' && <CasesView initial={caseFilter} onChanged={overview.reload} />}
           {view === 'partners' && <PartnersView isMaster={isMaster} openCases={canUse('cases') ? (id) => go('cases', { partner: id }) : undefined} />}
           {view === 'messages' && <MessagesView onChanged={overview.reload} />}
@@ -175,41 +176,6 @@ function Console({ staff, signOut }: { staff: StaffUser; signOut: () => void }) 
       </div>
       <PasswordModal open={pwOpen} onClose={() => setPwOpen(false)} save={adminApi.changePassword} min={10} />
     </>
-  );
-}
-
-/* ---------- overview: what needs attention ---------- */
-function OverviewView({ go, data, canUse }: {
-  go: (v: View, f?: { queue?: string }) => void; data: ReturnType<typeof useApi<import('./api').Overview>>['data']; canUse: (v: View) => boolean;
-}) {
-  const all: [View, string, number | undefined, string, () => void][] = [
-    ['cases', 'Case messages waiting for a reply', data?.casesAwaitingReply, 'b', () => go('cases', { queue: 'awaiting' })],
-    ['cases', 'Documents to review', data?.docsToReview, 'a', () => go('cases', { queue: 'review' })],
-    ['messages', 'RM messages waiting for a reply', data?.rmAwaitingReply, 'g', () => go('messages')],
-    ['payouts', 'Payouts to settle', data?.pendingPayouts, 'n', () => go('payouts')],
-    ['agreements', 'Open agreement requests', data?.openAgreementRequests, 'a', () => go('agreements')],
-    ['partners', 'Partners awaiting verification', data?.unverified, 'b', () => go('partners')],
-  ];
-  const cards = all.filter(([v]) => canUse(v)).map(([, ...rest]) => rest);
-  return (
-    <section className="view active">
-      <div className="d-cards adm-queue">
-        {cards.map(([label, n, ic, onClick]) => (
-          <button className="d-card" key={label} onClick={onClick}>
-            <span className={`num${n ? '' : ' zero'}`}>{n ?? '–'}</span>
-            <span className="lbl">{label}</span>
-            <span className={`adm-dot ${ic}`}></span>
-          </button>
-        ))}
-      </div>
-      <div className="panel">
-        <div className="panel-h"><h3>Network</h3></div>
-        <div className="panel-b adm-facts">
-          <div><b>{data?.partners ?? '–'}</b><span>Partner accounts</span></div>
-          <div><b>{data?.openCases ?? '–'}</b><span>Open cases</span></div>
-        </div>
-      </div>
-    </section>
   );
 }
 

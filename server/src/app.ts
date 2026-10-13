@@ -89,15 +89,14 @@ api.use('/', requireAuth, partnerRoutes);
 api.use('/', requireAuth, miscRoutes);
 app.use('/api', api);
 
-export function useErrorHandler(a: express.Express) {
-  a.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-    if (err instanceof HttpError) return res.status(err.status).json({ error: err.message });
-    if (err && typeof err === 'object' && 'code' in err && err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(413).json({ error: `File is larger than ${MAX_UPLOAD_BYTES / 1024 / 1024} MB` });
-    }
-    console.error(err);
-    res.status(500).json({ error: 'Something went wrong' });
-  });
-}
+/* Errors become JSON for the client. Registered here so it applies on Vercel, which loads this file directly. */
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  if (err instanceof HttpError) return res.status(err.status).json({ error: err.message });
+  if (err && typeof err === 'object' && 'code' in err && err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({ error: `File is larger than ${MAX_UPLOAD_BYTES / 1024 / 1024} MB` });
+  }
+  console.error(err);
+  res.status(500).json({ error: 'Something went wrong' });
+});
 
 export default app;

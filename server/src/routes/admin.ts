@@ -103,6 +103,93 @@ router.get('/overview', async (_req, res) => {
   });
 });
 
+/* ---------- dashboard figures ---------- */
+const monthKeys = (n: number) => {
+  const out: string[] = [];
+  const d = new Date();
+  d.setDate(1);
+  for (let i = n - 1; i >= 0; i--) {
+    const m = new Date(d.getFullYear(), d.getMonth() - i, 1);
+    out.push(`${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}`);
+  }
+  return out;
+};
+
+router.get('/stats', async (req, res) => {
+  const me = adminOf(req);
+  const seesMoney = me.role === 'master' || me.sections.includes('payouts');
+  const months = monthKeys(6);
+  const since = new Date(`${months[0]}-01T00:00:00`);
+  const monthStart = new Date(`${months[months.length - 1]}-01T00:00:00`);
+  const byMonth = (field: string) => ({ $dateToString: { format: '%Y-%m', date: `$${field}`, timezone: 'Asia/Kolkata' } });
+
+  const [partners, newPartners, suspended, students, statusRows, serviceRows, caseMonths, recent, top] = await Promise.all([
+    Agent.countDocuments(),
+    Agent.countDocuments({ createdAt: { $gte: monthStart } }),
+    Agent.countDocuments({ suspended: true }),
+    Student.countDocuments(),
+    ServiceRequest.aggregate([{ $group: { _id: '$status', n: { $sum: 1 } } }]),
+    ServiceRequest.aggregate([{ $group: { _id: '$service', n: { $sum: 1 } } }]),
+    ServiceRequest.aggregate([{ $match: { createdAt: { $gte: since } } }, { $group: { _id: byMonth('createdAt'), n: { $sum: 1 } } }]),
+    ServiceRequest.find().sort({ createdAt: -1 }).limit(6).populate('student', 'name country').populate('agent', 'name agency'),
+    ServiceRequest.aggregate([
+      { $group: { _id: '$agent', cases: { $sum: 1 }, open: { $sum: { $cond: [{ $ne: ['$status', 'Completed'] }, 1, 0] } } } },
+      { $sort: { cases: -1 } }, { $limit: 5 },
+    ]),
+  ]);
+  const topAgents = await Agent.find({ _id: { $in: top.map((t) => t._id) } }).select('name agency verified wallet');
+  const agentById = new Map(topAgents.map((a) => [String(a._id), a]));
+  const status = Object.fromEntries(STATUSES.map((s) => [s, 0]));
+  for (const r of statusRows) status[r._id] = r.n;
+  const caseMonth = new Map(caseMonths.map((r) => [r._id, r.n]));
+
+  let money = null;
+  if (seesMoney) {
+    const [credits, paid, pending, creditMonths] = await Promise.all([
+      Transaction.aggregate([{ $match: { type: 'Credit', status: { $ne: 'Rejected' }, date: { $gte: monthStart } } }, { $group: { _id: null, t: { $sum: '$amount' } } }]),
+      Transaction.aggregate([{ $match: { type: 'Debit', status: 'Completed', date: { $gte: monthStart } } }, { $group: { _id: null, t: { $sum: '$amount' } } }]),
+      Transaction.aggregate([{ $match: { type: 'Debit', status: 'Pending' } }, { $group: { _id: null, t: { $sum: '$amount' }, n: { $sum: 1 } } }]),
+      Transaction.aggregate([
+        { $match: { type: 'Credit', status: { $ne: 'Rejected' }, date: { $gte: since } } },
+        { $group: { _id: byMonth('date'), t: { $sum: '$amount' } } },
+      ]),
+    ]);
+    const cm = new Map(creditMonths.map((r) => [r._id, r.t]));
+    money = {
+      creditedThisMonth: credits[0]?.t ?? 0,
+      paidThisMonth: paid[0]?.t ?? 0,
+      pendingWithdrawals: pending[0]?.t ?? 0,
+      pendingWithdrawalCount: pending[0]?.n ?? 0,
+      monthly: months.map((m) => ({ month: m, amount: cm.get(m) ?? 0 })),
+    };
+  }
+
+  const activity = me.role === 'master'
+    ? (await AuditLog.find({ action: { $ne: 'Signed in' } }).sort({ at: -1 }).limit(8)).map((l) => ({ id: String(l._id), name: l.name, action: l.action, at: l.at }))
+    : null;
+
+  res.json({
+    partners: { total: partners, newThisMonth: newPartners, suspended },
+    students,
+    cases: {
+      total: Object.values(status).reduce((a, b) => a + b, 0),
+      byStatus: status,
+      byService: serviceRows.map((r) => ({ key: r._id, name: serviceByKey(r._id)?.name ?? r._id, count: r.n })).sort((a, b) => b.count - a.count),
+      monthly: months.map((m) => ({ month: m, count: caseMonth.get(m) ?? 0 })),
+    },
+    recent: recent.map((r: any) => ({
+      id: String(r._id), ref: r.ref, service: serviceByKey(r.service)?.name ?? r.service, status: r.status, createdAt: r.createdAt,
+      student: r.student?.name ?? '', country: r.student?.country ?? '', partner: r.agent?.agency || r.agent?.name || '',
+    })),
+    topPartners: top.map((t) => {
+      const a = agentById.get(String(t._id));
+      return { id: String(t._id), name: a?.agency || a?.name || 'Deleted partner', verified: !!a?.verified, cases: t.cases, open: t.open, balance: seesMoney ? a?.wallet?.balance ?? 0 : null };
+    }),
+    money,
+    activity,
+  });
+});
+
 /* ---------- cases ---------- */
 const withPartner = async (list: any[]) => {
   const agents = await Agent.find({ _id: { $in: [...new Set(list.map((r) => String(r.agent)))] } }).select('name agency');
