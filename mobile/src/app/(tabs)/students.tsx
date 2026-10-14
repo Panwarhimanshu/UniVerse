@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { Chips, Empty, ErrorNote, Feather, Header, IconButton, List, Loading, Screen, StatusPill } from '../../components/ui';
 import { api, CaseStatus } from '../../lib/api';
+import { ProfileButton } from '../../components/ProfileButton';
 import { useAccess } from '../../lib/auth';
 import { useApi } from '../../lib/hooks';
 import { shortDate } from '../../lib/format';
@@ -29,7 +30,7 @@ export default function Students() {
 
   return (
     <Screen onRefresh={refresh} refreshing={refreshing}>
-      <Header title="Students" right={can('create') ? <IconButton name="plus" label="Refer a student" onPress={() => router.push('/refer')} /> : undefined} />
+      <Header left={<ProfileButton />} title="Students" right={can('create') ? <IconButton name="plus" label="Refer a student" onPress={() => router.push('/refer')} /> : undefined} />
 
       <View style={styles.search}>
         <Feather name="search" size={16} color={colors.faint} />

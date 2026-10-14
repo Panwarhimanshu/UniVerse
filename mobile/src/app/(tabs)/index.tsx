@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { Avatar, Button, Empty, ErrorNote, Feather, Header, List, Loading, Screen, Section, Stat } from '../../components/ui';
 import { CaseRow } from '../../components/CaseRow';
+import { ProfileButton } from '../../components/ProfileButton';
 import { api } from '../../lib/api';
 import { useAccess, useAuth } from '../../lib/auth';
 import { useApi } from '../../lib/hooks';
@@ -27,6 +28,7 @@ export default function Home() {
   return (
     <Screen onRefresh={() => { refresh(); updates.reload(); }} refreshing={refreshing}>
       <Header
+        left={<ProfileButton />}
         subtitle={greeting()}
         title={myName.split(' ')[0]}
         right={

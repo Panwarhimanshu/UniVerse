@@ -39,9 +39,10 @@ export function Screen({
   );
 }
 
-export function Header({ title, subtitle, right }: { title: string; subtitle?: string; right?: ReactNode }) {
+export function Header({ title, subtitle, right, left }: { title: string; subtitle?: string; right?: ReactNode; left?: ReactNode }) {
   return (
     <View style={styles.header}>
+      {left}
       <View style={{ flex: 1 }}>
         {subtitle ? <Text style={type.small}>{subtitle}</Text> : null}
         <Text style={type.display}>{title}</Text>
@@ -282,7 +283,7 @@ export function ErrorNote({ message, onRetry }: { message: string; onRetry?: () 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   pad: { paddingHorizontal: space.xl, paddingTop: space.lg },
-  header: { flexDirection: 'row', alignItems: 'flex-end', gap: space.md, marginBottom: space.sm },
+  header: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginBottom: space.sm },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: space.sm },
   list: { borderWidth: StyleSheet.hairlineWidth, borderColor: colors.line, borderRadius: radius.md, overflow: 'hidden', backgroundColor: colors.bg },
   listSep: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },

@@ -3,6 +3,7 @@ import { StyleSheet, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { Chips, Empty, ErrorNote, Feather, Header, IconButton, List, Screen } from '../../components/ui';
 import { CaseRow } from '../../components/CaseRow';
+import { ProfileButton } from '../../components/ProfileButton';
 import { api, CaseStatus } from '../../lib/api';
 import { useApi } from '../../lib/hooks';
 import { useAccess } from '../../lib/auth';
@@ -25,7 +26,7 @@ export default function Cases() {
 
   return (
     <Screen onRefresh={refresh} refreshing={refreshing}>
-      <Header title="Cases" right={can('create') ? <IconButton name="plus" label="Refer a student" onPress={() => router.push('/refer')} /> : undefined} />
+      <Header left={<ProfileButton />} title="Cases" right={can('create') ? <IconButton name="plus" label="Refer a student" onPress={() => router.push('/refer')} /> : undefined} />
 
       <View style={styles.search}>
         <Feather name="search" size={16} color={colors.faint} />

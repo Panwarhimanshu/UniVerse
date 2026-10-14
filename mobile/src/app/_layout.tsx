@@ -46,6 +46,7 @@ function Navigator() {
       <Stack.Screen name="team" options={{ title: 'Team members' }} />
       <Stack.Screen name="team-member" options={{ title: 'Team member', presentation: 'modal' }} />
       <Stack.Screen name="password" options={{ title: 'Change password' }} />
+      <Stack.Screen name="profile" options={{ title: 'Profile' }} />
     </Stack>
   );
 }

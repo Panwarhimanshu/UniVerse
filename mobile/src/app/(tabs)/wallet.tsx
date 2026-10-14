@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { Button, Empty, ErrorNote, Header, List, Loading, Row, Screen, Section } from '../../components/ui';
 import { api } from '../../lib/api';
+import { ProfileButton } from '../../components/ProfileButton';
 import { useApi } from '../../lib/hooks';
 import { useAccess } from '../../lib/auth';
 import { inr, shortDate } from '../../lib/format';
@@ -14,7 +15,7 @@ export default function Wallet() {
 
   return (
     <Screen onRefresh={refresh} refreshing={refreshing}>
-      <Header title="Wallet" />
+      <Header left={<ProfileButton />} title="Wallet" />
       {error && !data ? <ErrorNote message={error} onRetry={refresh} /> : null}
 
       {data ? (
