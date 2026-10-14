@@ -45,11 +45,25 @@ The master admin signs in at the same `/admin` page and gets everything staff ha
   or hide a service from the site and new referrals.
 - **Insights**: add, edit and delete the articles on service pages and in the partner What's New feed.
 - **Settings**: support email and phone, minimum withdrawal, commission effective date, default RM for new partners.
+- **App usage**: active partners today, this week and this month; daily users of the app and of the website;
+  the most opened screens; what partners did (referrals, uploads, messages, withdrawals); the most active partners and
+  recent sign-ins. Usage records are kept for 180 days.
 - **Activity log**: every change made in the back office and who made it.
 
 The master login is created at server start from `MASTER_NAME`, `MASTER_EMAIL` and `MASTER_PASSWORD` in `server/.env`
 when no master exists. Content edits are stored in MongoDB and served from `GET /api/content`, so the website and the app
 pick them up without a code change.
+
+### Real figures only
+
+Every number on the public site comes from the database through `GET /api/content` (`stats`): live services, delivery
+partners, destinations, and partners, students and completed services once they exist. Nothing is invented. New
+partners are assigned the "UniVerse Partner Desk" until the master admin sets a relationship manager. The commission
+history is built from real rate changes: when the master admin changes a rate, the previous structure is archived.
+
+Partners and team members can upload a profile photo (JPG, PNG or WebP, up to 2 MB) from the account menu on the
+website or the Profile screen in the app. The partner overview has an analytics section: completion rate, average time
+to complete, documents waiting, referrals and earnings per month, and cases by status and service.
 
 ### Team logins
 
@@ -79,7 +93,8 @@ npm install
 EXPO_PUBLIC_API_URL=http://localhost:4000/api npx expo start --web
 ```
 
-Screens: Home (figures, updates, shortcuts, recent cases, RM) · Cases · Case detail (stage timeline, documents with
+Screens: Home (figures, updates, shortcuts, recent cases, RM) · Analytics (referrals and earnings per month, cases by
+status and service, completion rate) · Profile (photo, details, sign out) · Cases · Case detail (stage timeline, documents with
 upload and download, desk chat) · Students · Student record (edit, raise several services) · Wallet + withdraw ·
 More (profile and bank account, agreement and requests, team members, change password, What's New, services,
 commissions, updates, RM chat) · Sign in / Sign up. Team members only see the tabs and actions their owner allowed.

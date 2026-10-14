@@ -1,6 +1,6 @@
 import { Children, ReactNode, useState } from 'react';
 import {
-  ActivityIndicator, KeyboardAvoidingView, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, TextInputProps, View, ViewStyle,
+  ActivityIndicator, Image, KeyboardAvoidingView, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, TextInputProps, View, ViewStyle,
 } from 'react-native';
 import { SafeAreaView, Edge } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
@@ -250,8 +250,9 @@ export function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function Avatar({ name, size = 40 }: { name: string; size?: number }) {
+export function Avatar({ name, size = 40, uri }: { name: string; size?: number; uri?: string }) {
   const initials = name.trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+  if (uri) return <Image source={{ uri }} accessibilityLabel={name} style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.surface }} />;
   return (
     <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line }}>
       <Text style={{ fontSize: size * 0.36, fontWeight: '600', color: colors.text }}>{initials}</Text>

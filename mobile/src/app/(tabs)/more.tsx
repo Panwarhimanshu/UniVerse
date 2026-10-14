@@ -32,6 +32,7 @@ export default function More() {
       <Section title="Work">
         <List>
           <Row icon="message-circle" title={`Chat with ${agent.rm.name}`} subtitle="Relationship manager" onPress={() => router.push('/rm')} />
+          <Row icon="bar-chart-2" title="Your analytics" subtitle="Referrals, completion and earnings" onPress={() => router.push('/analytics')} />
           {sees('whatsnew') ? <Row icon="book-open" title="What's New" subtitle="Guides and market updates" onPress={() => router.push('/whatsnew')} /> : null}
           {sees('services') ? <Row icon="grid" title="Services" subtitle="Browse and refer into any service" onPress={() => router.push('/services')} /> : null}
           {sees('commissions') ? <Row icon="percent" title="Commission structure" onPress={() => router.push('/commissions')} /> : null}

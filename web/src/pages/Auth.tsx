@@ -3,7 +3,7 @@ import type { FormEvent, ReactNode } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { SITE } from '../lib/content';
+import { SITE, STATS } from '../lib/content';
 import { useToast } from '../lib/toast';
 
 const LOGO = '/img/universe-logo.png';
@@ -160,7 +160,7 @@ export function AgentLogin() {
   return (
     <AuthShell
       title="Your student's journey, our universe."
-      sub="Join 500+ consultants across India earning on nine study-abroad services, from loans to landing kits."
+      sub={`${STATS.partners > 1 ? `Join ${STATS.partners} consultants earning` : 'Earn'} on ${STATS.services} study-abroad services, from loans to landing kits.`}
       points={['Same-day partner verification', 'Dedicated relationship manager', 'Commission on every completed service']}
     >
       <div className="top"><img src={LOGO} alt="UniVerse" /></div>

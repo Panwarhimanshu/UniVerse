@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { Platform, Pressable, Text, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { Avatar, Button, Field, List, Row, Screen, Section, StatusPill } from '../components/ui';
-import { api } from '../lib/api';
+import { api, avatarUrl } from '../lib/api';
 import { useAccess, useAuth } from '../lib/auth';
-import { confirm, errorText } from '../lib/dialog';
+import { confirm, errorText, notify } from '../lib/dialog';
 import { longDate } from '../lib/format';
 import { colors, space, type } from '../theme';
 
@@ -19,7 +20,36 @@ export default function Profile() {
   const [form, setForm] = useState({ name: '', phone: '', agency: '', city: '', bankAccount: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [photoBusy, setPhotoBusy] = useState(false);
   if (!agent) return null;
+  const photo = member ? member.avatar : agent.avatar;
+
+  const pickPhoto = async () => {
+    const picked = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.7 });
+    if (picked.canceled || !picked.assets[0]) return;
+    const a = picked.assets[0];
+    if (a.fileSize && a.fileSize > 2 * 1024 * 1024) return notify('Photo too large', 'Choose a photo of 2 MB or less.');
+    const mimeType = a.mimeType && /^image\/(jpeg|png|webp|heic|heif)$/.test(a.mimeType) ? a.mimeType : 'image/jpeg';
+    setPhotoBusy(true);
+    try {
+      setAgent(await api.uploadAvatar({ uri: a.uri, name: a.fileName ?? `photo.${mimeType.split('/')[1]}`, mimeType, file: Platform.OS === 'web' ? a.file : undefined }));
+    } catch (e) {
+      notify('Could not update your photo', errorText(e, 'Please try again.'));
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+  const removePhoto = async () => {
+    if (!(await confirm('Remove your photo?', 'Your initials will show instead.', 'Remove', true))) return;
+    setPhotoBusy(true);
+    try {
+      setAgent(await api.removeAvatar());
+    } catch (e) {
+      notify('Could not remove your photo', errorText(e, 'Please try again.'));
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
 
   const startEdit = () => {
     setForm({ name: agent.name, phone: agent.phone, agency: agent.agency, city: agent.city, bankAccount: agent.bankAccount });
@@ -45,8 +75,16 @@ export default function Profile() {
   return (
     <Screen edges={['bottom']} keyboardOffset={headerHeight}>
       <View style={{ alignItems: 'center', paddingVertical: space.lg, gap: space.sm }}>
-        <Avatar name={member?.name ?? agent.name} size={76} />
-        <Text style={[type.title, { marginTop: space.sm }]}>{member?.name ?? agent.name}</Text>
+        <Pressable onPress={pickPhoto} disabled={photoBusy} accessibilityLabel="Change profile photo" style={({ pressed }) => pressed && { opacity: 0.7 }}>
+          <Avatar name={member?.name ?? agent.name} size={84} uri={avatarUrl(photo)} />
+        </Pressable>
+        <View style={{ flexDirection: 'row', gap: space.lg }}>
+          <Text style={{ color: colors.accent, fontWeight: '600', fontSize: 13 }} onPress={photoBusy ? undefined : pickPhoto}>
+            {photoBusy ? 'Saving…' : photo ? 'Change photo' : 'Add a photo'}
+          </Text>
+          {photo && !photoBusy ? <Text style={{ color: colors.muted, fontWeight: '600', fontSize: 13 }} onPress={removePhoto}>Remove</Text> : null}
+        </View>
+        <Text style={[type.title, { marginTop: space.xs }]}>{member?.name ?? agent.name}</Text>
         <Text style={type.small}>{member?.email ?? agent.email}</Text>
         {member ? (
           <StatusPill status="In Progress" label={`${member.role} · ${agent.agency || agent.name}`} />

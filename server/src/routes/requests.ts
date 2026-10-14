@@ -6,6 +6,7 @@ import { accessOf, agentIdOf, HttpError, need } from '../middleware/auth.js';
 import { SERVICES, serviceByKey, DESTINATIONS } from '../data/catalog.js';
 import { publicRequest, publicMessage } from '../serialize.js';
 import { isServiceHidden } from '../content.js';
+import { track } from '../usage.js';
 import { deleteFile, MAX_UPLOAD_BYTES, saveFile, sendDocFile } from '../files.js';
 
 const router = Router();
@@ -67,6 +68,7 @@ router.post('/', need('create'), async (req, res) => {
   const created = await openCase(agentId, student._id, svc.key, note ?? '');
 
   const full = await created.populate('student');
+  track(req, agentId, accessOf(req).memberId, 'referral_created');
   res.status(201).json(publicRequest(full));
 });
 
@@ -87,6 +89,7 @@ router.post('/:id/messages', need('chat'), async (req, res) => {
   if (!text) throw new HttpError(400, 'Message is empty');
   if (text.length > 2000) throw new HttpError(400, 'Message is too long');
   const m = await Message.create({ agent: agentId, request: r._id, from: 'agent', author: accessOf(req).name, text });
+  track(req, agentId, accessOf(req).memberId, 'message_sent');
   res.status(201).json(publicMessage(m));
 });
 
@@ -108,6 +111,7 @@ router.post('/:id/documents', need('upload'), upload.single('file'), async (req,
   await r.save();
   const by = accessOf(req).name;
   await Message.create({ agent: agentId, request: r._id, from: 'system', text: `${by || 'You'} uploaded “${file.originalname}”` });
+  track(req, agentId, accessOf(req).memberId, 'document_uploaded');
   res.status(201).json(publicRequest(r));
 });
 

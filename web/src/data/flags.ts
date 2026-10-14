@@ -58,6 +58,16 @@ export const flagSvg = (code: string) =>
     ? `<svg viewBox="0 0 640 480" role="img" aria-label="${code.toUpperCase()} flag" preserveAspectRatio="xMidYMid slice">${FLAGS[code]}</svg>`
     : '';
 
+/** Flag code and short label for each destination name the server uses */
+const DEST_CODES: Record<string, [string, string]> = {
+  Canada: ['ca', 'Canada'], 'United Kingdom': ['gb', 'UK'], 'United States': ['us', 'USA'], Germany: ['de', 'Germany'],
+  Australia: ['au', 'Australia'], UAE: ['ae', 'UAE'], France: ['fr', 'France'], Ireland: ['ie', 'Ireland'],
+  Hungary: ['hu', 'Hungary'], 'New Zealand': ['nz', 'New Zealand'], Singapore: ['sg', 'Singapore'], Italy: ['it', 'Italy'],
+  Netherlands: ['nl', 'Netherlands'], Sweden: ['se', 'Sweden'], Japan: ['jp', 'Japan'], Spain: ['es', 'Spain'], India: ['in', 'India'],
+};
+export const destinationFlags = (names: string[]): [string, string][] =>
+  names.map((n) => DEST_CODES[n] ?? ['', n]);
+
 export const DESTINATION_FLAGS: [string, string][] = [
   ['ca', 'Canada'], ['us', 'USA'], ['gb', 'UK'], ['au', 'Australia'], ['de', 'Germany'], ['nz', 'New Zealand'], ['ie', 'Ireland'],
   ['ae', 'UAE'], ['sg', 'Singapore'], ['fr', 'France'], ['it', 'Italy'], ['nl', 'Netherlands'], ['se', 'Sweden'], ['jp', 'Japan'], ['es', 'Spain'],

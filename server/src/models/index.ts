@@ -13,9 +13,9 @@ const agentSchema = new Schema(
     verified: { type: Boolean, default: false },
     suspended: { type: Boolean, default: false }, // set by the master admin; blocks sign-in
     rm: {
-      name: { type: String, default: 'Diya Amin' },
-      email: { type: String, default: 'diya.a@universe.com' },
-      phone: { type: String, default: '+91 98250 11024' },
+      name: { type: String, default: 'UniVerse Partner Desk' },
+      email: { type: String, default: 'vas@universe.com' },
+      phone: { type: String, default: '+91 63596 66055' },
     },
     agreement: {
       number: { type: String, default: '' }, // UV/AGR/2026/01847
@@ -29,6 +29,7 @@ const agentSchema = new Schema(
       lifetime: { type: Number, default: 0 },
     },
     bankAccount: { type: String, default: '' }, // e.g. "HDFC Bank •••• 4821", required before withdrawing
+    avatar: { type: String, default: '' }, // GridFS id of the profile photo
   },
   { timestamps: true },
 );
@@ -122,6 +123,7 @@ const teamSchema = new Schema(
     perms: [{ type: String, enum: PERMS }],
     passwordHash: { type: String, select: false },
     lastLoginAt: { type: Date, default: null },
+    avatar: { type: String, default: '' }, // GridFS id of the member's profile photo
   },
   { timestamps: true },
 );
@@ -191,9 +193,9 @@ const settingSchema = new Schema(
     supportPhone: { type: String, default: '+91 63596 66055' },
     commissionEffective: { type: String, default: 'July 2026' },
     defaultRm: {
-      name: { type: String, default: 'Diya Amin' },
-      email: { type: String, default: 'diya.a@universe.com' },
-      phone: { type: String, default: '+91 98250 11024' },
+      name: { type: String, default: 'UniVerse Partner Desk' },
+      email: { type: String, default: 'vas@universe.com' },
+      phone: { type: String, default: '+91 63596 66055' },
     },
     articlesImported: { type: Boolean, default: false }, // insights moved from the built-in list into the database
   },
@@ -211,3 +213,30 @@ const auditSchema = new Schema(
   { versionKey: false },
 );
 export const AuditLog = model('AuditLog', auditSchema);
+
+/* ---------- Commission structures that were replaced (recorded when the master admin changes a rate) ---------- */
+const commissionArchiveSchema = new Schema(
+  {
+    effective: { type: String, required: true }, // e.g. "July 2026 – October 2026"
+    items: [{ type: [String] }], // [service name, payout]
+  },
+  { timestamps: true },
+);
+export const CommissionArchive = model('CommissionArchive', commissionArchiveSchema);
+
+/* ---------- App and website usage, recorded by our own server (no third-party tracking) ---------- */
+const usageSchema = new Schema(
+  {
+    agent: { type: Schema.Types.ObjectId, ref: 'Agent', index: true },
+    member: { type: Schema.Types.ObjectId, ref: 'TeamMember', default: null },
+    platform: { type: String, enum: ['app', 'web'], required: true },
+    os: { type: String, default: '' }, // android / ios / web
+    event: { type: String, required: true }, // screen_view, sign_in, referral_created, ...
+    screen: { type: String, default: '' },
+    at: { type: Date, default: Date.now },
+  },
+  { versionKey: false },
+);
+usageSchema.index({ at: 1 }, { expireAfterSeconds: 180 * 24 * 3600 }); // keep 6 months
+usageSchema.index({ event: 1, at: -1 });
+export const UsageEvent = model('UsageEvent', usageSchema);

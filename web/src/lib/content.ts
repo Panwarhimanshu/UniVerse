@@ -10,6 +10,10 @@ export interface ServiceOverride { key: string; hidden: boolean; data: Partial<S
 export interface Article extends Blog { id: string; service: string }
 export interface SiteSettings { supportEmail: string; supportPhone: string; commissionEffective: string; minWithdrawal: number }
 
+/** Live figures from the database, shown on the public site. Zero until real partners and students exist. */
+export interface SiteStats { partners: number; students: number; completedCases: number; services: number; deliveryPartners: number; destinations: string[] }
+export const STATS: SiteStats = { partners: 0, students: 0, completedCases: 0, services: 9, deliveryPartners: 0, destinations: [] };
+
 export const SITE: SiteSettings = {
   supportEmail: 'vas@universe.com', supportPhone: '+91 63596 66055', commissionEffective: 'July 2026', minWithdrawal: 500,
 };
@@ -21,7 +25,8 @@ export const builtInArticles = () => Object.entries(BASE_BLOGS).flatMap(([servic
 
 const EDITABLE = ['name', 'short', 'cardText', 'about', 'tat', 'countries', 'kpis', 'feats', 'partners', 'steps'] as const;
 
-export function applyContent(c: { services: ServiceOverride[]; articles: Article[] | null; settings: SiteSettings }) {
+export function applyContent(c: { services: ServiceOverride[]; articles: Article[] | null; settings: SiteSettings; stats?: SiteStats }) {
+  if (c.stats) Object.assign(STATS, c.stats);
   SERVICES.forEach((s, i) => {
     const o = c.services.find((x) => x.key === s.key);
     const next: Service = structuredClone(BASE_SERVICES[i]);

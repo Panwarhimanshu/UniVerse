@@ -2,7 +2,9 @@ import { Router } from 'express';
 import { Types } from 'mongoose';
 import { Agent, Message, ServiceRequest, Student, Transaction } from '../models/index.js';
 import { accessOf, agentIdOf, HttpError, need, needMenu } from '../middleware/auth.js';
-import { SERVICES, COMMISSION_HISTORY, DESTINATIONS, serviceByKey } from '../data/catalog.js';
+import { SERVICES, DESTINATIONS, serviceByKey } from '../data/catalog.js';
+import { CommissionArchive } from '../models/index.js';
+import { track } from '../usage.js';
 import { publicMessage, publicRequest, publicTx } from '../serialize.js';
 import { getSettings, isServiceHidden } from '../content.js';
 
@@ -10,16 +12,20 @@ const router = Router();
 
 /* ---------- catalogue ---------- */
 router.get('/services', (_req, res) => res.json(SERVICES.filter((s) => !isServiceHidden(s.key))));
-router.get('/commissions', (_req, res) =>
+router.get('/commissions', async (_req, res) =>
   res.json({
     rates: SERVICES.filter((s) => !isServiceHidden(s.key)).map((s) => ({ key: s.key, icon: s.icon, name: s.name, ...s.commission })),
+    // the live structure, then every structure the master admin has replaced, newest first
     history: [
       {
-        ...COMMISSION_HISTORY[0],
+        id: 'current', title: 'Current structure', status: 'Active',
         effective: `${getSettings().commissionEffective} – present`,
         items: SERVICES.filter((s) => !isServiceHidden(s.key)).map((s) => [s.name, `${s.commission.amount} ${s.commission.note}`]),
       },
-      ...COMMISSION_HISTORY.slice(1),
+      ...(await CommissionArchive.find().sort({ createdAt: -1 }).limit(12)).map((a, i) => ({
+        id: i === 0 ? 'previous' : String(a._id), title: i === 0 ? 'Previous structure' : 'Earlier structure',
+        status: 'Archived', effective: a.effective, items: a.items,
+      })),
     ],
   }),
 );
@@ -91,6 +97,7 @@ router.post('/wallet/withdraw', need('withdraw'), async (req, res) => {
   const tx = await Transaction.create({
     agent: agentId, description: `Withdrawal to ${agent.bankAccount}`, type: 'Debit', amount, status: 'Pending',
   });
+  track(req, agentId, accessOf(req).memberId, 'withdrawal_requested');
   res.status(201).json({ balance: agent.wallet?.balance, transaction: publicTx(tx) });
 });
 
@@ -106,6 +113,7 @@ router.post('/rm/messages', need('chat'), async (req, res) => {
   if (!text) throw new HttpError(400, 'Message is empty');
   if (text.length > 2000) throw new HttpError(400, 'Message is too long');
   const m = await Message.create({ agent: agentId, request: null, from: 'agent', author: accessOf(req).name, text });
+  track(req, agentId, accessOf(req).memberId, 'message_sent');
   res.status(201).json(publicMessage(m));
 });
 

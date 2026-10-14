@@ -74,6 +74,7 @@ export default function Home() {
           ) : null}
 
           <View style={styles.shortcuts}>
+            <Shortcut icon="bar-chart-2" label="Analytics" onPress={() => router.push('/analytics')} />
             {sees('whatsnew') ? <Shortcut icon="book-open" label="What's New" onPress={() => router.push('/whatsnew')} /> : null}
             {sees('services') ? <Shortcut icon="grid" label="Services" onPress={() => router.push('/services')} /> : null}
             {sees('commissions') ? <Shortcut icon="percent" label="Commissions" onPress={() => router.push('/commissions')} /> : null}
@@ -123,7 +124,7 @@ export default function Home() {
   );
 }
 
-function Shortcut({ icon, label, onPress }: { icon: 'book-open' | 'grid' | 'percent'; label: string; onPress: () => void }) {
+function Shortcut({ icon, label, onPress }: { icon: 'bar-chart-2' | 'book-open' | 'grid' | 'percent'; label: string; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.shortcut, pressed && { opacity: 0.7 }]}>
       <Feather name={icon} size={18} color={colors.text} />

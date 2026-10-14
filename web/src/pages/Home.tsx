@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Counter, Flag, ServiceCard, ServiceQuickModal, SiteFooter, SiteNav, Svg } from '../components/site';
-import { DESTINATION_FLAGS } from '../data/flags';
+import { destinationFlags } from '../data/flags';
 import { ICONS } from '../data/services';
-import { SITE, visibleServices } from '../lib/content';
+import { SITE, STATS, visibleServices } from '../lib/content';
 import { useReveal } from '../lib/hooks';
 
 /* ---------- hero typewriter ---------- */
@@ -84,7 +84,7 @@ const WHY = [
     art: `<svg viewBox="0 0 200 90"><circle class="glow" cx="102" cy="45" r="26" fill="#2FA84F" opacity=".14"/><polygon points="108 10 84 44 100 44 94 78 126 38 108 38" fill="#0A66C2"/><line class="speed" x1="16" y1="30" x2="58" y2="30" stroke="#0A66C2" stroke-linecap="round" stroke-width="5"/><line class="speed s2" x1="8" y1="46" x2="48" y2="46" stroke="#2FA84F" stroke-linecap="round" stroke-width="5"/><line class="speed s3" x1="16" y1="62" x2="58" y2="62" stroke="#0A66C2" stroke-linecap="round" stroke-width="5" opacity=".5"/></svg>` },
   { h: 'Transparent tracking', p: 'Live status, payout triggers and audit trails on every case: manage student expectations with confidence.', d: 0,
     art: `<svg viewBox="0 0 200 90"><line x1="30" y1="78" x2="180" y2="78" stroke="#CBD9E8" stroke-width="2"/><rect class="chart-bar" x="50" y="46" width="24" height="32" rx="6" fill="#B9CBE0"/><rect class="chart-bar c2" x="92" y="30" width="24" height="48" rx="6" fill="#1B85E8"/><rect class="chart-bar c3" x="134" y="14" width="24" height="64" rx="6" fill="#2FA84F"/><polyline class="trend-line" points="42,40 98,22 156,8" fill="none" stroke="#0B4E97" stroke-width="2.5" stroke-linecap="round"/></svg>` },
-  { h: '15-country coverage', p: 'Canada, USA, UK, Australia, Germany, New Zealand, Ireland, UAE and more, all under one roof.', d: 1,
+  { h: 'Destinations covered', p: 'Every country you can refer students to, under one roof.', d: 1,
     art: `<svg viewBox="0 0 200 90"><circle cx="100" cy="45" r="30" fill="#E7F0FA" stroke="#0A66C2" stroke-width="2"/><ellipse cx="100" cy="45" rx="12" ry="30" fill="none" stroke="#0A66C2" stroke-opacity=".4" stroke-width="1.6"/><line x1="70" y1="45" x2="130" y2="45" stroke="#0A66C2" stroke-opacity=".4" stroke-width="1.6"/><g class="orbitg"><circle cx="100" cy="45" r="42" fill="none" stroke="#2FA84F" stroke-dasharray="3 7" stroke-width="1.6"/><circle cx="142" cy="45" r="4.5" fill="#2FA84F"/></g></svg>` },
   { h: 'Dedicated support', p: 'A named relationship manager plus a service desk that answers within the same business day, in English, Hindi or Gujarati.', d: 2,
     art: `<svg viewBox="0 0 200 90"><circle cx="84" cy="36" r="12" fill="#1B85E8"/><path d="M62 78c2-20 12-30 22-30s20 10 22 30" fill="#D9E7F5"/><circle cx="126" cy="32" r="10" fill="#2FA84F"/><path d="M108 76c2-16 10-24 18-24s16 8 18 24" fill="#DFF3E4"/><rect x="126" y="6" width="58" height="24" rx="9" fill="#fff" stroke="#CBD9E8" stroke-width="1.6"/><circle class="chatdot" cx="140" cy="18" r="3.4" fill="#0A66C2"/><circle class="chatdot d2" cx="153" cy="18" r="3.4" fill="#2FA84F"/><circle class="chatdot d3" cx="166" cy="18" r="3.4" fill="#0A66C2"/><circle class="pulsering" cx="84" cy="36" r="16" fill="none" stroke="#1B85E8" stroke-width="2"/></svg>` },
@@ -94,10 +94,21 @@ const MARQUEE_1 = [['CIBC', 'Canada GIC'], ['BMO', 'Canada GIC'], ['ICICI Bank C
 const MARQUEE_2 = [['IDFC First Bank', 'Education Loan'], ['HDFC Credila', 'Education Loan'], ['Avanse', 'Education Loan'], ['Auxilo', 'Education Loan'], ['Tata Capital', 'Education Loan'], ['Prodigy Finance', 'Education Loan'], ['EbixCash', 'Forex Card'], ['Thomas Cook', 'Forex Card'], ['Allianz Care', 'Insurance'], ['ICICI Lombard', 'Insurance'], ['Tata AIG', 'Insurance'], ['Medibank', 'OSHC'], ['nib', 'OSHC'], ['Vodafone', 'SIM Card'], ['Rogers', 'SIM Card'], ['Telus', 'SIM Card']];
 const MONO: Record<string, string> = { CIBC: 'CI', BMO: 'BM', 'ICICI Bank Canada': 'IC', 'Beacon Money': 'BE', Expatrio: 'EX', Flywire: 'FL', Convera: 'CO', PayMyTuition: 'PM', TransferMate: 'TM', SBI: 'SB', 'Bank of Baroda': 'BB', 'Punjab National Bank': 'PN', 'Union Bank': 'UB', 'Axis Bank': 'AX', 'ICICI Bank': 'IB', 'IDFC First Bank': 'ID', 'HDFC Credila': 'HC', Avanse: 'AV', Auxilo: 'AU', 'Tata Capital': 'TC', 'Prodigy Finance': 'PF', EbixCash: 'EB', 'Thomas Cook': 'TH', 'Allianz Care': 'AL', 'ICICI Lombard': 'IL', 'Tata AIG': 'TA', Medibank: 'ME', nib: 'NI', Vodafone: 'VO', Rogers: 'RO', Telus: 'TE' };
 
+function CountryAnswer() {
+  const list = STATS.destinations;
+  const names = list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}` : list.join('');
+  return (
+    <>
+      {list.length} study destinations: <strong>{names}.</strong> Individual services vary by destination: GIC is Canada-only and OSHC
+      is Australia-only, while loans, remittance and insurance cover every destination.
+    </>
+  );
+}
+
 const FAQ: [string, React.ReactNode][] = [
   ['What exactly is UniVerse?', <>UniVerse is a <strong>B2B value added services marketplace</strong> for immigration consultants and education agents. It consolidates nine student services (education loans, Canada GIC, German blocked accounts, forex remittance, forex cards, insurance, OSHC, accommodation and international SIM cards) into a single platform, so you deal with one partner instead of nine vendors.</>],
   ['Will my student data be shared with competing consultants?', <>No. This is the core design principle of the platform. Student records submitted by you are <strong>ring-fenced to your account</strong> and are never visible to, or shared with, another consultant on the platform. UniVerse is a service provider, not a recruitment competitor.</>],
-  ['Which countries does UniVerse support?', <>Fifteen study destinations: <strong>Canada, the United States, the United Kingdom, Australia, Germany, New Zealand, Ireland, the UAE, Singapore, France, Italy, the Netherlands, Sweden, Japan and Spain.</strong> Individual services vary by destination: GIC is Canada-only and OSHC is Australia-only, while loans, remittance and insurance span all fifteen.</>],
+  ['Which countries does UniVerse support?', <CountryAnswer />],
   ['How do I earn from UniVerse?', <>You earn a commission on every completed service. Payouts trigger on defined events (a funded account, a disbursed loan, an activated SIM, a paid premium) and are credited to your in-platform wallet, withdrawable to your bank account at any time.</>],
   ['How do I become a partner?', <>Register through the partner portal with your agency name, contact details, zone and city. Once verified, you get dashboard access to submit student service requests, track applications live and view your commission wallet.</>],
   ['How long do services take to process?', <>It varies by service: <strong>same day</strong> for insurance and OSHC certificates, <strong>2–3 working days</strong> for fee remittance, <strong>3–5 days</strong> for blocked accounts and SIM delivery, <strong>5–7 days</strong> for Canada GIC, and <strong>7–14 days</strong> for education loan sanction.</>],
@@ -136,7 +147,7 @@ export default function Home() {
         <section className="hero">
           <div className="container hero-grid">
             <div>
-              <span className="hero-badge reveal"><span className="pulse"></span>B2B MARKETPLACE · 500+ PARTNER CONSULTANTS</span>
+              <span className="hero-badge reveal"><span className="pulse"></span>{STATS.partners > 1 ? `B2B MARKETPLACE · ${STATS.partners} PARTNER CONSULTANTS` : 'B2B MARKETPLACE FOR STUDY-ABROAD SERVICES'}</span>
               <h1 className="reveal" data-d="1">
                 <span className="hl-line">One universe for every</span>
                 <span className="hl-line hl-dyn"><Typewriter /><span className="type-caret" aria-hidden="true"></span></span>
@@ -147,15 +158,15 @@ export default function Home() {
                 <Link to="/agent-login?tab=signup" className="btn btn-primary btn-lg">Start Partnering <span className="arr">→</span></Link>
                 <a href="#services" className="btn btn-light btn-lg">Explore Services</a>
               </div>
-              <div className="hero-flags reveal" data-d="4" aria-label="Top 15 study-abroad destinations">
+              <div className="hero-flags reveal" data-d="4" aria-label="Destinations we serve">
                 <span className="hf-label">Where Indian students fly</span>
-                {DESTINATION_FLAGS.map(([c, n]) => <span className="flagchip" key={c}><Flag code={c} />{n}</span>)}
+                {destinationFlags(STATS.destinations).map(([c, n]) => <span className="flagchip" key={n}>{c ? <Flag code={c} /> : null}{n}</span>)}
               </div>
               <div className="hero-stats reveal" data-d="5">
-                <div className="hstat"><div className="num"><Counter to={9} suffix="+" /></div><div className="lbl">VAS Categories</div></div>
-                <div className="hstat"><div className="num"><Counter to={50} suffix="+" /></div><div className="lbl">Banking Partners</div></div>
-                <div className="hstat"><div className="num"><Counter to={15} /></div><div className="lbl">Countries Served</div></div>
-                <div className="hstat"><div className="num"><Counter to={10} suffix="K+" /></div><div className="lbl">Students Served</div></div>
+                <div className="hstat"><div className="num"><Counter to={STATS.services} /></div><div className="lbl">Live Services</div></div>
+                <div className="hstat"><div className="num"><Counter to={STATS.deliveryPartners} /></div><div className="lbl">Delivery Partners</div></div>
+                <div className="hstat"><div className="num"><Counter to={STATS.destinations.length} /></div><div className="lbl">Countries Served</div></div>
+                {STATS.students ? <div className="hstat"><div className="num"><Counter to={STATS.students} /></div><div className="lbl">Students Referred</div></div> : null}
               </div>
             </div>
 
@@ -173,7 +184,7 @@ export default function Home() {
                   ))}
                 </div>
                 <div className="float-card fc1"><b>CAD 23,448</b><i>GIC funded <span className="ok">· complete</span></i></div>
-                <div className="float-card fc2"><b>₹12,200 credited</b><i>Commission <span className="ok">· wallet</span></i></div>
+                <div className="float-card fc2"><b>Commission credited</b><i>Partner wallet <span className="ok">· on completion</span></i></div>
                 <div className="float-card fc3"><b>OSHC issued</b><i>Same-day certificate <span className="ok">· done</span></i></div>
               </div>
             </div>
@@ -253,15 +264,17 @@ export default function Home() {
             <div className="cov-band reveal">
               <div>
                 <h2>Wherever your students fly, we're already there.</h2>
-                <p>Loans, remittance and insurance span all fifteen destinations; country-specific products like GIC, blocked accounts and OSHC activate per market.</p>
+                <p>Loans, remittance and insurance span all {STATS.destinations.length} destinations; country-specific products like GIC, blocked accounts and OSHC activate per market.</p>
                 <div className="cov-stats">
-                  <div className="cov-stat"><b><Counter to={15} /></b><span>Destinations</span></div>
-                  <div className="cov-stat"><b><Counter to={50} suffix="+" /></b><span>Partners</span></div>
-                  <div className="cov-stat"><b><em>₹</em><Counter to={640} suffix=" Cr+" /></b><span>Services facilitated</span></div>
+                  <div className="cov-stat"><b><Counter to={STATS.destinations.length} /></b><span>Destinations</span></div>
+                  <div className="cov-stat"><b><Counter to={STATS.deliveryPartners} /></b><span>Delivery partners</span></div>
+                  {STATS.completedCases
+                    ? <div className="cov-stat"><b><Counter to={STATS.completedCases} /></b><span>Services completed</span></div>
+                    : <div className="cov-stat"><b><Counter to={STATS.services} /></b><span>Live services</span></div>}
                 </div>
               </div>
               <div className="cov-chips">
-                {DESTINATION_FLAGS.map(([c, n]) => <span className="cov-chip" key={c}><Flag code={c} />{n}</span>)}
+                {destinationFlags(STATS.destinations).map(([c, n]) => <span className="cov-chip" key={n}>{c ? <Flag code={c} /> : null}{n}</span>)}
               </div>
             </div>
           </div>
@@ -272,7 +285,7 @@ export default function Home() {
           <div className="container">
             <div className="sec-head reveal">
               <span className="eyebrow">Delivery Partners</span>
-              <h2>Powered by 50+ trusted institutions</h2>
+              <h2>Powered by {STATS.deliveryPartners} delivery partners</h2>
               <p>Banks, insurers, payment platforms and telcos delivering every service behind the scenes.</p>
             </div>
           </div>
@@ -311,7 +324,7 @@ export default function Home() {
             <div className="cta-wrap reveal">
               <div className="cta-inner">
                 <h2>Ready to grow your consultancy?</h2>
-                <p>Join 500+ immigration consultants earning on every service their students need. Onboarding takes minutes, and your relationship manager calls within the day.</p>
+                <p>{STATS.partners > 1 ? `Join ${STATS.partners} immigration consultants earning` : 'Earn'} on every service your students need. Onboarding takes minutes, and your relationship manager calls within the day.</p>
                 <div className="cta-actions">
                   <Link to="/agent-login?tab=signup" className="btn btn-green btn-lg">Become a Partner <span className="arr">→</span></Link>
                   <Link to="/partner-login" className="btn btn-light btn-lg">Partner Login</Link>

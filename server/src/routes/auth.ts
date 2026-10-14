@@ -1,10 +1,13 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
+import multer from 'multer';
 import { Agent, TeamMember } from '../models/index.js';
 import { signToken, requireAuth, agentIdOf, accessOf, ownerOnly, HttpError } from '../middleware/auth.js';
 import { ZONES } from '../data/catalog.js';
 import { publicAgent, publicTeamMember } from '../serialize.js';
 import { getSettings } from '../content.js';
+import { deleteFile, MAX_AVATAR_BYTES, saveFile } from '../files.js';
+import { track } from '../usage.js';
 
 const router = Router();
 export const SUSPENDED = 'This partner account is suspended. Please contact UniVerse support.';
@@ -35,6 +38,7 @@ router.post('/register', async (req, res) => {
     rm: getSettings().defaultRm,
     agreement: { number: `UV/AGR/${now.getFullYear()}/${seq}`, signedAt: now, validTill, autoRenew: true },
   });
+  track(req, agent.id, null, 'sign_up');
   res.status(201).json({ token: signToken(agent.id), agent: { ...publicAgent(agent), member: null } });
 });
 
@@ -46,6 +50,7 @@ router.post('/login', async (req, res) => {
   if (agent) {
     if (!(await bcrypt.compare(password, agent.passwordHash))) throw new HttpError(401, 'Incorrect email or password');
     if (agent.suspended) throw new HttpError(403, SUSPENDED);
+    track(req, agent.id, null, 'sign_in');
     return res.json({ token: signToken(agent.id), agent: { ...publicAgent(agent), member: null } });
   }
 
@@ -60,6 +65,7 @@ router.post('/login', async (req, res) => {
   member.status = 'Active';
   member.lastLoginAt = new Date();
   await member.save();
+  track(req, owner.id, member.id, 'sign_in');
   res.json({ token: signToken(owner.id, member.id), agent: { ...publicAgent(owner), member: publicTeamMember(member) } });
 });
 
@@ -79,6 +85,46 @@ router.patch('/me', requireAuth, ownerOnly, async (req, res) => {
   const agent = await Agent.findByIdAndUpdate(agentIdOf(req), update, { new: true });
   if (!agent) throw new HttpError(404, 'Account not found');
   res.json({ ...publicAgent(agent), member: null });
+});
+
+/* Profile photo for whoever is signed in (the owner, or a team member for their own login) */
+const photo = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_AVATAR_BYTES },
+  fileFilter: (_req, file, cb) => cb(null, /^image\/(jpeg|png|webp|heic|heif)$/.test(file.mimetype)),
+});
+
+const meDoc = async (req: import('express').Request) => {
+  const { memberId } = accessOf(req);
+  const doc = memberId ? await TeamMember.findById(memberId) : await Agent.findById(agentIdOf(req));
+  if (!doc) throw new HttpError(404, 'Account not found');
+  return doc;
+};
+const meJson = async (req: import('express').Request) => {
+  const agent = await Agent.findById(agentIdOf(req));
+  const { memberId } = accessOf(req);
+  const member = memberId ? await TeamMember.findById(memberId) : null;
+  return { ...publicAgent(agent), member: member ? publicTeamMember(member) : null };
+};
+
+router.post('/me/avatar', requireAuth, photo.single('photo'), async (req, res) => {
+  if (!req.file) throw new HttpError(400, 'Choose a JPG, PNG or WebP photo up to 2 MB');
+  const doc = await meDoc(req);
+  const id = await saveFile(req.file.buffer, req.file.originalname || 'photo', req.file.mimetype, 'avatars');
+  const old = doc.avatar;
+  doc.avatar = id;
+  await doc.save();
+  if (old) await deleteFile(old, 'avatars');
+  track(req, agentIdOf(req), accessOf(req).memberId, 'profile_photo');
+  res.json(await meJson(req));
+});
+
+router.delete('/me/avatar', requireAuth, async (req, res) => {
+  const doc = await meDoc(req);
+  if (doc.avatar) await deleteFile(doc.avatar, 'avatars');
+  doc.avatar = '';
+  await doc.save();
+  res.json(await meJson(req));
 });
 
 /* Change your own password (owner or team member) */

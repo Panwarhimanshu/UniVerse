@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
-import { Stack, router, useSegments } from 'expo-router';
+import { useEffect, useRef } from 'react';
+import { Stack, router, usePathname, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { api } from '../lib/api';
 import { AuthProvider, useAuth } from '../lib/auth';
 import { Loading } from '../components/ui';
 import { colors } from '../theme';
@@ -15,6 +16,20 @@ function Navigator() {
   useEffect(() => {
     if (ready && !agent && !inAuth) router.replace('/login');
   }, [ready, agent, inAuth]);
+
+  // screen views for the usage report: sent in small batches, never while signed out
+  const pathname = usePathname();
+  const queue = useRef<string[]>([]);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!agent || inAuth || !pathname) return;
+    queue.current.push(pathname);
+    if (timer.current) return;
+    timer.current = setTimeout(() => {
+      api.trackViews(queue.current.splice(0, 25));
+      timer.current = null;
+    }, 4000);
+  }, [pathname, agent?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!ready) return <Loading />;
 
@@ -47,6 +62,7 @@ function Navigator() {
       <Stack.Screen name="team-member" options={{ title: 'Team member', presentation: 'modal' }} />
       <Stack.Screen name="password" options={{ title: 'Change password' }} />
       <Stack.Screen name="profile" options={{ title: 'Profile' }} />
+      <Stack.Screen name="analytics" options={{ title: 'Your analytics' }} />
     </Stack>
   );
 }

@@ -5,6 +5,7 @@ import { DESTINATIONS, serviceName } from '../data/services';
 import { SITE, visibleServices } from '../lib/content';
 import { api } from '../lib/api';
 import type { Agent, Case, Commissions, Menu, Message, Perm, Student, TeamMember } from '../lib/api';
+import { avatarUrl } from '../lib/api';
 import { fileSize, fmtDate, fmtTime, inr, initials, statusClass, useInterval } from '../lib/hooks';
 import { useToast } from '../lib/toast';
 
@@ -597,6 +598,69 @@ export function StudentModal({ student, canEdit, canCreate, onClose, onChanged }
             {busy ? 'Raising…' : pick.length ? `Raise ${pick.length} request${pick.length > 1 ? 's' : ''}` : 'Raise selected requests'}
           </button>
           </> : null}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/* ---------- profile photo (or initials when there is none) ---------- */
+export function Avatar({ name, photo, size = 32, radius = '50%', className = 'av' }: { name: string; photo?: string; size?: number; radius?: string; className?: string }) {
+  const style = { width: size, height: size, borderRadius: radius, fontSize: Math.round(size * 0.38) };
+  return photo
+    ? <img className={`${className} av-photo`} src={avatarUrl(photo)} alt={name} style={{ ...style, objectFit: 'cover' }} />
+    : <span className={className} style={style}>{initials(name)}</span>;
+}
+
+export function PhotoModal({ open, name, photo, onClose, onSaved }: {
+  open: boolean; name: string; photo: string; onClose: () => void; onSaved: (a: Agent) => void;
+}) {
+  const toast = useToast();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => { if (open) setError(''); }, [open]);
+  const pick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return setError('Choose a JPG, PNG or WebP photo');
+    if (file.size > 2 * 1024 * 1024) return setError('The photo must be 2 MB or smaller');
+    setBusy(true);
+    setError('');
+    try {
+      onSaved(await api.uploadAvatar(file));
+      toast('Profile photo updated.');
+      onClose();
+    } catch (err) {
+      setError(errMsg(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const remove = async () => {
+    setBusy(true);
+    try {
+      onSaved(await api.removeAvatar());
+      toast('Profile photo removed.');
+      onClose();
+    } catch (err) {
+      setError(errMsg(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal open={open} onClose={onClose}>
+      <Hero title="Profile photo" sub="Shown on your dashboard, in the app and to your UniVerse team." onClose={onClose} />
+      <div className="modal-body" style={{ alignItems: 'center', textAlign: 'center' }}>
+        <Avatar name={name} photo={photo} size={112} className="photo-preview" />
+        <input ref={fileRef} type="file" hidden accept="image/jpeg,image/png,image/webp" onChange={pick} />
+        {error ? <p className="form-error">{error}</p> : null}
+        <p style={{ fontSize: '.82rem', color: 'var(--ink-soft)' }}>JPG, PNG or WebP, up to 2 MB. A square photo of your face works best.</p>
+        <div className="m-cta" style={{ justifyContent: 'center' }}>
+          <button className="btn btn-primary" disabled={busy} onClick={() => fileRef.current?.click()}>{busy ? 'Saving…' : photo ? 'Choose another photo' : 'Upload a photo'}</button>
+          {photo ? <button className="btn btn-ghost" disabled={busy} onClick={remove}>Remove photo</button> : null}
         </div>
       </div>
     </Modal>

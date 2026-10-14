@@ -2,12 +2,13 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { Types } from 'mongoose';
 import {
-  Admin, Agent, AgreementRequest, Article, AuditLog, Message, ServiceContent, ServiceRequest, Setting,
+  Admin, Agent, AgreementRequest, Article, AuditLog, CommissionArchive, Message, ServiceContent, ServiceRequest, Setting,
+  UsageEvent,
   STAFF_SECTIONS, Student, TeamMember, Transaction,
 } from '../models/index.js';
 import { adminOf, HttpError } from '../middleware/auth.js';
 import { SERVICES, serviceByKey, ZONES } from '../data/catalog.js';
-import { getSettings, loadServiceContent, loadSettings, serviceOverrides } from '../content.js';
+import { getSettings, isServiceHidden, loadServiceContent, loadSettings, serviceOverrides } from '../content.js';
 import { publicAgent, publicTeamMember, publicTx } from '../serialize.js';
 import { publicArticle } from './content.js';
 import { deleteFile } from '../files.js';
@@ -189,7 +190,22 @@ const servicesWithCurrent = () => serviceOverrides().map((o) => {
 
 router.get('/services', (_req, res) => res.json(servicesWithCurrent()));
 
+/* When a commission rate changes, the structure that was in force is archived so partners see real history. */
+const commissionSnapshot = () => SERVICES.filter((s) => !isServiceHidden(s.key)).map((s) => [s.name, `${s.commission.amount} ${s.commission.note}`]);
+const monthLabel = () => new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' });
+async function archiveIfRatesChanged(before: string[][], rates: Map<string, string>) {
+  const changed = SERVICES.some((s) => rates.get(s.key) !== `${s.commission.amount} ${s.commission.note}`);
+  if (!changed) return;
+  const now = monthLabel();
+  await CommissionArchive.create({ effective: `${getSettings().commissionEffective} – ${now}`, items: before });
+  await Setting.updateOne({ key: 'site' }, { commissionEffective: now });
+  await loadSettings();
+}
+const currentRates = () => new Map(SERVICES.map((s) => [s.key, `${s.commission.amount} ${s.commission.note}`]));
+
 router.put('/services/:key', async (req, res) => {
+  const before = commissionSnapshot();
+  const rates = currentRates();
   const key = String(req.params.key);
   if (!serviceByKey(key)) throw new HttpError(404, 'Service not found');
   const b = req.body?.data ?? {};
@@ -212,13 +228,17 @@ router.put('/services/:key', async (req, res) => {
   }
   await ServiceContent.findOneAndUpdate({ key }, { key, data, hidden: !!req.body?.hidden }, { upsert: true });
   await loadServiceContent();
+  await archiveIfRatesChanged(before, rates);
   res.locals.audit = `Edited service ${serviceByKey(key)?.name}${req.body?.hidden ? ' (hidden)' : ''}`;
   res.json(servicesWithCurrent().find((s) => s.key === key));
 });
 
 router.delete('/services/:key', async (req, res) => {
+  const before = commissionSnapshot();
+  const rates = currentRates();
   await ServiceContent.deleteOne({ key: String(req.params.key) });
   await loadServiceContent();
+  await archiveIfRatesChanged(before, rates);
   res.locals.audit = `Reset service ${serviceByKey(String(req.params.key))?.name ?? req.params.key} to the original text`;
   res.status(204).end();
 });
@@ -302,6 +322,60 @@ router.patch('/settings', async (req, res) => {
   await Setting.updateOne({ key: 'site' }, { $set: set });
   res.locals.audit = 'Updated site settings';
   res.json(await loadSettings());
+});
+
+/* ---------- app and website usage ---------- */
+router.get('/usage', async (req, res) => {
+  const days = Math.min(90, Math.max(7, Number(req.query.days) || 30));
+  const tz = 'Asia/Kolkata';
+  const now = Date.now();
+  const since = new Date(now - days * 864e5);
+  const userKey = { $concat: [{ $toString: '$agent' }, ':', { $ifNull: [{ $toString: '$member' }, 'owner'] }] };
+  const distinctSince = async (ms: number, extra: Record<string, unknown> = {}) =>
+    (await UsageEvent.aggregate([{ $match: { at: { $gte: new Date(now - ms) }, ...extra } }, { $group: { _id: userKey } }, { $count: 'n' }]))[0]?.n ?? 0;
+
+  const [dau, wau, mau, daily, platforms, oses, screens, actions, active, signIns] = await Promise.all([
+    distinctSince(864e5),
+    distinctSince(7 * 864e5),
+    distinctSince(30 * 864e5),
+    UsageEvent.aggregate([
+      { $match: { at: { $gte: since } } },
+      { $group: { _id: { day: { $dateToString: { format: '%Y-%m-%d', date: '$at', timezone: tz } }, platform: '$platform' }, users: { $addToSet: userKey } } },
+      { $project: { _id: 0, day: '$_id.day', platform: '$_id.platform', n: { $size: '$users' } } },
+    ]),
+    UsageEvent.aggregate([{ $match: { at: { $gte: since } } }, { $group: { _id: '$platform', users: { $addToSet: userKey } } }, { $project: { n: { $size: '$users' } } }]),
+    UsageEvent.aggregate([{ $match: { at: { $gte: since }, platform: 'app' } }, { $group: { _id: '$os', users: { $addToSet: userKey } } }, { $project: { n: { $size: '$users' } } }]),
+    UsageEvent.aggregate([{ $match: { at: { $gte: since }, event: 'screen_view' } }, { $group: { _id: { platform: '$platform', screen: '$screen' }, n: { $sum: 1 } } }, { $sort: { n: -1 } }, { $limit: 12 }]),
+    UsageEvent.aggregate([{ $match: { at: { $gte: since }, event: { $ne: 'screen_view' } } }, { $group: { _id: '$event', n: { $sum: 1 } } }, { $sort: { n: -1 } }]),
+    UsageEvent.aggregate([
+      { $match: { at: { $gte: since } } },
+      { $group: { _id: '$agent', events: { $sum: 1 }, lastSeen: { $max: '$at' }, platforms: { $addToSet: '$platform' } } },
+      { $sort: { events: -1 } }, { $limit: 8 },
+    ]),
+    UsageEvent.find({ event: 'sign_in' }).sort({ at: -1 }).limit(10),
+  ]);
+
+  const agentIds = [...new Set([...active.map((a) => String(a._id)), ...signIns.map((s) => String(s.agent))])];
+  const agents = await Agent.find({ _id: { $in: agentIds } }).select('name agency');
+  const nameOf = new Map(agents.map((a) => [String(a._id), a.agency || a.name]));
+  const dayKeys = Array.from({ length: days }, (_, i) =>
+    new Date(now - (days - 1 - i) * 864e5).toLocaleDateString('en-CA', { timeZone: tz }));
+
+  res.json({
+    days,
+    activeUsers: { day: dau, week: wau, month: mau },
+    daily: dayKeys.map((d) => ({
+      day: d,
+      app: daily.find((r) => r.day === d && r.platform === 'app')?.n ?? 0,
+      web: daily.find((r) => r.day === d && r.platform === 'web')?.n ?? 0,
+    })),
+    platforms: Object.fromEntries(platforms.map((p) => [p._id, p.n])),
+    appOs: Object.fromEntries(oses.map((o) => [o._id || 'unknown', o.n])),
+    screens: screens.map((s) => ({ platform: s._id.platform, screen: s._id.screen, views: s.n })),
+    actions: actions.map((a) => ({ event: a._id, count: a.n })),
+    topPartners: active.map((a) => ({ id: String(a._id), name: nameOf.get(String(a._id)) ?? 'Deleted partner', events: a.events, lastSeen: a.lastSeen, platforms: a.platforms })),
+    recentSignIns: signIns.map((s) => ({ name: nameOf.get(String(s.agent)) ?? 'Deleted partner', platform: s.platform, os: s.os, at: s.at })),
+  });
 });
 
 /* ---------- activity log ---------- */

@@ -7,6 +7,8 @@ import { emailTaken } from './auth.js';
 import { DESTINATIONS, serviceByKey } from '../data/catalog.js';
 import { publicMessage, publicStudent, publicTeamMember } from '../serialize.js';
 import { openCase } from './requests.js';
+import { track } from '../usage.js';
+import { accessOf } from '../middleware/auth.js';
 
 const router = Router();
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -72,6 +74,7 @@ router.post('/students/:id/requests', need('create'), async (req, res) => {
   if (!toRaise.length) throw new HttpError(409, 'Those services are already active for this student');
 
   for (const k of toRaise) await openCase(agentId, s._id, k);
+  track(req, agentId, accessOf(req).memberId, 'services_raised');
   const requests = await ServiceRequest.find({ agent: agentId, student: s._id }).sort({ createdAt: 1 });
   res.status(201).json(publicStudent(s, requests));
 });
@@ -150,6 +153,7 @@ router.post('/agreement/requests', ownerOnly, async (req, res) => {
   }
   await AgreementRequest.create({ agent: agentId, type });
   await Message.create({ agent: agentId, request: null, from: 'system', text: AGREEMENT_TEXT[type] });
+  track(req, agentId, null, 'agreement_request');
   res.status(201).json({ ok: true });
 });
 

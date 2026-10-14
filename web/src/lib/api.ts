@@ -6,6 +6,7 @@ export interface Agent {
   id: string; name: string; email: string; phone: string; agency: string; zone: string; city: string; verified: boolean;
   rm: { name: string; email: string; phone: string };
   bankAccount: string;
+  avatar: string;
   agreement: { number: string; signedAt: string; validTill: string | null; autoRenew: boolean };
   partnerSince: string;
   /** set when a team member (not the owner) is signed in */
@@ -32,6 +33,18 @@ export interface Dashboard {
   recent: Case[];
   mix: { key: string; name: string; count: number }[];
 }
+export interface Analytics {
+  totals: {
+    students: number; cases: number; open: number; completed: number; completionRate: number | null;
+    avgDaysToComplete: number | null; docsNeeded: number; docsInReview: number;
+  };
+  byStatus: Record<CaseStatus, number>;
+  byService: { key: string; name: string; count: number }[];
+  monthly: { month: string; count: number }[];
+  money: { balance: number; pending: number; lifetime: number; monthly: { month: string; amount: number }[] } | null;
+}
+/** Profile photos are public images served by the API */
+export const avatarUrl = (id: string) => (id ? `/api/content/avatar/${id}` : '');
 export interface Commissions {
   rates: { key: string; icon: string; name: string; amount: string; note: string }[];
   history: { id: string; title: string; effective: string; status: string; items: [string, string][] }[];
@@ -39,7 +52,7 @@ export interface Commissions {
 export type Menu = 'overview' | 'whatsnew' | 'students' | 'requests' | 'services' | 'wallet' | 'commissions';
 export type Perm = 'create' | 'chat' | 'upload' | 'edit' | 'withdraw';
 export interface TeamMember {
-  id: string; name: string; email: string; role: 'Manager' | 'Staff'; status: 'Pending' | 'Active'; menus: Menu[]; perms: Perm[]; lastLoginAt: string | null;
+  id: string; name: string; email: string; role: 'Manager' | 'Staff'; status: 'Pending' | 'Active'; menus: Menu[]; perms: Perm[]; lastLoginAt: string | null; avatar: string;
 }
 
 export class ApiError extends Error {
@@ -122,6 +135,15 @@ export const api = {
   me: () => request<Agent>('/auth/me'),
   updateMe: (b: Partial<Pick<Agent, 'name' | 'phone' | 'agency' | 'city' | 'bankAccount'>>) => request<Agent>('/auth/me', json('PATCH', b)),
   changePassword: (current: string, next: string) => request<{ ok: boolean }>('/auth/password', json('POST', { current, next })),
+  uploadAvatar: (file: File) => {
+    const form = new FormData();
+    form.append('photo', file);
+    return request<Agent>('/auth/me/avatar', { method: 'POST', body: form });
+  },
+  removeAvatar: () => request<Agent>('/auth/me/avatar', json('DELETE')),
+  analytics: () => request<Analytics>('/analytics'),
+  /** Records a page view for the master admin's usage report. Never throws. */
+  trackView: (screen: string) => { if (store.get()) request('/events', json('POST', { events: [{ event: 'screen_view', screen }] })).catch(() => {}); },
 
   dashboard: () => request<Dashboard>('/dashboard'),
   commissions: () => request<Commissions>('/commissions'),

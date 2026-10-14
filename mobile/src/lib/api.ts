@@ -10,12 +10,13 @@ export type Perm = 'create' | 'chat' | 'upload' | 'edit' | 'withdraw';
 
 export interface TeamMember {
   id: string; name: string; email: string; role: 'Manager' | 'Staff'; status: 'Pending' | 'Active';
-  menus: Menu[]; perms: Perm[]; lastLoginAt: string | null;
+  menus: Menu[]; perms: Perm[]; lastLoginAt: string | null; avatar: string;
 }
 export interface Agent {
   id: string; name: string; email: string; phone: string; agency: string; zone: string; city: string; verified: boolean;
   rm: { name: string; email: string; phone: string };
   bankAccount: string;
+  avatar: string;
   agreement: { number: string; signedAt: string; validTill: string | null; autoRenew: boolean };
   partnerSince: string;
   /** set when a team member (not the owner) is signed in */
@@ -51,6 +52,16 @@ export interface Commissions {
   rates: { key: string; icon: string; name: string; amount: string; note: string }[];
   history: { id: string; title: string; effective: string; status: string; items: [string, string][] }[];
 }
+export interface Analytics {
+  totals: {
+    students: number; cases: number; open: number; completed: number; completionRate: number | null;
+    avgDaysToComplete: number | null; docsNeeded: number; docsInReview: number;
+  };
+  byStatus: Record<CaseStatus, number>;
+  byService: { key: string; name: string; count: number }[];
+  monthly: { month: string; count: number }[];
+  money: { balance: number; pending: number; lifetime: number; monthly: { month: string; amount: number }[] } | null;
+}
 export interface Article { id: string; service: string; t: string; d: string; mins: number; teaser: string; body: string[] }
 export interface SiteContent {
   articles: Article[] | null;
@@ -65,6 +76,8 @@ export const API_URL = (process.env.EXPO_PUBLIC_API_URL || 'https://universeport
 let token: string | null = null;
 let onUnauthorized: ((message: string) => void) | null = null;
 export const setToken = (t: string | null) => { token = t; };
+/** Public address of a profile photo, or '' when there is none */
+export const avatarUrl = (id?: string | null) => (id ? `${API_URL}/content/avatar/${id}` : '');
 export const setUnauthorizedHandler = (fn: (message: string) => void) => { onUnauthorized = fn; };
 
 export class ApiError extends Error {
@@ -72,7 +85,8 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const headers: Record<string, string> = { ...(init.headers as Record<string, string>) };
+  // tells the server which platform the request came from, for the usage report
+  const headers: Record<string, string> = { 'X-Client': 'app', 'X-Client-OS': Platform.OS, ...(init.headers as Record<string, string>) };
   if (token) headers.Authorization = `Bearer ${token}`;
   if (init.body && !(init.body instanceof FormData)) headers['Content-Type'] = 'application/json';
 
@@ -105,6 +119,18 @@ export const api = {
   me: () => request<Agent>('/auth/me'),
   updateMe: (body: Partial<Pick<Agent, 'name' | 'phone' | 'agency' | 'city' | 'bankAccount'>>) => request<Agent>('/auth/me', json('PATCH', body)),
   changePassword: (current: string, next: string) => post<{ ok: boolean }>('/auth/password', { current, next }),
+  uploadAvatar: (f: UploadFile) => {
+    const form = new FormData();
+    if (f.file) form.append('photo', f.file);
+    else form.append('photo', { uri: f.uri, name: f.name, type: f.mimeType ?? 'image/jpeg' } as unknown as Blob);
+    return request<Agent>('/auth/me/avatar', { method: 'POST', body: form });
+  },
+  removeAvatar: () => request<Agent>('/auth/me/avatar', json('DELETE')),
+  analytics: () => request<Analytics>('/analytics'),
+  /** Records which screens are opened, for the master admin's usage report. Never throws. */
+  trackViews: (screens: string[]) => {
+    if (token && screens.length) post('/events', { events: screens.map((screen) => ({ event: 'screen_view', screen })) }).catch(() => {});
+  },
 
   content: () => request<SiteContent>('/content'),
   dashboard: () => request<Dashboard>('/dashboard'),

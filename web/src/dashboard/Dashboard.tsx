@@ -6,11 +6,12 @@ import { serviceByKey, serviceName } from '../data/services';
 import { SITE, visibleServices } from '../lib/content';
 import { api } from '../lib/api';
 import type { Case, Commissions, Menu, Notification, Perm, Student, TeamMember } from '../lib/api';
+import { Columns, monthLabel, Ranked, StatusStack } from '../components/charts';
 import { useAuth } from '../lib/auth';
 import { fmtDate, fmtTime, inr, initials, statusClass, useApi, useInterval } from '../lib/hooks';
 import { useToast } from '../lib/toast';
 import {
-  AgreementModal, CaseModal, CommModal, MENU_LIST, PasswordModal, PERM_LIST, ProfileModal, ReferModal, RmDrawer, StudentModal, UserModal, WithdrawModal,
+  AgreementModal, Avatar, CaseModal, CommModal, MENU_LIST, PasswordModal, PERM_LIST, PhotoModal, ProfileModal, ReferModal, RmDrawer, StudentModal, UserModal, WithdrawModal,
 } from './modals';
 import { buildTimeline } from './timeline';
 
@@ -86,6 +87,7 @@ export default function Dashboard() {
   const wallet = useApi(api.wallet, key, on && sees('wallet'));
   const comms = useApi(api.commissions, key, on && sees('commissions'));
   const team = useApi(api.team, key, on && isOwner);
+  const analytics = useApi(api.analytics, key, on && sees('overview'));
   const refreshCases = useCallback(() => { dash.reload(); cases.reload(); students.reload(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ---------- ui state ---------- */
@@ -105,6 +107,7 @@ export default function Dashboard() {
   const [rmOpen, setRmOpen] = useState(false);
   const [wnFilter, setWnFilter] = useState('all');
   const [pwOpen, setPwOpen] = useState(false);
+  const [photoOpen, setPhotoOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifs, setNotifs] = useState<Notification[]>([]);
   const seenKey = `uv_seen_${agent?.id}_${member?.id ?? 'owner'}`;
@@ -116,6 +119,7 @@ export default function Dashboard() {
   const unread = notifs.filter((n) => n.createdAt > seen).length;
 
   useEffect(() => { document.title = `${TITLES[view]} | UniVerse Partner Portal`; setSideOpen(false); window.scrollTo({ top: 0 }); }, [view]);
+  useEffect(() => { if (agent) api.trackView(`/dashboard/${view}`); }, [view, agent?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const close = () => { setMenuOpen(false); setNotifOpen(false); };
     document.addEventListener('click', close);
@@ -226,7 +230,7 @@ export default function Dashboard() {
           </div>
           <button className="icon-btn" aria-label="Notifications" aria-expanded={notifOpen} onClick={toggleNotifs}><Svg html={I.bell} />{unread ? <span className="dot-n"></span> : null}</button>
           <div className="user-chip" role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); setNotifOpen(false); setMenuOpen(!menuOpen); }}>
-            <span className="av">{initials(myName)}</span><b>{myName}</b>
+            <Avatar name={myName} photo={member ? member.avatar : agent.avatar} /><b>{myName}</b>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
           </div>
         </header>
@@ -243,6 +247,7 @@ export default function Dashboard() {
           {member ? <div className="nm-head"><b>{member.name}</b><span>{member.role} · {agent.agency || agent.name}</span></div> : null}
           {isOwner ? <button onClick={() => go('profile')}><Svg html={I.profile} />My profile</button> : null}
           {sees('wallet') ? <button onClick={() => go('wallet')}><Svg html={I.wallet} />My wallet</button> : null}
+          <button onClick={() => setPhotoOpen(true)}><Svg html={I.profile} />Profile photo</button>
           <button onClick={() => setPwOpen(true)}><Svg html={I.key} />Change password</button>
           <button onClick={() => { signOut(); toast("You've been signed out."); navigate('/partner-login'); }}><Svg html={I.logout} />Log out</button>
         </div>
@@ -257,6 +262,8 @@ export default function Dashboard() {
                 {sees('wallet') ? <StatCard ic="n" icon={I.wallet} value={stats ? inr(stats.balance ?? 0) : '–'} label="Wallet Balance" /> : null}
                 {sees('wallet') ? <StatCard ic="a" icon={I.commissions} value={stats ? inr(stats.monthEarnings ?? 0) : '–'} label={`Earnings · ${month}`} /> : null}
               </div>
+
+              {analytics.data ? <PartnerAnalytics a={analytics.data} money={sees('wallet')} /> : null}
 
               <div className="d-grid">
                 <div className="panel">
@@ -505,7 +512,10 @@ export default function Dashboard() {
                   <div className="panel-h"><h3>Agent profile</h3><button className="btn btn-ghost btn-sm" onClick={() => setProfileOpen(true)}>Edit</button></div>
                   <div className="panel-b">
                     <div style={{ display: 'flex', gap: '1.1rem', alignItems: 'center', marginBottom: '1.4rem' }}>
-                      <span style={{ width: 58, height: 58, borderRadius: 16, background: 'linear-gradient(135deg,var(--blue),var(--blue-deep))', color: '#fff', display: 'grid', placeItems: 'center', font: '800 1.2rem var(--font)' }}>{initials(agent.name)}</span>
+                      <button type="button" className="photo-btn" onClick={() => setPhotoOpen(true)} title="Change profile photo" aria-label="Change profile photo">
+                        <Avatar name={agent.name} photo={agent.avatar} size={58} radius="16px" className="profile-av" />
+                        <span className="photo-edit">Edit</span>
+                      </button>
                       <div>
                         <h3 style={{ fontSize: '1.2rem' }}>{agent.name}</h3>
                         <p style={{ fontSize: '.85rem', color: 'var(--ink-soft)' }}>
@@ -603,6 +613,7 @@ export default function Dashboard() {
         onChanged={(s: Student) => { students.setData((list) => (list ?? []).map((x) => (x.id === s.id ? s : x))); refreshCases(); }} />
       <RmDrawer open={rmOpen} agent={agent} myName={myName} isOwner={isOwner} canChat={can('chat')} onClose={() => { setRmOpen(false); loadNotifs(); }} />
       <PasswordModal open={pwOpen} onClose={() => setPwOpen(false)} />
+      <PhotoModal open={photoOpen} name={myName} photo={(member ? member.avatar : agent.avatar) ?? ''} onClose={() => setPhotoOpen(false)} onSaved={setAgent} />
     </>
   );
 }
@@ -708,5 +719,47 @@ function TeamRow({ name, email, role, status, menus, perms, owner, lastLoginAt, 
         )}
       </td>
     </tr>
+  );
+}
+
+/* ---------- the partner's own figures ---------- */
+function PartnerAnalytics({ a, money }: { a: import('../lib/api').Analytics; money: boolean }) {
+  const t = a.totals;
+  const pct = t.completionRate === null ? '–' : `${Math.round(t.completionRate * 100)}%`;
+  const d = t.avgDaysToComplete === null ? null : Math.round(t.avgDaysToComplete);
+  const days = d === null ? '–' : d < 1 ? 'Under a day' : `${d} day${d === 1 ? '' : 's'}`;
+  return (
+    <>
+      <div className="panel" style={{ marginBottom: '1.4rem' }}>
+        <div className="panel-h"><h3>Your performance</h3><span className="t-sub">All time</span></div>
+        <div className="panel-b pa-facts">
+          <div><b>{pct}</b><span>Cases completed</span></div>
+          <div><b>{days}</b><span>Average time to complete</span></div>
+          <div><b>{t.docsNeeded}</b><span>Documents still needed</span></div>
+          <div><b>{t.docsInReview}</b><span>Documents in review</span></div>
+          {money && a.money ? <div><b>{inr(a.money.pending)}</b><span>Commission pending</span></div> : null}
+        </div>
+      </div>
+      <div className="d-grid pa-grid">
+        <div className="panel">
+          <div className="panel-h"><h3>Referrals per month</h3><span className="t-sub">Last 6 months</span></div>
+          <div className="panel-b"><Columns data={a.monthly.map((m) => ({ label: monthLabel(m.month), value: m.count }))} color="#0A66C2" unit="cases" /></div>
+        </div>
+        {money && a.money ? (
+          <div className="panel">
+            <div className="panel-h"><h3>Earnings per month</h3><span className="t-sub">Last 6 months</span></div>
+            <div className="panel-b"><Columns data={a.money.monthly.map((m) => ({ label: monthLabel(m.month), value: m.amount }))} color="#1E7E39" money /></div>
+          </div>
+        ) : null}
+        <div className="panel">
+          <div className="panel-h"><h3>Cases by status</h3><span className="t-sub">{t.cases} in total</span></div>
+          <div className="panel-b"><StatusStack counts={a.byStatus} /></div>
+        </div>
+        <div className="panel">
+          <div className="panel-h"><h3>Cases by service</h3></div>
+          <div className="panel-b"><Ranked rows={a.byService} /></div>
+        </div>
+      </div>
+    </>
   );
 }

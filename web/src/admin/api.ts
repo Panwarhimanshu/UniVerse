@@ -99,6 +99,7 @@ export const adminApi = {
   closeAgreementRequest: (id: string, status: 'Open' | 'Closed') => request<{ ok: boolean }>(`/admin/agreement-requests/${id}`, json('PATCH', { status })),
 
   /* master admin */
+  usage: (days: number) => request<Usage>(`/admin/master/usage?days=${days}`),
   staff: () => request<StaffUser[]>('/admin/master/staff'),
   addStaff: (b: { name: string; email: string; password: string; role: 'master' | 'staff'; sections: Section[] }) => request<StaffUser>('/admin/master/staff', json('POST', b)),
   updateStaff: (id: string, b: Partial<{ name: string; email: string; password: string; role: 'master' | 'staff'; sections: Section[]; active: boolean }>) =>
@@ -124,3 +125,15 @@ export const adminApi = {
   saveSettings: (b: Partial<MasterSettings>) => request<MasterSettings>('/admin/master/settings', json('PATCH', b)),
   activity: () => request<Activity[]>('/admin/master/activity'),
 };
+
+export interface Usage {
+  days: number;
+  activeUsers: { day: number; week: number; month: number };
+  daily: { day: string; app: number; web: number }[];
+  platforms: Partial<Record<'app' | 'web', number>>;
+  appOs: Record<string, number>;
+  screens: { platform: 'app' | 'web'; screen: string; views: number }[];
+  actions: { event: string; count: number }[];
+  topPartners: { id: string; name: string; events: number; lastSeen: string; platforms: ('app' | 'web')[] }[];
+  recentSignIns: { name: string; platform: 'app' | 'web'; os: string; at: string }[];
+}

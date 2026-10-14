@@ -14,6 +14,7 @@ export const publicAgent = (a: any) => ({
   verified: a.verified,
   rm: { name: a.rm?.name, email: a.rm?.email, phone: a.rm?.phone },
   bankAccount: a.bankAccount ?? '',
+  avatar: a.avatar ?? '',
   agreement: {
     number: a.agreement?.number ?? '',
     signedAt: a.agreement?.signedAt ?? a.createdAt,
@@ -37,6 +38,7 @@ export const publicStudent = (s: any, requests: any[] = []) => ({
 export const publicTeamMember = (m: any) => ({
   id: String(m._id), name: m.name, email: m.email, role: m.role, status: m.status, menus: m.menus, perms: m.perms,
   lastLoginAt: m.lastLoginAt ?? null,
+  avatar: m.avatar ?? '',
 });
 
 /** The case's stages with the date each one was reached. */
