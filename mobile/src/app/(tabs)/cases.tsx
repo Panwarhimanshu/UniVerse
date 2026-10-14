@@ -5,6 +5,7 @@ import { Chips, Empty, ErrorNote, Feather, Header, IconButton, List, Screen } fr
 import { CaseRow } from '../../components/CaseRow';
 import { api, CaseStatus } from '../../lib/api';
 import { useApi } from '../../lib/hooks';
+import { useAccess } from '../../lib/auth';
 import { colors, radius, space } from '../../theme';
 
 const STATUSES: CaseStatus[] = ['In Progress', 'Pending', 'Completed', 'On Hold'];
@@ -20,10 +21,11 @@ export default function Cases() {
   }, [query]);
 
   const { data, error, refreshing, refresh } = useApi(() => api.cases(debounced, status), [debounced, status]);
+  const { can } = useAccess();
 
   return (
     <Screen onRefresh={refresh} refreshing={refreshing}>
-      <Header title="Cases" right={<IconButton name="plus" label="Refer a student" onPress={() => router.push('/refer')} />} />
+      <Header title="Cases" right={can('create') ? <IconButton name="plus" label="Refer a student" onPress={() => router.push('/refer')} /> : undefined} />
 
       <View style={styles.search}>
         <Feather name="search" size={16} color={colors.faint} />

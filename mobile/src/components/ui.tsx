@@ -1,6 +1,6 @@
 import { Children, ReactNode, useState } from 'react';
 import {
-  ActivityIndicator, KeyboardAvoidingView, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TextInputProps, View, ViewStyle,
+  ActivityIndicator, KeyboardAvoidingView, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, TextInputProps, View, ViewStyle,
 } from 'react-native';
 import { SafeAreaView, Edge } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
@@ -156,7 +156,7 @@ export function Field({ label, error, ...props }: TextInputProps & { label: stri
   );
 }
 
-/** Horizontal single-choice chips — a minimal alternative to a select */
+/** Horizontal single-choice chips, used instead of a select */
 export function Chips<T extends string>({
   options, value, onChange, label, format,
 }: {
@@ -183,7 +183,45 @@ export function Chips<T extends string>({
   );
 }
 
+/** On/off row with a title and a one-line explanation */
+export function Toggle({ title, subtitle, value, onChange, disabled }: { title: string; subtitle?: string; value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+  return (
+    <View style={styles.toggle}>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={[type.body, { fontWeight: '500' }]}>{title}</Text>
+        {subtitle ? <Text style={type.small}>{subtitle}</Text> : null}
+      </View>
+      <Switch value={value} onValueChange={onChange} disabled={disabled} trackColor={{ true: colors.positive, false: colors.line }} thumbColor="#fff" />
+    </View>
+  );
+}
+
 /* ---------- display ---------- */
+
+/** Case stages as recorded by the service desk, with the date each was reached */
+export function Timeline({ steps, onHold }: { steps: { title: string; sub: string; done: boolean; now: boolean; at: string | null }[]; onHold?: boolean }) {
+  return (
+    <View>
+      {steps.map((s, i) => (
+        <View key={s.title} style={styles.tlItem}>
+          <View style={{ alignItems: 'center' }}>
+            <View style={[styles.tlDot, s.done && styles.tlDone, s.now && styles.tlNow]}>
+              {s.done ? <Feather name="check" size={12} color={colors.positive} /> : <Text style={[type.small, { fontSize: 11, color: s.now ? colors.accent : colors.faint }]}>{i + 1}</Text>}
+            </View>
+            {i < steps.length - 1 ? <View style={[styles.tlLine, s.done && { backgroundColor: colors.positive }]} /> : null}
+          </View>
+          <View style={{ flex: 1, paddingBottom: space.lg }}>
+            <Text style={[type.body, { fontWeight: s.done || s.now ? '600' : '400', color: s.done || s.now ? colors.text : colors.muted }]}>{s.title}</Text>
+            <Text style={type.small}>
+              {s.done && s.at ? `${new Date(s.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} · ` : s.now ? (onHold ? 'On hold · ' : 'Next · ') : ''}{s.sub}
+            </Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 
 export function StatusPill({ status, label }: { status: string; label?: string }) {
   const tone = statusTone[status] ?? { fg: colors.muted, bg: colors.surface };
@@ -258,4 +296,10 @@ const styles = StyleSheet.create({
   track: { height: 4, borderRadius: 2, backgroundColor: colors.line, overflow: 'hidden' },
   fill: { height: 4, borderRadius: 2, backgroundColor: colors.accent },
   stat: { flex: 1, padding: space.lg, borderRadius: radius.md, backgroundColor: colors.surface, gap: 2 },
+  toggle: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingVertical: 12 },
+  tlItem: { flexDirection: 'row', gap: space.md },
+  tlDot: { width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: colors.line, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
+  tlDone: { borderColor: colors.positive, backgroundColor: colors.positiveTint },
+  tlNow: { borderColor: colors.accent, backgroundColor: colors.accentTint },
+  tlLine: { width: 2, flex: 1, backgroundColor: colors.line, marginVertical: 2 },
 });

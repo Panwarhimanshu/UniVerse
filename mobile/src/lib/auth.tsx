@@ -1,7 +1,7 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-import { Agent, api, setToken, setUnauthorizedHandler } from './api';
+import { Agent, api, Menu, Perm, setToken, setUnauthorizedHandler } from './api';
 
 const KEY = 'uv_token';
 
@@ -15,8 +15,10 @@ const store = {
 interface AuthState {
   agent: Agent | null;
   ready: boolean;
+  /** why the last session ended, shown on the sign-in screen (e.g. account suspended) */
+  notice: string;
   signIn: (token: string, agent: Agent) => Promise<void>;
-  signOut: () => Promise<void>;
+  signOut: (notice?: string) => Promise<void>;
   setAgent: (a: Agent) => void;
 }
 
@@ -25,15 +27,17 @@ const AuthContext = createContext<AuthState | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [agent, setAgent] = useState<Agent | null>(null);
   const [ready, setReady] = useState(false);
+  const [notice, setNotice] = useState('');
 
-  const signOut = useCallback(async () => {
+  const signOut = useCallback(async (why = '') => {
     setToken(null);
     setAgent(null);
+    setNotice(why);
     await store.clear();
   }, []);
 
   useEffect(() => {
-    setUnauthorizedHandler(signOut);
+    setUnauthorizedHandler((message) => { signOut(message); });
     (async () => {
       try {
         const saved = await store.get();
@@ -41,21 +45,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setToken(saved);
           setAgent(await api.me());
         }
-      } catch {
-        await signOut();
+      } catch (e) {
+        // keep the session if the phone is just offline; drop it if the server rejected it
+        if (e instanceof Error && 'status' in e && (e as { status: number }).status !== 0) await signOut(e.message);
       } finally {
         setReady(true);
       }
     })();
   }, [signOut]);
 
-  const signIn = useCallback(async (token: string, a: Agent) => {
-    setToken(token);
-    await store.set(token);
+  const signIn = useCallback(async (t: string, a: Agent) => {
+    setToken(t);
+    await store.set(t);
+    setNotice('');
     setAgent(a);
   }, []);
 
-  const value = useMemo(() => ({ agent, ready, signIn, signOut, setAgent }), [agent, ready, signIn, signOut]);
+  const value = useMemo(() => ({ agent, ready, notice, signIn, signOut, setAgent }), [agent, ready, notice, signIn, signOut]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
@@ -63,4 +69,17 @@ export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used inside AuthProvider');
   return ctx;
+}
+
+/** What the signed-in person may see and do. The account owner can do everything; team members get what the owner allowed. */
+export function useAccess() {
+  const { agent } = useAuth();
+  const member = agent?.member ?? null;
+  return {
+    isOwner: !member,
+    member,
+    myName: member?.name ?? agent?.name ?? '',
+    sees: (m: Menu) => !member || member.menus.includes(m),
+    can: (p: Perm) => !member || member.perms.includes(p),
+  };
 }

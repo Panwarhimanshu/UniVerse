@@ -38,7 +38,7 @@ export default function Refer() {
   return (
       <Screen edges={['bottom']} keyboardOffset={headerHeight}>
         <Text style={[type.small, { marginBottom: space.xl }]}>
-          Ring-fenced to your account — never shared with another consultant.
+          Only you and your team can see this student. Other consultants never will.
         </Text>
 
         <Field label="Student name" value={f.name} onChangeText={set('name')} placeholder="Riya Shah" />
@@ -46,7 +46,7 @@ export default function Refer() {
         <Field label="Email (optional)" value={f.email} onChangeText={set('email')} placeholder="student@gmail.com" keyboardType="email-address" autoCapitalize="none" />
         <Chips label="Destination" options={meta.data.destinations} value={country} onChange={setCountry} />
         <Chips label="Service" options={services.data.map((s) => s.key)} value={service} onChange={setService} format={(k) => nameOf[k]} />
-        <Field label="Note for the desk (optional)" value={f.note} onChangeText={set('note')} placeholder="Visa interview on 18 Oct — needs GIC first" multiline style={{ height: 80, paddingTop: 12, textAlignVertical: 'top' }} />
+        <Field label="Note for the desk (optional)" value={f.note} onChangeText={set('note')} placeholder="Visa interview on 18 Oct, needs GIC first" multiline style={{ height: 80, paddingTop: 12, textAlignVertical: 'top' }} />
 
         {error ? <Text style={[type.small, { color: colors.danger, marginBottom: space.md }]}>{error}</Text> : null}
         <Button label="Submit referral" onPress={submit} loading={busy} disabled={!f.name.trim() || !f.phone.trim() || !country || !service} />

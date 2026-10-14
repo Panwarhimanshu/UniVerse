@@ -33,6 +33,18 @@ export default function Withdraw() {
     }
   };
 
+  if (!data.bankAccount) {
+    return (
+      <Screen edges={['bottom']}>
+        <Text style={[type.heading, { marginBottom: space.sm }]}>Add a bank account first</Text>
+        <Text style={[type.small, { marginBottom: space.xl }]}>
+          Withdrawals go to the payout bank account on your profile. The account owner can add it from More, then Edit.
+        </Text>
+        <Button label="Go to my details" onPress={() => router.replace('/more')} />
+      </Screen>
+    );
+  }
+
   return (
     <Screen edges={['bottom']} keyboardOffset={headerHeight}>
       <View style={{ padding: space.lg, borderRadius: radius.md, backgroundColor: colors.surface, marginBottom: space.xl }}>

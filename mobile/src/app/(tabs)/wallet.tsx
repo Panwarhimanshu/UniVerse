@@ -3,11 +3,13 @@ import { router } from 'expo-router';
 import { Button, Empty, ErrorNote, Header, List, Loading, Row, Screen, Section } from '../../components/ui';
 import { api } from '../../lib/api';
 import { useApi } from '../../lib/hooks';
+import { useAccess } from '../../lib/auth';
 import { inr, shortDate } from '../../lib/format';
 import { colors, space, type } from '../../theme';
 
 export default function Wallet() {
   const { data, error, refreshing, refresh } = useApi(api.wallet);
+  const { can, sees } = useAccess();
   if (!data && !error) return <Loading />;
 
   return (
@@ -34,8 +36,8 @@ export default function Wallet() {
           </View>
 
           <View style={{ flexDirection: 'row', gap: space.sm }}>
-            <Button label="Withdraw" onPress={() => router.push('/withdraw')} style={{ flex: 1 }} disabled={data.balance < data.minWithdrawal} />
-            <Button label="Commissions" variant="secondary" onPress={() => router.push('/commissions')} style={{ flex: 1 }} />
+            {can('withdraw') ? <Button label="Withdraw" onPress={() => router.push('/withdraw')} style={{ flex: 1 }} disabled={data.balance < data.minWithdrawal} /> : null}
+            {sees('commissions') ? <Button label="Commissions" variant="secondary" onPress={() => router.push('/commissions')} style={{ flex: 1 }} /> : null}
           </View>
 
           <Section title="Transactions">
@@ -45,9 +47,9 @@ export default function Wallet() {
                   <Row
                     key={t.id}
                     title={t.description}
-                    subtitle={`${shortDate(t.date)}${t.status === 'Pending' ? ' · Pending' : ''}`}
+                    subtitle={`${shortDate(t.date)}${t.status === 'Pending' ? ' · Pending' : t.status === 'Rejected' ? ' · Rejected' : t.type === 'Debit' ? ' · Paid' : ''}`}
                     right={
-                      <Text style={{ fontSize: 15, fontWeight: '600', color: t.type === 'Credit' ? colors.positive : colors.text }}>
+                      <Text style={{ fontSize: 15, fontWeight: '600', color: t.status === 'Rejected' ? colors.faint : t.type === 'Credit' ? colors.positive : colors.text, textDecorationLine: t.status === 'Rejected' ? 'line-through' : 'none' }}>
                         {t.type === 'Credit' ? '+' : '−'}{inr(t.amount)}
                       </Text>
                     }
@@ -55,7 +57,7 @@ export default function Wallet() {
                 ))}
               </List>
             ) : (
-              <Empty text="No transactions yet." />
+              <Empty text="No transactions yet. Commissions show up here when a case reaches its payout step." />
             )}
           </Section>
         </>

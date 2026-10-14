@@ -3,16 +3,17 @@ import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInpu
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Message } from '../lib/api';
 import { useApi, usePolling } from '../lib/hooks';
+import { useAccess, useAuth } from '../lib/auth';
 import { time } from '../lib/format';
 import { colors, radius, space, type } from '../theme';
 import { Feather, IconName, Loading } from './ui';
 
 /**
- * Message thread with composer. Polls for new messages while focused
- * (the desk / RM replies arrive asynchronously from the server).
+ * Message thread with composer. Polls for new messages while focused,
+ * since replies come from UniVerse staff in the back office.
  */
 export function Chat({
-  load, send, theirName, placeholder, extraAction, keyboardOffset = 0,
+  load, send, theirName, placeholder, extraAction, keyboardOffset = 0, canSend = true,
 }: {
   load: () => Promise<Message[]>;
   send: (text: string) => Promise<Message>;
@@ -20,7 +21,16 @@ export function Chat({
   placeholder: string;
   extraAction?: { icon: IconName; label: string; onPress: () => void };
   keyboardOffset?: number;
+  /** team members without chat permission can read but not reply */
+  canSend?: boolean;
 }) {
+  const { agent } = useAuth();
+  const { isOwner, myName } = useAccess();
+  // who wrote a partner-side message: the owner leaves no author, team members sign their name
+  const partnerLabel = (m: Message) => {
+    if (m.author) return m.author === myName && !isOwner ? 'You' : m.author;
+    return isOwner ? 'You' : agent?.name ?? 'Owner';
+  };
   const { data, setData, reload } = useApi(load);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
@@ -70,15 +80,20 @@ export function Chat({
                 <Text style={{ fontSize: 15, lineHeight: 20, color: m.from === 'agent' ? '#fff' : colors.text }}>{m.text}</Text>
               </View>
               <Text style={[type.small, { fontSize: 11, marginTop: 3 }]}>
-                {m.from === 'agent' ? 'You' : theirName} · {time(m.createdAt)}
+                {m.from === 'agent' ? partnerLabel(m) : m.author || theirName} · {time(m.createdAt)}
               </Text>
             </View>
           ),
         )}
       </ScrollView>
 
-      {sendError ? <Text style={[type.small, styles.sendError]}>{sendError} — tap send to retry</Text> : null}
-      <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, space.md) }]}>
+      {sendError ? <Text style={[type.small, styles.sendError]}>{sendError}. Tap send to try again.</Text> : null}
+      {!canSend ? (
+        <Text style={[type.small, styles.readOnly, { paddingBottom: Math.max(insets.bottom, space.md) }]}>
+          You can read this conversation. Ask your account owner if you need to reply.
+        </Text>
+      ) : null}
+      {canSend ? <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, space.md) }]}>
         {extraAction ? (
           <Pressable onPress={extraAction.onPress} accessibilityLabel={extraAction.label} hitSlop={8} style={styles.sideBtn}>
             <Feather name={extraAction.icon} size={20} color={colors.muted} />
@@ -102,13 +117,14 @@ export function Chat({
         >
           <Feather name="arrow-up" size={18} color="#fff" />
         </Pressable>
-      </View>
+      </View> : null}
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   sendError: { color: colors.danger, paddingHorizontal: space.lg, paddingVertical: space.xs },
+  readOnly: { textAlign: 'center', paddingHorizontal: space.xl, paddingTop: space.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
   system: { textAlign: 'center', fontSize: 12, marginVertical: space.sm },
   bubbleWrap: { maxWidth: '100%' },
   bubble: { maxWidth: '82%', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18 },

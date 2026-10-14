@@ -1,10 +1,10 @@
 import { Text } from 'react-native';
 import { router } from 'expo-router';
-import { ErrorNote, Header, List, Loading, Row, Screen, Section } from '../../components/ui';
-import { api, Service } from '../../lib/api';
-import { useApi } from '../../lib/hooks';
-import { serviceIcon } from '../../lib/format';
-import { space, type } from '../../theme';
+import { ErrorNote, List, Loading, Row, Screen, Section } from '../components/ui';
+import { api, Service } from '../lib/api';
+import { useApi } from '../lib/hooks';
+import { serviceIcon } from '../lib/format';
+import { space, type } from '../theme';
 
 export default function Services() {
   const { data, error, refreshing, refresh } = useApi(api.services);
@@ -17,9 +17,8 @@ export default function Services() {
   }, {});
 
   return (
-    <Screen onRefresh={refresh} refreshing={refreshing}>
-      <Header title="Services" />
-      <Text style={[type.small, { marginTop: space.xs }]}>Refer a student into any service — our specialist desks take it from there.</Text>
+    <Screen edges={['bottom']} onRefresh={refresh} refreshing={refreshing}>
+      <Text style={type.small}>Refer a student into any service and our specialist desks take it from there.</Text>
       {error && !data ? <ErrorNote message={error} onRetry={refresh} /> : null}
 
       {Object.entries(groups).map(([category, items]) => (

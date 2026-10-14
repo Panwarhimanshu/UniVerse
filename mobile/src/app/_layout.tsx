@@ -38,6 +38,14 @@ function Navigator() {
       <Stack.Screen name="rm" options={{ title: 'Relationship manager' }} />
       <Stack.Screen name="refer" options={{ title: 'Refer a student', presentation: 'modal' }} />
       <Stack.Screen name="withdraw" options={{ title: 'Withdraw', presentation: 'modal' }} />
+      <Stack.Screen name="student/[id]" options={{ title: '' }} />
+      <Stack.Screen name="services" options={{ title: 'Services' }} />
+      <Stack.Screen name="whatsnew" options={{ title: "What's New" }} />
+      <Stack.Screen name="updates" options={{ title: 'Updates' }} />
+      <Stack.Screen name="agreement" options={{ title: 'Partner agreement' }} />
+      <Stack.Screen name="team" options={{ title: 'Team members' }} />
+      <Stack.Screen name="team-member" options={{ title: 'Team member', presentation: 'modal' }} />
+      <Stack.Screen name="password" options={{ title: 'Change password' }} />
     </Stack>
   );
 }

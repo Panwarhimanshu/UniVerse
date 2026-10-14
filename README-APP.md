@@ -1,6 +1,6 @@
 # UniVerse Partner App
 
-Mobile version of the partner portal (`agent-dashboard.html`).
+UniVerse partner platform: website, back office, API and mobile app.
 
 ```
 web/      React + Vite + TypeScript website (marketing site, 9 service pages, partner dashboard)
@@ -15,12 +15,12 @@ cd server && npm run dev        # API on :4000, connected to MongoDB Atlas (serv
 cd web && npm run dev           # website on http://localhost:5173 (proxies /api to :4000)
 ```
 
-Production: `cd web && npm run build`, then start the server — it serves the built site and the API together on
+Production: `cd web && npm run build`, then start the server. It serves the built site and the API together on
 port 4000 (`http://localhost:4000`). Pages: `/`, `/services/:key`, `/partner-login`, `/agent-login`
 (`?tab=signup`), `/dashboard/:view` (overview, whatsnew, students, requests, services, wallet, commissions, profile, users).
 
 Marketing content (services, insights articles) lives in `web/src/data/`. Partner data (students, cases, chats,
-documents, wallet, team, agreement requests) is stored in MongoDB. Uploaded documents are saved to `server/uploads/`.
+documents, wallet, team, agreement requests) is stored in MongoDB.
 
 ### Back office (`/admin`)
 
@@ -48,8 +48,8 @@ The master admin signs in at the same `/admin` page and gets everything staff ha
 - **Activity log**: every change made in the back office and who made it.
 
 The master login is created at server start from `MASTER_NAME`, `MASTER_EMAIL` and `MASTER_PASSWORD` in `server/.env`
-when no master exists. Content edits are stored in MongoDB and served from `GET /api/content`, so the website (and the
-app, once it uses the hosted server) picks them up without a code change.
+when no master exists. Content edits are stored in MongoDB and served from `GET /api/content`, so the website and the app
+pick them up without a code change.
 
 ### Team logins
 
@@ -57,49 +57,37 @@ Partner owners add team members under User Management with a temporary password.
 partner login and only see the menus and actions the owner allowed; the API enforces the same rules. Removing a member
 signs them out immediately.
 
-## Offline mode (default)
+## Live site
 
-The app runs fully on the phone — no server, laptop or internet needed. Data is stored on the device
-(`mobile/src/lib/local.ts`, AsyncStorage) and starts empty — create a partner account with Sign up.
-Data is per-device and not shared between phones.
+- Website: https://universeportal.vercel.app (back office at `/admin`)
+- API: https://universeportal-api.vercel.app/api (the website forwards `/api` to it)
 
-To use the Node/MongoDB server instead, build with `EXPO_PUBLIC_API_URL=https://your-api/api` set; every screen
-then talks to `server/` with no other changes.
+Both are Vercel projects deployed from `web/` and `server/` with `npx vercel deploy --prod`. The API's settings
+(database, JWT secret, master login) are Vercel environment variables, not files in the repo. Uploaded documents are
+stored in MongoDB (GridFS), up to 4 MB each.
 
-**Android build note:** the OneDrive path is too long for the native build (Windows 260-char limit), so the APK is
-built from a copy in `C:\uv`: copy `mobile/` there, then `npx expo prebuild -p android` and
-`cd android && gradlew assembleRelease`. The latest APK is saved as `UniVerse.apk` in this folder.
+## Mobile app
 
-## Run with the server
+The app uses the same live API as the website, so partners, team members and staff share one set of data, and the
+back office and master admin manage the app too. It needs an internet connection.
 
-**1. API** (port 4000)
-
-```bash
-cd server
-npm install
-npm run dev
-```
-
-`server/.env` holds `MONGODB_URI`. Leave it empty to use a throwaway in-memory MongoDB (data resets on restart).
-The database starts empty — register a partner account from the app.
-
-**2. App**
+To test against a local server instead, start it with the API address (use your computer's network IP on a phone):
 
 ```bash
 cd mobile
 npm install
-npx expo start          # scan the QR with Expo Go (phone on the same Wi-Fi)
-npx expo start --web    # or run in the browser
+EXPO_PUBLIC_API_URL=http://localhost:4000/api npx expo start --web
 ```
 
-The app finds the API automatically on the machine running Expo. To point it elsewhere, set
-`EXPO_PUBLIC_API_URL=https://your-api` in `mobile/.env`.
+Screens: Home (figures, updates, shortcuts, recent cases, RM) · Cases · Case detail (stage timeline, documents with
+upload and download, desk chat) · Students · Student record (edit, raise several services) · Wallet + withdraw ·
+More (profile and bank account, agreement and requests, team members, change password, What's New, services,
+commissions, updates, RM chat) · Sign in / Sign up. Team members only see the tabs and actions their owner allowed.
 
-## Screens
-
-Home (stats, recent cases, service mix, RM) · Cases (search + status filter) · Case detail (status, documents
-with upload, desk chat) · Services catalogue + detail · Refer a student · Wallet + withdraw · Commissions
-(current rates + history) · Profile (edit) · RM chat · Sign in / Sign up.
+**Android build:** the OneDrive path is too long for the native build (Windows 260-char limit), so the APK is built
+from a copy in `C:\uv`: copy `mobile/` there (without `node_modules` and `android`), run `npm install`, then
+`npx expo prebuild -p android --clean` and `cd android && gradlew assembleRelease`. The latest APK is saved as
+`UniVerse.apk` in this folder.
 
 ## API
 
