@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { Avatar, Button, Field, List, Row, Screen, Section, StatusPill } from '../components/ui';
 import { api, avatarUrl } from '../lib/api';
@@ -13,7 +13,8 @@ import { colors, space, type } from '../theme';
 const zoneLabel = (z: string) => z[0] + z.slice(1).toLowerCase();
 
 export default function Profile() {
-  const { agent, setAgent, signOut } = useAuth();
+  const { agent, setAgent, signOut, refresh } = useAuth();
+  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
   const { isOwner, member, sees } = useAccess();
   const headerHeight = useHeaderHeight();
   const [editing, setEditing] = useState(false);
@@ -130,7 +131,7 @@ export default function Profile() {
           {sees('whatsnew') ? <Row icon="book-open" title="What's New" subtitle="Guides and market updates" onPress={() => router.push('/whatsnew')} /> : null}
           {sees('services') ? <Row icon="grid" title="Services" subtitle="Browse services and request one" onPress={() => router.push('/services')} /> : null}
           {sees('commissions') ? <Row icon="percent" title="Commission structure" onPress={() => router.push('/commissions')} /> : null}
-          <Row icon="bell" title="Updates" subtitle="Replies from the desk and your RM" onPress={() => router.push('/updates')} />
+          <Row icon="bell" title="Notifications" subtitle="Case updates, replies and account notices" onPress={() => router.push('/updates')} />
         </List>
       </Section>
 

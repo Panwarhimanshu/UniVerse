@@ -13,6 +13,7 @@ import { publicAgent, publicTeamMember, publicTx } from '../serialize.js';
 import { publicArticle } from './content.js';
 import { deleteFile } from '../files.js';
 import { EMAIL_RE } from './auth.js';
+import { accountNotices } from '../notify.js';
 
 /* Master admin only (mounted behind masterOnly in admin.ts). */
 const router = Router();
@@ -125,6 +126,7 @@ router.patch('/partners/:id', async (req, res) => {
     if (!ZONES.includes(b.zone)) throw new HttpError(400, 'Unknown zone');
     a.zone = b.zone;
   }
+  const before = { verified: a.verified, rm: a.rm?.name, suspended: !!a.suspended };
   if (typeof b.verified === 'boolean') a.verified = b.verified;
   if (typeof b.suspended === 'boolean') a.suspended = b.suspended;
   if (b.agreement && typeof b.agreement === 'object') {
@@ -139,6 +141,7 @@ router.patch('/partners/:id', async (req, res) => {
     for (const k of ['name', 'email', 'phone'] as const) if (typeof b.rm[k] === 'string' && b.rm[k].trim()) a.set(`rm.${k}`, b.rm[k].trim());
   }
   await a.save();
+  await accountNotices(a, before);
   res.locals.audit = typeof b.suspended === 'boolean'
     ? `${a.agency || a.name}: ${b.suspended ? 'suspended' : 'reactivated'}`
     : `${a.agency || a.name}: details edited`;

@@ -158,9 +158,13 @@ router.post('/agreement/requests', ownerOnly, async (req, res) => {
 });
 
 /* ---------- notifications: latest desk / RM messages ---------- */
+/* The app's notification centre: replies from our side, case updates, money and account notices
+   (not the notes about the partner's own actions) */
 router.get('/notifications', async (req, res) => {
-  const msgs = await Message.find({ agent: agentIdOf(req), from: { $in: ['desk', 'rm'] } })
-    .sort({ createdAt: -1 }).limit(8).populate('request', 'ref');
+  const msgs = await Message.find({
+    agent: agentIdOf(req), from: { $in: ['desk', 'rm', 'system'] }, quiet: { $ne: true },
+    text: { $not: /^REQ-\d+ opened for |uploaded “/ },
+  }).sort({ createdAt: -1 }).limit(40).populate('request', 'ref');
   res.json(msgs.map((m: any) => ({ ...publicMessage(m), ref: m.request?.ref ?? null, requestId: m.request?._id ? String(m.request._id) : null })));
 });
 

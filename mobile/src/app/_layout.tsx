@@ -1,11 +1,14 @@
 import { useEffect, useRef } from 'react';
 import { Stack, router, usePathname, useSegments } from 'expo-router';
+import { Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import { api } from '../lib/api';
 import { registerForPush, urlOf } from '../lib/push';
 import { AuthProvider, useAuth } from '../lib/auth';
+import { UpdatesProvider } from '../lib/updates';
+import { InAppBanner } from '../components/InAppBanner';
 import { Loading } from '../components/ui';
 import { colors } from '../theme';
 
@@ -23,10 +26,15 @@ function Navigator() {
   useEffect(() => {
     if (agent) registerForPush();
   }, [agent?.id, agent?.member?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-  const lastTap = Notifications.useLastNotificationResponse();
   useEffect(() => {
-    if (agent && lastTap?.actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER) router.push(urlOf(lastTap.notification) as never);
-  }, [lastTap, agent?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!agent || Platform.OS === 'web') return;
+    const open = (r: Notifications.NotificationResponse | null) => {
+      if (r?.actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER) router.push(urlOf(r.notification) as never);
+    };
+    Notifications.getLastNotificationResponseAsync().then(open).catch(() => {}); // the tap that opened the app
+    const sub = Notifications.addNotificationResponseReceivedListener(open);
+    return () => sub.remove();
+  }, [agent?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // screen views for the usage report: sent in small batches, never while signed out
   const pathname = usePathname();
@@ -67,7 +75,7 @@ function Navigator() {
       <Stack.Screen name="student/[id]" options={{ title: '' }} />
       <Stack.Screen name="services" options={{ title: 'Services' }} />
       <Stack.Screen name="whatsnew" options={{ title: "What's New" }} />
-      <Stack.Screen name="updates" options={{ title: 'Updates' }} />
+      <Stack.Screen name="updates" options={{ title: 'Notifications' }} />
       <Stack.Screen name="agreement" options={{ title: 'Partner agreement' }} />
       <Stack.Screen name="team" options={{ title: 'Team members' }} />
       <Stack.Screen name="team-member" options={{ title: 'Team member', presentation: 'modal' }} />
@@ -83,7 +91,10 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <AuthProvider>
         <StatusBar style="dark" />
-        <Navigator />
+        <UpdatesProvider>
+          <Navigator />
+          <InAppBanner />
+        </UpdatesProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

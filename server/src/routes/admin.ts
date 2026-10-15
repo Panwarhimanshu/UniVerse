@@ -10,6 +10,7 @@ import { LAST_STEP, progressFor, stepsFor } from '../data/timelines.js';
 import { publicAgent, publicMessage, publicRequest, publicTx } from '../serialize.js';
 import { deleteFile, sendDocFile } from '../files.js';
 import { checkAttempts, clearAttempts, recordFailure } from '../limits.js';
+import { accountNotices } from '../notify.js';
 
 /* Back office for the UniVerse service desk and relationship managers. */
 const router = Router();
@@ -437,6 +438,7 @@ router.get('/partners', async (_req, res) => {
 router.patch('/partners/:id', async (req, res) => {
   const a = await Agent.findById(oid(req.params.id, 'Partner'));
   if (!a) throw new HttpError(404, 'Partner not found');
+  const before = { verified: a.verified, rm: a.rm?.name };
   if (typeof req.body?.verified === 'boolean') a.verified = req.body.verified;
   const rm = req.body?.rm;
   if (rm && typeof rm === 'object') {
@@ -445,6 +447,7 @@ router.patch('/partners/:id', async (req, res) => {
     }
   }
   await a.save();
+  await accountNotices(a, before);
   res.locals.audit = `${a.agency || a.name}: ${typeof req.body?.verified === 'boolean' ? (a.verified ? 'verified' : 'unverified') : 'RM updated'}`;
   res.json(publicAgent(a));
 });

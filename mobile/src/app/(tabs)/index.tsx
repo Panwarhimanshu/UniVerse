@@ -33,9 +33,9 @@ export default function Home() {
         title={myName.split(' ')[0]}
         right={
           <View style={{ flexDirection: 'row', gap: space.sm }}>
-            <Pressable onPress={() => router.push('/updates')} accessibilityLabel="Updates" hitSlop={8} style={styles.iconBtn}>
+            <Pressable onPress={() => router.push('/updates')} accessibilityLabel={`Notifications${updates.unread ? `, ${updates.unread} unread` : ''}`} hitSlop={8} style={styles.iconBtn}>
               <Feather name="bell" size={20} color={colors.text} />
-              {updates.unread ? <View style={styles.dot} /> : null}
+              {updates.unread ? <View style={styles.count}><Text style={styles.countText}>{updates.unread > 9 ? '9+' : updates.unread}</Text></View> : null}
             </Pressable>
             {can('create') ? (
               <Pressable onPress={() => router.push('/refer')} accessibilityLabel="Request a service" hitSlop={8} style={styles.iconBtn}>
@@ -137,6 +137,8 @@ const styles = StyleSheet.create({
   stats: { flexDirection: 'row', gap: space.sm, marginTop: space.lg },
   link: { fontSize: 13, color: colors.accent, fontWeight: '600' },
   iconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line },
+  count: { position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: colors.danger, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.bg },
+  countText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   dot: { position: 'absolute', top: 8, right: 9, width: 9, height: 9, borderRadius: 5, backgroundColor: colors.positive, borderWidth: 2, borderColor: colors.bg },
   banner: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginTop: space.lg, padding: space.lg, borderRadius: radius.md, backgroundColor: colors.accentTint },
   shortcuts: { flexDirection: 'row', gap: space.sm, marginTop: space.lg },

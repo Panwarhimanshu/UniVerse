@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import type { Types } from 'mongoose';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
-import { Agent, Device, messageHooks, ServiceRequest, TeamMember } from './models/index.js';
+import { Agent, Device, Message, messageHooks, ServiceRequest, TeamMember } from './models/index.js';
 import { layout, sendMail, siteUrl } from './mail.js';
 
 /* Push notifications through Firebase Cloud Messaging, plus emails for the updates a partner must act on. */
@@ -51,7 +51,7 @@ export async function pushToAgent(id: unknown, msg: PushMessage, walletOnly = fa
 
 const MONEY = /₹|commission|withdrawal/i;
 // worth an email as well: someone on our side wrote to them, or something they need to know or act on
-const IMPORTANT = /Completed|couldn't accept|upload it again|credited|withdrawal|commission/i;
+const IMPORTANT = /Completed|couldn't accept|upload it again|credited|withdrawal|commission|verified|relationship manager|reactivated/i;
 
 messageHooks.onCreate = async (m) => {
   const agent = await Agent.findById(m.agent).select('email name agency');
@@ -62,11 +62,12 @@ messageHooks.onCreate = async (m) => {
   const title = c ? `${c.ref}${student ? ` · ${student}` : ''}` : m.from === 'rm' ? `Message from ${who}` : 'UniVerse update';
   const body = m.from === 'system' ? m.text : `${who}: ${m.text}`;
   const url = c ? `/case/${c._id}` : m.from === 'rm' ? '/rm' : '/updates';
+  const subjectFor = m.from === 'system' && !c ? 'Your UniVerse account' : null;
 
   await Promise.all([
     pushToAgent(m.agent, { title, body, url }, MONEY.test(m.text)).catch((e) => console.error('push failed', e)),
     m.from !== 'system' || IMPORTANT.test(m.text)
-      ? sendMail(agent.email, m.from === 'system' ? `Update on ${title}` : `${who} replied${c ? ` on ${title}` : ''}`, layout({
+      ? sendMail(agent.email, subjectFor ?? (m.from === 'system' ? `Update on ${title}` : `${who} replied${c ? ` on ${title}` : ''}`), layout({
         greeting: `Hello ${agent.name.split(' ')[0]},`,
         paragraphs: [
           m.from === 'system' ? `${c ? `${title}: ` : ''}${m.text}` : `${who} wrote${c ? ` about ${title}` : ''}: “${m.text}”`,
@@ -77,3 +78,17 @@ messageHooks.onCreate = async (m) => {
       : null,
   ]);
 };
+
+/** Tells the partner (notification centre, push, email) when their verification or RM changes */
+export async function accountNotices(a: InstanceType<typeof Agent>, before: { verified?: boolean; rm?: string; suspended?: boolean }) {
+  const say = (text: string) => Message.create({ agent: a._id, request: null, from: 'system', text });
+  if (before.verified !== undefined && before.verified !== a.verified) {
+    await say(a.verified
+      ? 'Your partner account has been verified. Thank you for completing your onboarding with UniVerse.'
+      : 'Your account verification has been withdrawn. Your relationship manager will contact you.');
+  }
+  if (before.rm !== undefined && before.rm !== a.rm?.name && a.rm?.name) {
+    await say(`Your relationship manager is now ${a.rm.name}${a.rm.phone ? ` (${a.rm.phone})` : ''}. You can chat with them from the app.`);
+  }
+  if (before.suspended === true && !a.suspended) await say('Your partner account has been reactivated. Welcome back.');
+}

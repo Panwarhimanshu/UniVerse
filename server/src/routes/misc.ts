@@ -103,7 +103,8 @@ router.post('/wallet/withdraw', need('withdraw'), async (req, res) => {
 
 /* ---------- relationship manager chat ---------- */
 router.get('/rm/messages', async (req, res) => {
-  const msgs = await Message.find({ agent: agentIdOf(req), request: null }).sort({ createdAt: 1 });
+  // account notices (from: system) live in the notification centre, not in the RM chat
+  const msgs = await Message.find({ agent: agentIdOf(req), request: null, from: { $ne: 'system' } }).sort({ createdAt: 1 });
   res.json(msgs.map(publicMessage));
 });
 

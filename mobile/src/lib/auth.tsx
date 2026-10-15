@@ -21,6 +21,8 @@ interface AuthState {
   signIn: (token: string, agent: Agent) => Promise<void>;
   signOut: (notice?: string) => Promise<void>;
   setAgent: (a: Agent) => void;
+  /** reloads the account from the server, so back-office changes (verification, RM, permissions) show up */
+  refresh: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -63,7 +65,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAgent(a);
   }, []);
 
-  const value = useMemo(() => ({ agent, ready, notice, signIn, signOut, setAgent }), [agent, ready, notice, signIn, signOut]);
+  const refresh = useCallback(async () => {
+    try {
+      if (await store.get()) setAgent(await api.me());
+    } catch {
+      /* offline, or signed out by the 401 handler */
+    }
+  }, []);
+
+  const value = useMemo(() => ({ agent, ready, notice, signIn, signOut, setAgent, refresh }), [agent, ready, notice, signIn, signOut, refresh]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

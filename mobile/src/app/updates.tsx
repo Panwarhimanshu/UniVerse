@@ -3,37 +3,37 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Empty, Feather, Screen } from '../components/ui';
 import { time } from '../lib/format';
-import { useUpdates } from '../lib/updates';
+import { updateLabel, updateTarget, useUpdates } from '../lib/updates';
 import { colors, radius, space, type } from '../theme';
 
 export default function Updates() {
-  const { list, seen, markSeen } = useUpdates();
+  const { list, seen, markSeen, reload } = useUpdates();
   // opening this screen counts as reading everything listed
-  useFocusEffect(useCallback(() => { markSeen(); }, [markSeen]));
+  useFocusEffect(useCallback(() => { reload().then(markSeen); }, [])); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <Screen edges={['bottom']}>
-      <Text style={[type.small, { marginBottom: space.lg }]}>Replies from the service desk and your relationship manager.</Text>
+    <Screen edges={['bottom']} onRefresh={reload}>
+      <Text style={[type.small, { marginBottom: space.lg }]}>Case updates, replies from the desk and your RM, payments and account notices.</Text>
       {list.length ? (
         <View style={{ gap: space.sm }}>
           {list.map((n) => (
             <Pressable
               key={n.id}
-              onPress={() => router.push(n.requestId ? `/case/${n.requestId}` : '/rm')}
+              onPress={() => router.push(updateTarget(n) as never)}
               style={({ pressed }) => [styles.item, n.createdAt > seen && styles.fresh, pressed && { opacity: 0.7 }]}
             >
-              <Feather name={n.requestId ? 'folder' : 'message-circle'} size={18} color={colors.muted} style={{ marginTop: 2 }} />
+              <Feather name={n.requestId ? 'folder' : n.from === 'system' ? 'bell' : 'message-circle'} size={18} color={n.createdAt > seen ? colors.accent : colors.muted} style={{ marginTop: 2 }} />
               <View style={{ flex: 1, gap: 4 }}>
                 <Text style={[type.small, { fontWeight: '600' }]}>
-                  {n.ref ?? 'Relationship manager'}{n.author ? ` · ${n.author}` : ''} · {time(n.createdAt)}
+                  {updateLabel(n)}{n.author ? ` · ${n.author}` : ''} · {time(n.createdAt)}
                 </Text>
-                <Text style={type.body} numberOfLines={3}>{n.text}</Text>
+                <Text style={type.body} numberOfLines={4}>{n.text}</Text>
               </View>
             </Pressable>
           ))}
         </View>
       ) : (
-        <Empty text="No updates yet. Replies from the desk and your RM will show up here." />
+        <Empty text="No notifications yet. Case updates and replies will show up here." />
       )}
     </Screen>
   );
@@ -41,5 +41,5 @@ export default function Updates() {
 
 const styles = StyleSheet.create({
   item: { flexDirection: 'row', gap: space.md, padding: space.lg, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.line },
-  fresh: { borderColor: colors.positive, backgroundColor: colors.positiveTint },
+  fresh: { borderColor: colors.accent, backgroundColor: colors.accentTint },
 });
