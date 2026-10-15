@@ -9,9 +9,16 @@ import { ProfileButton } from '../../components/ProfileButton';
 import { api } from '../../lib/api';
 import { useAccess, useAuth } from '../../lib/auth';
 import { useApi } from '../../lib/hooks';
-import { inr } from '../../lib/format';
 import { useUpdates } from '../../lib/updates';
 import { colors, radius, space, type } from '../../theme';
+
+/* Case status colours, the same set the website uses, always shown with their label */
+const PIPE = [
+  { key: 'In Progress', label: 'In progress', color: '#3B9BFF' },
+  { key: 'Pending', label: 'Pending', color: '#F59E0B' },
+  { key: 'On Hold', label: 'On hold', color: '#F87171' },
+  { key: 'Completed', label: 'Done', color: '#4ADE80' },
+] as const;
 
 const greeting = () => {
   const h = new Date().getHours();
@@ -23,14 +30,16 @@ export default function Home() {
   const { myName, sees, can, member } = useAccess();
   const { data, error, refreshing, refresh } = useApi(api.dashboard);
   const updates = useUpdates();
+  const stats = useApi(api.analytics);
+  const totals = stats.data?.totals;
+  const byStatus = stats.data?.byStatus;
+  const caseTotal = byStatus ? PIPE.reduce((n, p) => n + byStatus[p.key], 0) : 0;
 
   if (!data && !error) return <Loading />;
-  const month = new Date().toLocaleDateString('en-GB', { month: 'long' });
-  const money = sees('wallet') && data?.stats.balance !== null && data?.stats.balance !== undefined;
   const firstUnread = updates.items.find((n) => !n.read);
 
   return (
-    <Screen onRefresh={() => { refresh(); updates.reload(); }} refreshing={refreshing}>
+    <Screen onRefresh={() => { refresh(); stats.refresh(); updates.reload(); }} refreshing={refreshing}>
       <Header
         left={<ProfileButton />}
         subtitle={greeting()}
@@ -48,23 +57,53 @@ export default function Home() {
 
       {data ? (
         <>
-          {/* the one dark card: money if this person can see it, otherwise the case load */}
-          <Pressable onPress={() => router.push(money ? '/wallet' : '/cases')} style={({ pressed }) => [styles.hero, pressed && { opacity: 0.94 }]}>
+          {/* the one dark card: where the cases stand and what needs doing (money lives on the Wallet tab) */}
+          <Pressable onPress={() => router.push(sees('requests') ? '/cases' : '/students')} style={({ pressed }) => [styles.hero, pressed && { opacity: 0.94 }]}>
             <Orbit />
-            <Text style={styles.heroLabel}>{money ? 'Wallet balance' : 'Active cases'}</Text>
-            <Text style={styles.heroValue} numberOfLines={1} adjustsFontSizeToFit>
-              {money ? inr(data.stats.balance ?? 0) : data.stats.activeCases}
-            </Text>
+            <View style={styles.heroTop}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.heroLabel}>Cases in progress</Text>
+                <Text style={styles.heroValue}>{totals?.open ?? data.stats.activeCases}</Text>
+              </View>
+              <View style={styles.heroSide}>
+                <Text style={styles.heroSideValue}>{data.stats.students}</Text>
+                <Text style={styles.heroSideLabel}>{data.stats.students === 1 ? 'student' : 'students'}</Text>
+              </View>
+            </View>
+
+            {byStatus && caseTotal ? (
+              <>
+                <View style={styles.pipe}>
+                  {PIPE.filter((p) => byStatus[p.key]).map((p) => (
+                    <View key={p.key} style={{ flex: byStatus[p.key], backgroundColor: p.color }} />
+                  ))}
+                </View>
+                <View style={styles.pipeLegend}>
+                  {PIPE.map((p) => (
+                    <View key={p.key} style={styles.pipeItem}>
+                      <View style={[styles.pipeDot, { backgroundColor: p.color }]} />
+                      <Text style={styles.pipeCount}>{byStatus[p.key]}</Text>
+                      <Text style={styles.pipeLabel}>{p.label}</Text>
+                    </View>
+                  ))}
+                </View>
+              </>
+            ) : null}
+
             <View style={styles.heroFoot}>
-              {money ? (
-                <>
-                  <HeroFact label={`Earned in ${month}`} value={inr(data.stats.monthEarnings ?? 0)} />
-                  <View style={styles.heroRule} />
-                  <HeroFact label="Active cases" value={String(data.stats.activeCases)} />
-                </>
-              ) : (
-                <HeroFact label="Students" value={String(data.stats.students)} />
-              )}
+              {totals ? (
+                totals.docsNeeded ? (
+                  <View style={styles.todo}>
+                    <Feather name="file-text" size={14} color="#FBBF24" />
+                    <Text style={styles.todoText}>{totals.docsNeeded} document{totals.docsNeeded === 1 ? '' : 's'} still to upload</Text>
+                  </View>
+                ) : (
+                  <View style={styles.todo}>
+                    <Feather name="check-circle" size={14} color="#7BD795" />
+                    <Text style={styles.todoText}>{caseTotal ? 'All documents are in' : 'No cases yet'}</Text>
+                  </View>
+                )
+              ) : <View />}
               <View style={{ flex: 1 }} />
               <View style={styles.heroGo}><Feather name="arrow-up-right" size={16} color="#fff" /></View>
             </View>
@@ -120,15 +159,6 @@ export default function Home() {
   );
 }
 
-function HeroFact({ label, value }: { label: string; value: string }) {
-  return (
-    <View>
-      <Text style={styles.heroFactLabel}>{label}</Text>
-      <Text style={styles.heroFactValue}>{value}</Text>
-    </View>
-  );
-}
-
 function Action({ icon, label, onPress, primary }: { icon: IconName; label: string; onPress: () => void; primary?: boolean }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.action, pressed && { transform: [{ scale: 0.96 }] }]} accessibilityLabel={label}>
@@ -164,10 +194,19 @@ const styles = StyleSheet.create({
   hero: { marginTop: space.lg, padding: space.xl, paddingBottom: space.lg, borderRadius: 22, backgroundColor: colors.text, overflow: 'hidden' },
   heroLabel: { color: '#A9B8CC', fontSize: 13, fontWeight: '600' },
   heroValue: { color: '#fff', fontSize: 36, fontWeight: '800', letterSpacing: -1.2, marginTop: 4 },
-  heroFoot: { flexDirection: 'row', alignItems: 'center', gap: space.lg, marginTop: space.xl },
-  heroFactLabel: { color: '#8FA1B8', fontSize: 11, fontWeight: '600' },
-  heroFactValue: { color: '#fff', fontSize: 15, fontWeight: '700', marginTop: 2 },
-  heroRule: { width: StyleSheet.hairlineWidth, alignSelf: 'stretch', backgroundColor: '#3A5070' },
+  heroTop: { flexDirection: 'row', alignItems: 'flex-start' },
+  heroSide: { alignItems: 'flex-end', paddingTop: 2 },
+  heroSideValue: { color: '#fff', fontSize: 20, fontWeight: '800' },
+  heroSideLabel: { color: '#8FA1B8', fontSize: 11, fontWeight: '600' },
+  pipe: { flexDirection: 'row', height: 8, borderRadius: 4, overflow: 'hidden', gap: 3, marginTop: space.lg },
+  pipeLegend: { flexDirection: 'row', justifyContent: 'space-between', marginTop: space.md },
+  pipeItem: { alignItems: 'flex-start', gap: 2 },
+  pipeDot: { width: 8, height: 8, borderRadius: 2, marginBottom: 2 },
+  pipeCount: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  pipeLabel: { color: '#8FA1B8', fontSize: 11, fontWeight: '600' },
+  heroFoot: { flexDirection: 'row', alignItems: 'center', gap: space.lg, marginTop: space.lg, paddingTop: space.md, borderTopWidth: StyleSheet.hairlineWidth, borderColor: '#2A4060' },
+  todo: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  todoText: { color: '#DCE5F0', fontSize: 13, fontWeight: '600' },
   heroGo: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
 
   actions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: space.xl, paddingHorizontal: space.xs },
