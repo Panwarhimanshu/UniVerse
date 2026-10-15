@@ -1,10 +1,12 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ErrorNote, Loading, Screen, Section, Stat } from '../components/ui';
 import { api } from '../lib/api';
 import type { CaseStatus } from '../lib/api';
 import { useAccess } from '../lib/auth';
 import { inr } from '../lib/format';
 import { useApi } from '../lib/hooks';
+import { Donut } from '../components/Donut';
 import { colors, radius, space, type } from '../theme';
 
 /* Same status colours as the website charts, always shown with their label. */
@@ -52,42 +54,37 @@ export default function Analytics() {
       </Section>
 
       <Section title="Cases by service">
-        {data.byService.length ? (
-          <View style={{ gap: space.md }}>
-            {data.byService.map((s) => {
-              const max = Math.max(...data.byService.map((x) => x.count));
-              return (
-                <View key={s.key} accessibilityLabel={`${s.name}: ${s.count}`}>
-                  <View style={styles.rankHead}>
-                    <Text style={[type.body, { flex: 1 }]} numberOfLines={1}>{s.name}</Text>
-                    <Text style={[type.body, { fontWeight: '600' }]}>{s.count}</Text>
-                  </View>
-                  <View style={styles.track}><View style={[styles.fill, { width: `${(s.count / max) * 100}%` }]} /></View>
-                </View>
-              );
-            })}
-          </View>
-        ) : <Text style={type.small}>No cases yet. Request a service to see your mix here.</Text>}
+        {data.byService.length
+          ? <Donut data={data.byService} />
+          : <Text style={type.small}>No cases yet. Request a service to see your mix here.</Text>}
       </Section>
     </Screen>
   );
 }
 
 /* Single-series columns, value above each bar, month underneath. */
+/* Single-series columns. Tap a month to read its value; the latest month is shown first. */
 function Columns({ data, color, format }: { data: { label: string; value: number }[]; color: string; format: (v: number) => string }) {
+  const [sel, setSel] = useState(data.length - 1);
   const max = Math.max(1, ...data.map((d) => d.value));
+  const cur = data[sel];
   return (
-    <View style={styles.chart} accessibilityLabel={data.map((d) => `${d.label}: ${format(d.value)}`).join(', ')}>
-      {data.map((d, i) => (
-        <View key={d.label} style={styles.col}>
-          <Text style={[styles.val, i === data.length - 1 && { color: colors.text }]} numberOfLines={1}>{d.value ? format(d.value) : ''}</Text>
-          <View style={styles.colTrack}>
-            <View style={{ height: `${(d.value / max) * 100}%`, minHeight: d.value ? 3 : 0, backgroundColor: color, borderTopLeftRadius: 4, borderTopRightRadius: 4, opacity: i === data.length - 1 ? 1 : 0.75 }} />
-          </View>
-          <View style={styles.base} />
-          <Text style={styles.axis}>{d.label}</Text>
-        </View>
-      ))}
+    <View>
+      <View style={styles.readout}>
+        <Text style={styles.readValue}>{format(cur?.value ?? 0)}</Text>
+        <Text style={type.small}>{cur?.label}{sel === data.length - 1 ? ' (this month)' : ''}</Text>
+      </View>
+      <View style={styles.chart} accessibilityLabel={data.map((d) => `${d.label}: ${format(d.value)}`).join(', ')}>
+        {data.map((d, i) => (
+          <Pressable key={d.label} style={styles.col} onPress={() => setSel(i)} accessibilityRole="button" accessibilityLabel={`${d.label}: ${format(d.value)}`}>
+            <View style={styles.colTrack}>
+              <View style={{ height: `${(d.value / max) * 100}%`, minHeight: d.value ? 4 : 0, backgroundColor: color, borderRadius: 6, opacity: i === sel ? 1 : 0.3 }} />
+            </View>
+            <View style={styles.base} />
+            <Text style={[styles.axis, i === sel && { color: colors.text, fontWeight: '700' }]}>{d.label}</Text>
+          </Pressable>
+        ))}
+      </View>
     </View>
   );
 }
@@ -117,6 +114,8 @@ function StatusStack({ counts }: { counts: Record<CaseStatus, number> }) {
 const styles = StyleSheet.create({
   stats: { flexDirection: 'row', gap: space.sm, marginTop: space.md },
   foot: { marginTop: space.sm },
+  readout: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm, marginBottom: space.sm },
+  readValue: { fontSize: 24, fontWeight: '800', color: colors.text, letterSpacing: -0.5 },
   chart: { flexDirection: 'row', alignItems: 'flex-end', height: 190, paddingTop: space.sm },
   col: { flex: 1, alignItems: 'center', height: '100%' },
   colTrack: { flex: 1, width: '62%', maxWidth: 28, justifyContent: 'flex-end' },

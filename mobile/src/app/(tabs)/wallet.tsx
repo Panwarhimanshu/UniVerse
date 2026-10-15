@@ -1,17 +1,30 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { Button, Empty, ErrorNote, Header, List, Loading, Row, Screen, Section } from '../../components/ui';
+import { Empty, ErrorNote, Feather, Header, Loading, Screen } from '../../components/ui';
+import { Orbit } from '../../components/Orbit';
 import { api } from '../../lib/api';
+import type { Transaction } from '../../lib/api';
 import { ProfileButton } from '../../components/ProfileButton';
 import { useApi } from '../../lib/hooks';
 import { useAccess } from '../../lib/auth';
 import { inr, shortDate } from '../../lib/format';
-import { colors, space, type } from '../../theme';
+import { colors, radius, space, type } from '../../theme';
+
+const monthOf = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 
 export default function Wallet() {
   const { data, error, refreshing, refresh } = useApi(api.wallet);
   const { can, sees } = useAccess();
   if (!data && !error) return <Loading />;
+  const canWithdraw = !!data && data.balance >= data.minWithdrawal;
+
+  // transactions grouped by month, newest first
+  const groups: { month: string; items: Transaction[] }[] = [];
+  for (const t of data?.transactions ?? []) {
+    const m = monthOf(t.date);
+    if (groups[groups.length - 1]?.month !== m) groups.push({ month: m, items: [] });
+    groups[groups.length - 1].items.push(t);
+  }
 
   return (
     <Screen onRefresh={refresh} refreshing={refreshing}>
@@ -20,54 +33,104 @@ export default function Wallet() {
 
       {data ? (
         <>
-          <View style={{ marginTop: space.xl }}>
-            <Text style={type.label}>Available balance</Text>
-            <Text style={styles.balance}>{inr(data.balance)}</Text>
-          </View>
-
-          <View style={styles.meta}>
-            <View style={{ flex: 1 }}>
-              <Text style={[type.body, { fontWeight: '600' }]}>{inr(data.pending)}</Text>
-              <Text style={type.small}>Pending clearance</Text>
+          <View style={styles.hero}>
+            <Orbit />
+            <Text style={styles.heroLabel}>Available balance</Text>
+            <Text style={styles.heroValue} numberOfLines={1} adjustsFontSizeToFit>{inr(data.balance)}</Text>
+            <View style={styles.facts}>
+              <View>
+                <Text style={styles.factLabel}>Pending clearance</Text>
+                <Text style={styles.factValue}>{inr(data.pending)}</Text>
+              </View>
+              <View style={styles.rule} />
+              <View>
+                <Text style={styles.factLabel}>Earned so far</Text>
+                <Text style={styles.factValue}>{inr(data.lifetime)}</Text>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[type.body, { fontWeight: '600' }]}>{inr(data.lifetime)}</Text>
-              <Text style={type.small}>Lifetime earnings</Text>
+            <View style={styles.heroActions}>
+              {can('withdraw') ? (
+                <Pressable
+                  onPress={() => router.push('/withdraw')}
+                  disabled={!canWithdraw}
+                  style={({ pressed }) => [styles.primary, !canWithdraw && { opacity: 0.45 }, pressed && { opacity: 0.85 }]}
+                >
+                  <Feather name="arrow-up-right" size={16} color={colors.text} />
+                  <Text style={styles.primaryText}>Withdraw</Text>
+                </Pressable>
+              ) : null}
+              {sees('commissions') ? (
+                <Pressable onPress={() => router.push('/commissions')} style={({ pressed }) => [styles.secondary, pressed && { opacity: 0.8 }]}>
+                  <Feather name="percent" size={15} color="#fff" />
+                  <Text style={styles.secondaryText}>Rates</Text>
+                </Pressable>
+              ) : null}
             </View>
+            {can('withdraw') && !canWithdraw ? (
+              <Text style={styles.hint}>You can withdraw once your balance reaches {inr(data.minWithdrawal)}.</Text>
+            ) : null}
           </View>
 
-          <View style={{ flexDirection: 'row', gap: space.sm }}>
-            {can('withdraw') ? <Button label="Withdraw" onPress={() => router.push('/withdraw')} style={{ flex: 1 }} disabled={data.balance < data.minWithdrawal} /> : null}
-            {sees('commissions') ? <Button label="Commissions" variant="secondary" onPress={() => router.push('/commissions')} style={{ flex: 1 }} /> : null}
-          </View>
-
-          <Section title="Transactions">
-            {data.transactions.length ? (
-              <List>
-                {data.transactions.map((t) => (
-                  <Row
-                    key={t.id}
-                    title={t.description}
-                    subtitle={`${shortDate(t.date)}${t.status === 'Pending' ? ' · Pending' : t.status === 'Rejected' ? ' · Rejected' : t.type === 'Debit' ? ' · Paid' : ''}`}
-                    right={
-                      <Text style={{ fontSize: 15, fontWeight: '600', color: t.status === 'Rejected' ? colors.faint : t.type === 'Credit' ? colors.positive : colors.text, textDecorationLine: t.status === 'Rejected' ? 'line-through' : 'none' }}>
-                        {t.type === 'Credit' ? '+' : '−'}{inr(t.amount)}
-                      </Text>
-                    }
-                  />
-                ))}
-              </List>
-            ) : (
+          {groups.length ? groups.map((g) => (
+            <View key={g.month} style={{ marginTop: space.xl }}>
+              <Text style={type.label}>{g.month}</Text>
+              <View style={styles.card}>
+                {g.items.map((t, i) => <TxRow key={t.id} t={t} first={i === 0} />)}
+              </View>
+            </View>
+          )) : (
+            <View style={{ marginTop: space.xl }}>
               <Empty text="No transactions yet. Commissions show up here when a case reaches its payout step." />
-            )}
-          </Section>
+            </View>
+          )}
         </>
       ) : null}
     </Screen>
   );
 }
 
+function TxRow({ t, first }: { t: Transaction; first: boolean }) {
+  const credit = t.type === 'Credit';
+  const rejected = t.status === 'Rejected';
+  const [title, detail] = t.description.split(' · ');
+  const state = rejected ? 'Rejected' : t.status === 'Pending' ? (credit ? 'Clearing' : 'Processing') : credit ? 'Credited' : 'Paid';
+  const tone = rejected ? colors.faint : credit ? colors.positive : colors.text;
+  return (
+    <View style={[styles.tx, !first && styles.sep]}>
+      <View style={[styles.txIcon, { backgroundColor: rejected ? colors.surface : credit ? colors.positiveTint : colors.accentTint }]}>
+        <Feather name={credit ? 'arrow-down-left' : 'arrow-up-right'} size={17} color={rejected ? colors.faint : credit ? colors.positive : colors.accent} />
+      </View>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={[type.body, { fontWeight: '600' }]} numberOfLines={1}>{credit ? title : 'Withdrawal'}</Text>
+        <Text style={type.small} numberOfLines={1}>{[credit ? detail : title.replace(/^Withdrawal to /, 'To '), shortDate(t.date)].filter(Boolean).join(' · ')}</Text>
+      </View>
+      <View style={{ alignItems: 'flex-end', gap: 2 }}>
+        <Text style={{ fontSize: 15, fontWeight: '700', color: tone, textDecorationLine: rejected ? 'line-through' : 'none' }}>
+          {credit ? '+' : '−'}{inr(t.amount)}
+        </Text>
+        <Text style={[styles.state, t.status === 'Pending' && { color: colors.warning }]}>{state}</Text>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  balance: { fontSize: 40, fontWeight: '700', letterSpacing: -1, color: colors.text, marginTop: space.xs },
-  meta: { flexDirection: 'row', gap: space.lg, marginVertical: space.xl },
+  hero: { marginTop: space.lg, padding: space.xl, borderRadius: 22, backgroundColor: colors.text, overflow: 'hidden' },
+  heroLabel: { color: '#A9B8CC', fontSize: 13, fontWeight: '600' },
+  heroValue: { color: '#fff', fontSize: 38, fontWeight: '800', letterSpacing: -1.2, marginTop: 4 },
+  facts: { flexDirection: 'row', gap: space.lg, marginTop: space.lg },
+  factLabel: { color: '#8FA1B8', fontSize: 11, fontWeight: '600' },
+  factValue: { color: '#fff', fontSize: 15, fontWeight: '700', marginTop: 2 },
+  rule: { width: StyleSheet.hairlineWidth, backgroundColor: '#3A5070' },
+  heroActions: { flexDirection: 'row', gap: space.sm, marginTop: space.xl },
+  primary: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 42, paddingHorizontal: space.lg, borderRadius: radius.pill, backgroundColor: '#fff' },
+  primaryText: { fontSize: 14, fontWeight: '700', color: colors.text },
+  secondary: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 42, paddingHorizontal: space.lg, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.12)' },
+  secondaryText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  hint: { color: '#8FA1B8', fontSize: 12, marginTop: space.md },
+  card: { marginTop: space.sm, borderRadius: radius.lg + 2, borderWidth: 1, borderColor: colors.line, overflow: 'hidden' },
+  tx: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingVertical: 14 },
+  sep: { borderTopWidth: StyleSheet.hairlineWidth, borderColor: colors.line },
+  txIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  state: { fontSize: 11, fontWeight: '600', color: colors.muted },
 });
