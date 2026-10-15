@@ -10,11 +10,11 @@ import partnerRoutes from './routes/partner.js';
 import adminRoutes from './routes/admin.js';
 import contentRoutes from './routes/content.js';
 import analyticsRoutes from './routes/analytics.js';
+import notificationRoutes from './routes/notifications.js';
 import { Admin } from './models/index.js';
 import { loadContent, refreshContentIfStale } from './content.js';
 import { requireAuth, HttpError } from './middleware/auth.js';
 import { MAX_UPLOAD_BYTES } from './files.js';
-import './notify.js'; // push and email for partner updates
 
 async function connectDb() {
   let uri = process.env.MONGODB_URI;
@@ -88,6 +88,7 @@ api.use('/auth', authRoutes);
 api.use('/admin', adminRoutes);
 api.use('/requests', requireAuth, requestRoutes);
 api.use('/', requireAuth, analyticsRoutes);
+api.use('/', requireAuth, notificationRoutes);
 api.use('/', requireAuth, partnerRoutes);
 api.use('/', requireAuth, miscRoutes);
 app.use('/api', api);

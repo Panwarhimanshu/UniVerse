@@ -268,3 +268,21 @@
 .panel-h .t-sub{font-size:.78rem;color:var(--ink-soft);font-weight:500}
 .adm-export{margin-left:auto;display:inline-flex;align-items:center;gap:.4rem;white-space:nowrap}
 .adm-export svg{width:15px;height:15px}
+
+/* notification centre */
+.count-n{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:#B42318;color:#fff;font:700 .62rem/18px var(--font);text-align:center;border:2px solid var(--surface)}
+.icon-btn{position:relative}
+.nm-row{display:flex;align-items:flex-start;justify-content:space-between;gap:.6rem}
+.notif-menu .nm-all,.notif-menu .nm-foot{width:auto;border:0;background:none;color:var(--blue);font:600 .76rem var(--font);padding:.2rem .3rem;cursor:pointer;flex-direction:row}
+.notif-menu .nm-foot{width:100%;justify-content:center;border-top:1px solid var(--line);margin-top:.3rem;padding:.6rem}
+.notif-menu button.fresh{border-left-color:var(--blue);background:#F0F6FD}
+.nm-title{font:600 .84rem var(--font);color:var(--navy)}
+.notif-prefs td:nth-child(2),.notif-prefs td:nth-child(3),.notif-prefs th:nth-child(2),.notif-prefs th:nth-child(3){text-align:center;width:120px}
+.switch{appearance:none;width:38px;height:22px;border-radius:11px;background:var(--line);position:relative;cursor:pointer;transition:background .2s;vertical-align:middle}
+.switch::after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform .2s}
+.switch:checked{background:var(--blue)}
+.switch:checked::after{transform:translateX(16px)}
+.switch:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.an-preview{display:flex;flex-direction:column;gap:.25rem;padding:.8rem 1rem;border:1px dashed var(--line);border-radius:12px;background:#F0F6FD;font-size:.86rem}
+.an-pv-label{font:600 .68rem var(--font);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft)}
+.an-preview b{color:var(--navy)}

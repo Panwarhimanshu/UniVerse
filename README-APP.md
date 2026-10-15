@@ -73,8 +73,12 @@ signs them out immediately.
 
 ## Notifications, email and security
 
-- **Push notifications** (Android, through Firebase): replies from the desk and the RM, stage changes, documents
-  returned, commissions and payouts. Tapping one opens the case or chat. They also show while the app is open.
+- **Notification engine**: every partner-facing event (case progress, documents, messages, payments, account changes,
+  announcements) goes through one `notify()` on the server. Each person gets their own in-app notification with read
+  state, plus push and email according to their settings. The app and portal show an unread badge, a notification
+  centre and (app) a banner when something new arrives. The master admin can send announcements. Full flow, events
+  and defaults: [docs/NOTIFICATIONS.md](docs/NOTIFICATIONS.md).
+- **Push notifications** (Android, through Firebase): tapping one opens the case, wallet or chat it is about.
   Needs `secrets/google-services.json` (copied into `mobile/` before building) and the Firebase service account key
   (`FIREBASE_SERVICE_ACCOUNT_FILE` locally, `FIREBASE_SERVICE_ACCOUNT` on Vercel).
 - **Email** over SMTP (`SMTP_*` in `server/.env`): welcome on sign-up, password reset links, desk and RM replies, completed

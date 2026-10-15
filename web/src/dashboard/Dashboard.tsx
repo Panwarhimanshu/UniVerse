@@ -55,11 +55,8 @@ const buildFeed = () => Object.entries(BLOGS)
 const isFresh = (iso: string, days: number) => Date.now() - new Date(iso + 'T00:00:00').getTime() < days * 864e5;
 const OWNER_ONLY: View[] = ['profile', 'users'];
 
-const readSeen = (key: string) => {
-  try { return localStorage.getItem(key) ?? ''; } catch { return ''; }
-};
-const writeSeen = (key: string, v: string) => {
-  try { localStorage.setItem(key, v); } catch { /* private mode */ }
+const NOTIF_LABEL: Record<Notification['category'], string> = {
+  case: 'Case', document: 'Document', message: 'Message', payment: 'Payment', account: 'Account', announcement: 'News',
 };
 
 export default function Dashboard() {
@@ -110,13 +107,16 @@ export default function Dashboard() {
   const [photoOpen, setPhotoOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifs, setNotifs] = useState<Notification[]>([]);
-  const seenKey = `uv_seen_${agent?.id}_${member?.id ?? 'owner'}`;
-  const [seen, setSeen] = useState('');
-  useEffect(() => { setSeen(readSeen(seenKey)); }, [seenKey]);
-  const loadNotifs = useCallback(() => { if (agent) api.notifications().then(setNotifs).catch(() => {}); }, [agent]);
+  const [unread, setUnread] = useState(0);
+  const loadNotifs = useCallback(() => {
+    if (agent) api.notifications().then((p) => { setNotifs(p.items); setUnread(p.unread); }).catch(() => {});
+  }, [agent]);
   useEffect(loadNotifs, [loadNotifs]);
-  useInterval(loadNotifs, agent ? 30000 : null);
-  const unread = notifs.filter((n) => n.createdAt > seen).length;
+  useInterval(loadNotifs, agent ? 20000 : null);
+  const markRead = (ids: string[] | 'all') => {
+    setNotifs((list) => list.map((n) => (ids === 'all' || ids.includes(n.id) ? { ...n, read: true } : n)));
+    api.markNotificationsRead(ids).then((r) => setUnread(r.unread)).catch(() => {});
+  };
 
   useEffect(() => { document.title = `${TITLES[view]} | UniVerse Partner Portal`; setSideOpen(false); window.scrollTo({ top: 0 }); }, [view]);
   useEffect(() => { if (agent) api.trackView(`/dashboard/${view}`); }, [view, agent?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -154,15 +154,17 @@ export default function Dashboard() {
     e.stopPropagation();
     setMenuOpen(false);
     setNotifOpen(!notifOpen);
-    if (!notifOpen && notifs.length) {
-      writeSeen(seenKey, notifs[0].createdAt);
-      setTimeout(() => setSeen(notifs[0].createdAt), 1500);
-    }
+    if (!notifOpen) loadNotifs();
   };
   const openNotif = (n: Notification) => {
     setNotifOpen(false);
-    if (n.requestId) setCaseId(n.requestId);
-    else setRmOpen(true);
+    if (!n.read) markRead([n.id]);
+    const l = n.link;
+    if (l.kind === 'case' && l.id) setCaseId(l.id);
+    else if (l.kind === 'rm') setRmOpen(true);
+    else if (l.kind === 'wallet') go('wallet');
+    else if (l.kind === 'profile' && isOwner) go('profile');
+    else if (l.kind === 'whatsnew') go('whatsnew');
   };
   const agreementAction = async (type: 'download' | 'discussion' | 'termination') => {
     try {
@@ -228,20 +230,25 @@ export default function Dashboard() {
             <input type="search" placeholder="Search students…" aria-label="Search students" value={search}
               onChange={(e) => { setSearch(e.target.value); if (e.target.value && view !== 'students' && view !== 'requests') go('students'); }} />
           </div>
-          <button className="icon-btn" aria-label="Notifications" aria-expanded={notifOpen} onClick={toggleNotifs}><Svg html={I.bell} />{unread ? <span className="dot-n"></span> : null}</button>
+          <button className="icon-btn" aria-label="Notifications" aria-expanded={notifOpen} onClick={toggleNotifs}><Svg html={I.bell} />{unread ? <span className="count-n">{unread > 9 ? '9+' : unread}</span> : null}</button>
           <div className="user-chip" role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); setNotifOpen(false); setMenuOpen(!menuOpen); }}>
             <Avatar name={myName} photo={member ? member.avatar : agent.avatar} /><b>{myName}</b>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
           </div>
         </header>
         <div className={`user-menu notif-menu${notifOpen ? ' open' : ''}`} onClick={(e) => e.stopPropagation()}>
-          <div className="nm-head"><b>Updates</b><span>From the service desk and {agent.rm.name.split(' ')[0]}</span></div>
+          <div className="nm-head nm-row">
+            <div><b>Notifications</b><span>{unread ? `${unread} unread` : 'All caught up'}</span></div>
+            {unread ? <button type="button" className="nm-all" onClick={() => markRead('all')}>Mark all read</button> : null}
+          </div>
           {notifs.length ? notifs.map((n) => (
-            <button key={n.id} className={n.createdAt > seen ? 'fresh' : ''} onClick={() => openNotif(n)}>
-              <span className="nm-who">{n.ref ?? 'Relationship manager'} · {fmtTime(n.createdAt)}</span>
-              <span className="nm-text">{n.text}</span>
+            <button key={n.id} className={n.read ? '' : 'fresh'} onClick={() => openNotif(n)}>
+              <span className="nm-who">{NOTIF_LABEL[n.category] ?? 'Update'} · {fmtTime(n.createdAt)}</span>
+              <span className="nm-title">{n.title}</span>
+              <span className="nm-text">{n.body}</span>
             </button>
-          )) : <p className="nm-empty">No updates yet. Replies from the desk and your RM will show up here.</p>}
+          )) : <p className="nm-empty">No notifications yet. Case updates, replies and payments will show up here.</p>}
+          {isOwner ? <button type="button" className="nm-foot" onClick={() => { setNotifOpen(false); go('profile'); }}>Notification settings</button> : null}
         </div>
         <div className={`user-menu${menuOpen ? ' open' : ''}`}>
           {member ? <div className="nm-head"><b>{member.name}</b><span>{member.role} · {agent.agency || agent.name}</span></div> : null}
@@ -543,6 +550,8 @@ export default function Dashboard() {
                 </div>
               </div>
 
+              <NotificationSettings />
+
               <div className="panel" style={{ marginTop: '1.4rem' }}>
                 <div className="panel-h"><h3>Partner agreement</h3><span className="status done">Active</span></div>
                 <div className="panel-b">
@@ -761,5 +770,37 @@ function PartnerAnalytics({ a, money }: { a: import('../lib/api').Analytics; mon
         </div>
       </div>
     </>
+  );
+}
+
+/* ---------- push and email per category (in-app is always on) ---------- */
+function NotificationSettings() {
+  const prefs = useApi(api.notificationPrefs, []);
+  const [list, setList] = useState<import('../lib/api').NotificationPref[] | null>(null);
+  const rows = list ?? prefs.data;
+  const toggle = async (key: Notification['category'], channel: 'push' | 'email', value: boolean) => {
+    if (!rows) return;
+    const before = rows;
+    setList(rows.map((p) => (p.key === key ? { ...p, [channel]: value } : p)));
+    try { setList(await api.saveNotificationPrefs({ [key]: { [channel]: value } })); } catch { setList(before); }
+  };
+  return (
+    <div className="panel" style={{ marginTop: '1.4rem' }}>
+      <div className="panel-h"><h3>Notifications</h3><span className="t-sub">Every notification shows in the portal and the app</span></div>
+      <div style={{ overflowX: 'auto' }}>
+        <table className="tbl notif-prefs">
+          <thead><tr><th>Kind</th><th>Phone (app)</th><th>Email</th></tr></thead>
+          <tbody>
+            {rows?.map((p) => (
+              <tr key={p.key}>
+                <td><div className="t-name">{p.label}</div><div className="t-sub">{p.description}</div></td>
+                <td><input type="checkbox" className="switch" checked={p.push} onChange={(e) => toggle(p.key, 'push', e.target.checked)} aria-label={`${p.label} on phone`} /></td>
+                <td><input type="checkbox" className="switch" checked={p.email} onChange={(e) => toggle(p.key, 'email', e.target.checked)} aria-label={`${p.label} by email`} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }

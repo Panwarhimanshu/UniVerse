@@ -2,7 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { Types } from 'mongoose';
 import {
-  Admin, Agent, AgreementRequest, Article, AuditLog, CommissionArchive, Message, ServiceContent, ServiceRequest, Setting,
+  Admin, Agent, AgreementRequest, Announcement, Article, AuditLog, CommissionArchive, Device, Message, Notification, ServiceContent, ServiceRequest, Setting,
   UsageEvent,
   STAFF_SECTIONS, Student, TeamMember, Transaction,
 } from '../models/index.js';
@@ -13,7 +13,7 @@ import { publicAgent, publicTeamMember, publicTx } from '../serialize.js';
 import { publicArticle } from './content.js';
 import { deleteFile } from '../files.js';
 import { EMAIL_RE } from './auth.js';
-import { accountNotices } from '../notify.js';
+import { accountNotices, notify } from '../notify.js';
 
 /* Master admin only (mounted behind masterOnly in admin.ts). */
 const router = Router();
@@ -176,6 +176,7 @@ router.delete('/partners/:id', async (req, res) => {
   await Promise.all([
     Student.deleteMany({ agent: a._id }), ServiceRequest.deleteMany({ agent: a._id }), Message.deleteMany({ agent: a._id }),
     Transaction.deleteMany({ agent: a._id }), TeamMember.deleteMany({ agent: a._id }), AgreementRequest.deleteMany({ agent: a._id }),
+    Notification.deleteMany({ agent: a._id }), Device.deleteMany({ agent: a._id }), UsageEvent.deleteMany({ agent: a._id }),
   ]);
   await a.deleteOne();
   res.locals.audit = `Deleted partner ${a.agency || a.name} (${a.email}) and all their data`;
@@ -379,6 +380,35 @@ router.get('/usage', async (req, res) => {
     topPartners: active.map((a) => ({ id: String(a._id), name: nameOf.get(String(a._id)) ?? 'Deleted partner', events: a.events, lastSeen: a.lastSeen, platforms: a.platforms })),
     recentSignIns: signIns.map((s) => ({ name: nameOf.get(String(s.agent)) ?? 'Deleted partner', platform: s.platform, os: s.os, at: s.at })),
   });
+});
+
+/* ---------- announcements: a notification to every partner, or to one ---------- */
+router.get('/announcements', async (_req, res) => {
+  const list = await Announcement.find().sort({ createdAt: -1 }).limit(50).populate('partner', 'name agency');
+  res.json(list.map((a: any) => ({
+    id: String(a._id), title: a.title, body: a.body, sentBy: a.sentBy, recipients: a.recipients, createdAt: a.createdAt,
+    partner: a.partner ? { id: String(a.partner._id), name: a.partner.agency || a.partner.name } : null,
+  })));
+});
+
+router.post('/announcements', async (req, res) => {
+  const title = String(req.body?.title ?? '').trim();
+  const body = String(req.body?.body ?? '').trim();
+  if (!title || title.length > 80) throw new HttpError(400, 'Write a title of up to 80 characters');
+  if (!body || body.length > 600) throw new HttpError(400, 'Write a message of up to 600 characters');
+  const partner = req.body?.partnerId ? oid(req.body.partnerId, 'Partner') : null;
+  const agents = await Agent.find(partner ? { _id: partner } : { suspended: { $ne: true } }).select('_id');
+  if (partner && !agents.length) throw new HttpError(404, 'Partner not found');
+  let recipients = 0;
+  for (let i = 0; i < agents.length; i += 20) {
+    const counts = await Promise.all(agents.slice(i, i + 20).map((a) => notify({
+      agent: a._id, category: 'announcement', type: 'announcement', title, body, link: { kind: 'none' },
+    })));
+    recipients += counts.reduce((n, c) => n + (c ?? 0), 0);
+  }
+  const a = await Announcement.create({ title, body, partner, sentBy: adminOf(req).name, recipients });
+  res.locals.audit = `Sent announcement “${title}” to ${partner ? 'one partner' : 'all partners'}`;
+  res.status(201).json({ id: String(a._id), recipients });
 });
 
 /* ---------- activity log ---------- */

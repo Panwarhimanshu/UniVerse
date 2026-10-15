@@ -5,6 +5,7 @@ import { ServiceRequest, Student, Message, STATUSES } from '../models/index.js';
 import { accessOf, agentIdOf, HttpError, need } from '../middleware/auth.js';
 import { SERVICES, serviceByKey, isCountry } from '../data/catalog.js';
 import { EMAIL_RE } from './auth.js';
+import { notify } from '../notify.js';
 import { publicRequest, publicMessage } from '../serialize.js';
 import { isServiceHidden } from '../content.js';
 import { track } from '../usage.js';
@@ -93,6 +94,11 @@ router.post('/', need('create'), async (req, res) => {
   for (const k of toOpen) created.push(await openCase(agentId, student._id, k, String(note ?? '')));
   const full = await created[0].populate('student');
   track(req, agentId, accessOf(req).memberId, 'referral_created');
+  const { memberId, name: byName } = accessOf(req);
+  if (memberId) {
+    const names = toOpen.map((k) => serviceByKey(k)?.name ?? k).join(', ');
+    await notify({ agent: agentId, category: 'case', type: 'case.created_by_team', title: `${byName} requested ${created.length > 1 ? `${created.length} services` : 'a service'}`, body: `${names} for ${student.name}.`, link: { kind: 'case', id: String(created[0]._id) }, audience: 'owner', email: false });
+  }
   res.status(201).json({ ...publicRequest(full), opened: created.length });
 });
 

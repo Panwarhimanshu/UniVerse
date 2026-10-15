@@ -2,13 +2,14 @@ import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { api } from './api';
+import type { NotificationLink } from './api';
 
 /* Push notifications (Firebase on Android). Each phone registers its token with our server after sign-in;
    the server pushes desk and RM replies, case updates, commissions and payouts. */
 
-// show the banner even while the app is open, so updates appear in-app too
+// while the app is open our own in-app banner shows it (InAppBanner), so the system banner is skipped; it still goes to the tray
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
+  handleNotification: async () => ({ shouldShowBanner: false, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
 });
 
 let current: string | null = null;
@@ -45,8 +46,8 @@ export async function unregisterPush() {
   await api.unregisterDevice(t).catch(() => {});
 }
 
-/** Where a tapped notification should open, e.g. /case/123 */
-export const urlOf = (n: Notifications.Notification) => {
-  const url = n.request.content.data?.url;
-  return typeof url === 'string' && url.startsWith('/') ? url : '/updates';
+/** What a tapped push is about: its notification id and the screen to open (see routeFor in updates.tsx) */
+export const pushTarget = (n: Notifications.Notification) => {
+  const d = (n.request.content.data ?? {}) as { notificationId?: string; kind?: string; id?: string };
+  return { notificationId: d.notificationId ?? '', link: { kind: (d.kind || 'none') as NotificationLink['kind'], id: d.id || undefined } };
 };

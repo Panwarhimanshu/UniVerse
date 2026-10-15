@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { Types } from 'mongoose';
-import { AgreementRequest, Message, MENUS, PERMS, ServiceRequest, Student, TeamMember } from '../models/index.js';
+import { AgreementRequest, Device, Message, MENUS, Notification, PERMS, ServiceRequest, Student, TeamMember } from '../models/index.js';
 import bcrypt from 'bcryptjs';
 import { agentIdOf, HttpError, need, needMenu, ownerOnly } from '../middleware/auth.js';
 import { emailTaken } from './auth.js';
@@ -134,6 +134,7 @@ router.delete('/team/:id', ownerOnly, async (req, res) => {
   if (!Types.ObjectId.isValid(String(req.params.id))) throw new HttpError(404, 'Member not found');
   const r = await TeamMember.deleteOne({ _id: req.params.id, agent: agentIdOf(req) });
   if (!r.deletedCount) throw new HttpError(404, 'Member not found');
+  await Promise.all([Notification.deleteMany({ member: req.params.id }), Device.deleteMany({ member: req.params.id })]);
   res.status(204).end();
 });
 
@@ -158,14 +159,4 @@ router.post('/agreement/requests', ownerOnly, async (req, res) => {
 });
 
 /* ---------- notifications: latest desk / RM messages ---------- */
-/* The app's notification centre: replies from our side, case updates, money and account notices
-   (not the notes about the partner's own actions) */
-router.get('/notifications', async (req, res) => {
-  const msgs = await Message.find({
-    agent: agentIdOf(req), from: { $in: ['desk', 'rm', 'system'] }, quiet: { $ne: true },
-    text: { $not: /^REQ-\d+ opened for |uploaded “/ },
-  }).sort({ createdAt: -1 }).limit(40).populate('request', 'ref');
-  res.json(msgs.map((m: any) => ({ ...publicMessage(m), ref: m.request?.ref ?? null, requestId: m.request?._id ? String(m.request._id) : null })));
-});
-
 export default router;

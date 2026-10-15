@@ -30,8 +30,9 @@ const agentSchema = new Schema(
     },
     bankAccount: { type: String, default: '' }, // e.g. "HDFC Bank •••• 4821", required before withdrawing
     avatar: { type: String, default: '' }, // GridFS id of the profile photo
+    notifyPrefs: { type: Schema.Types.Mixed, default: {} }, // { category: { push, email } }, see notify.ts
   },
-  { timestamps: true },
+  { timestamps: true, minimize: false },
 );
 export const Agent = model('Agent', agentSchema);
 export type AgentDoc = InferSchemaType<typeof agentSchema> & { _id: Types.ObjectId };
@@ -92,11 +93,6 @@ const messageSchema = new Schema(
   },
   { timestamps: true },
 );
-/** Set by notify.ts: sends a push (and for important ones, an email) for every message our side writes */
-export const messageHooks: { onCreate?: (m: { agent: unknown; request?: unknown; from: string; author: string; text: string; quiet?: boolean | null }) => Promise<void> } = {};
-messageSchema.post('save', async function (doc) {
-  if (doc.from !== 'agent' && !doc.quiet && messageHooks.onCreate) await messageHooks.onCreate(doc).catch((e) => console.error('notify failed', e));
-});
 export const Message = model('Message', messageSchema);
 
 /* ---------- Wallet transaction ---------- */
@@ -130,6 +126,7 @@ const teamSchema = new Schema(
     passwordHash: { type: String, select: false },
     lastLoginAt: { type: Date, default: null },
     avatar: { type: String, default: '' }, // GridFS id of the member's profile photo
+    notifyPrefs: { type: Schema.Types.Mixed, default: {} },
   },
   { timestamps: true },
 );
@@ -246,6 +243,37 @@ const usageSchema = new Schema(
 usageSchema.index({ at: 1 }, { expireAfterSeconds: 180 * 24 * 3600 }); // keep 6 months
 usageSchema.index({ event: 1, at: -1 });
 export const UsageEvent = model('UsageEvent', usageSchema);
+
+/* ---------- In-app notifications: one per recipient, created by notify() in notify.ts ---------- */
+const notificationSchema = new Schema(
+  {
+    agent: { type: Schema.Types.ObjectId, ref: 'Agent', required: true },
+    member: { type: Schema.Types.ObjectId, ref: 'TeamMember', default: null }, // null = the account owner
+    category: { type: String, required: true }, // case, document, message, payment, account, announcement
+    type: { type: String, required: true }, // e.g. case.stage
+    title: { type: String, required: true },
+    body: { type: String, default: '' },
+    link: { kind: { type: String, default: 'none' }, id: { type: String, default: '' } },
+    readAt: { type: Date, default: null },
+  },
+  { timestamps: { createdAt: true, updatedAt: false }, versionKey: false },
+);
+notificationSchema.index({ agent: 1, member: 1, createdAt: -1 });
+notificationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 180 * 24 * 3600 }); // kept 6 months
+export const Notification = model('Notification', notificationSchema);
+
+/* ---------- Announcements sent by the master admin ---------- */
+const announcementSchema = new Schema(
+  {
+    title: { type: String, required: true },
+    body: { type: String, required: true },
+    partner: { type: Schema.Types.ObjectId, ref: 'Agent', default: null }, // null = all partners
+    sentBy: { type: String, default: '' },
+    recipients: { type: Number, default: 0 },
+  },
+  { timestamps: true },
+);
+export const Announcement = model('Announcement', announcementSchema);
 
 /* ---------- Phones registered for push notifications ---------- */
 const deviceSchema = new Schema(

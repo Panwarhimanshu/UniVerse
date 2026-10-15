@@ -1,79 +1,94 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
-import { api, Notification } from './api';
+import { api } from './api';
+import type { AppNotification, NotificationCategory, NotificationLink } from './api';
+import type { IconName } from '../components/ui';
 import { useAuth } from './auth';
 
-/* The notification centre: replies from the desk and RM, case updates, money and account notices.
-   Checked every 20 seconds while the app is open, when it comes back to the front, and when a push arrives.
-   Anything new also refreshes the account, so changes made in the back office (verification, RM) show at once. */
+/*
+  In-app side of the notification engine (server: notify.ts, docs/NOTIFICATIONS.md).
+  - The unread count is checked every 20 s while the app is open, when it comes back to the front, and when a push arrives.
+  - When something newer than before shows up, the latest page is loaded, the newest unread one is shown as a banner,
+    and the account is refreshed, so back-office changes (verification, RM) appear at once.
+  - Read state lives on the server, so it matches across phones and the website.
+*/
 
 const POLL_MS = 20000;
-const keyFor = (agentId?: string, memberId?: string) => `uv_seen_${agentId}_${memberId ?? 'owner'}`;
 
 interface UpdatesState {
-  list: Notification[];
-  seen: string;
+  items: AppNotification[];
   unread: number;
-  /** the newest item that arrived while the app was open, for the in-app banner */
-  incoming: Notification | null;
+  /** the newest notification that arrived while the app was open, for the banner */
+  incoming: AppNotification | null;
   dismiss: () => void;
   reload: () => Promise<void>;
-  markSeen: () => Promise<void>;
+  markRead: (ids: string[] | 'all') => Promise<void>;
 }
 const Ctx = createContext<UpdatesState | null>(null);
 
 export function UpdatesProvider({ children }: { children: ReactNode }) {
   const { agent, refresh } = useAuth();
-  const key = keyFor(agent?.id, agent?.member?.id);
-  const [list, setList] = useState<Notification[]>([]);
-  const [seen, setSeen] = useState('');
-  const [incoming, setIncoming] = useState<Notification | null>(null);
-  const newest = useRef<string | null>(null);
+  const [items, setItems] = useState<AppNotification[]>([]);
+  const [unread, setUnread] = useState(0);
+  const [incoming, setIncoming] = useState<AppNotification | null>(null);
+  const latest = useRef<string | null>(null); // newest createdAt we know about; null until the first load
 
   const reload = useCallback(async () => {
-    if (!agent) return;
     try {
-      const [items, mark] = await Promise.all([api.notifications(), AsyncStorage.getItem(key)]);
-      const top = items[0]?.createdAt ?? '';
-      // first load only sets the baseline; later loads announce what is new
-      if (newest.current !== null && top > newest.current) {
-        setIncoming(items[0]);
-        refresh();
-      }
-      newest.current = top;
-      setList(items);
-      setSeen(mark ?? '');
+      const page = await api.notifications();
+      setItems(page.items);
+      setUnread(page.unread);
+      latest.current = page.items[0]?.createdAt ?? '';
     } catch {
       /* offline: keep what we have */
     }
-  }, [agent?.id, key, refresh]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
+
+  const check = useCallback(async () => {
+    try {
+      const { count, latest: newest } = await api.unreadNotifications();
+      setUnread(count);
+      if (latest.current !== null && newest && newest > latest.current) {
+        const known = latest.current;
+        await reload();
+        refresh();
+        const page = await api.notifications().catch(() => null);
+        const fresh = page?.items.find((n) => !n.read && n.createdAt > known);
+        if (fresh) setIncoming(fresh);
+      }
+    } catch {
+      /* offline */
+    }
+  }, [reload, refresh]);
 
   useEffect(() => {
-    newest.current = null;
-    setList([]);
+    latest.current = null;
+    setItems([]);
+    setUnread(0);
     setIncoming(null);
     if (!agent) return;
     reload();
-    const t = setInterval(() => { if (AppState.currentState === 'active') reload(); }, POLL_MS);
-    const app = AppState.addEventListener('change', (s) => { if (s === 'active') { reload(); refresh(); } });
-    const push = Platform.OS === 'web' ? null : Notifications.addNotificationReceivedListener(() => reload());
+    const t = setInterval(() => { if (AppState.currentState === 'active') check(); }, POLL_MS);
+    const app = AppState.addEventListener('change', (s) => { if (s === 'active') { check(); refresh(); } });
+    const push = Platform.OS === 'web' ? null : Notifications.addNotificationReceivedListener(() => check());
     return () => { clearInterval(t); app.remove(); push?.remove(); };
   }, [agent?.id, agent?.member?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const markSeen = useCallback(async () => {
-    if (!list.length) return;
-    await AsyncStorage.setItem(key, list[0].createdAt);
-    setSeen(list[0].createdAt);
-    setIncoming(null);
-  }, [key, list]);
+  const markRead = useCallback(async (ids: string[] | 'all') => {
+    if (ids !== 'all' && !ids.length) return;
+    setItems((list) => list.map((n) => (ids === 'all' || ids.includes(n.id) ? { ...n, read: true } : n)));
+    setIncoming((n) => (n && (ids === 'all' || ids.includes(n.id)) ? null : n));
+    try {
+      setUnread((await api.markNotificationsRead(ids)).unread);
+    } catch {
+      /* will sync on the next check */
+    }
+  }, []);
 
   const value = useMemo<UpdatesState>(() => ({
-    list, seen, incoming, reload, markSeen,
-    unread: list.filter((n) => n.createdAt > seen).length,
-    dismiss: () => setIncoming(null),
-  }), [list, seen, incoming, reload, markSeen]);
+    items, unread, incoming, reload, markRead, dismiss: () => setIncoming(null),
+  }), [items, unread, incoming, reload, markRead]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
@@ -83,6 +98,16 @@ export function useUpdates() {
   return ctx;
 }
 
-/** Where an item opens: its case, the RM chat, or (account notices) the profile */
-export const updateTarget = (n: Notification) => (n.requestId ? `/case/${n.requestId}` : n.from === 'system' ? '/profile' : '/rm');
-export const updateLabel = (n: Notification) => n.ref ?? (n.from === 'system' ? 'Your account' : 'Relationship manager');
+/** Screen a notification opens, or null when it only needs reading */
+export const routeFor = (link: NotificationLink): string | null => ({
+  case: link.id ? `/case/${link.id}` : '/cases', rm: '/rm', wallet: '/wallet', profile: '/profile', whatsnew: '/whatsnew', none: null,
+} as Record<NotificationLink['kind'], string | null>)[link.kind] ?? null;
+
+export const CATEGORY_META: Record<NotificationCategory, { label: string; icon: IconName; color: string }> = {
+  case: { label: 'Cases', icon: 'folder', color: '#0A66C2' },
+  document: { label: 'Documents', icon: 'file-text', color: '#B45309' },
+  message: { label: 'Messages', icon: 'message-circle', color: '#0A66C2' },
+  payment: { label: 'Payments', icon: 'credit-card', color: '#1E7E39' },
+  account: { label: 'Account', icon: 'user-check', color: '#0B2440' },
+  announcement: { label: 'News', icon: 'volume-2', color: '#7C3AED' },
+};

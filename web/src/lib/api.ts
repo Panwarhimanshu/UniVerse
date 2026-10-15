@@ -25,7 +25,13 @@ export interface Student {
   requests: { id: string; ref: string; service: string; status: CaseStatus; progress: number }[];
 }
 export interface Message { id: string; from: 'agent' | 'desk' | 'rm' | 'system'; author: string; text: string; createdAt: string }
-export interface Notification extends Message { ref: string | null; requestId: string | null }
+/* Notifications from the server's notification engine (docs/NOTIFICATIONS.md) */
+export type NotificationCategory = 'case' | 'document' | 'message' | 'payment' | 'account' | 'announcement';
+export interface Notification {
+  id: string; category: NotificationCategory; type: string; title: string; body: string;
+  link: { kind: 'case' | 'rm' | 'wallet' | 'profile' | 'whatsnew' | 'none'; id?: string }; read: boolean; createdAt: string;
+}
+export interface NotificationPref { key: NotificationCategory; label: string; description: string; push: boolean; email: boolean }
 export interface Transaction { id: string; description: string; type: 'Credit' | 'Debit'; amount: number; status: 'Pending' | 'Completed' | 'Rejected'; date: string }
 export interface Wallet { balance: number; pending: number; lifetime: number; bankAccount: string; minWithdrawal: number; transactions: Transaction[] }
 export interface Dashboard {
@@ -149,7 +155,10 @@ export const api = {
 
   dashboard: () => request<Dashboard>('/dashboard'),
   commissions: () => request<Commissions>('/commissions'),
-  notifications: () => request<Notification[]>('/notifications'),
+  notifications: () => request<{ items: Notification[]; unread: number; more: boolean }>('/notifications?limit=20'),
+  markNotificationsRead: (ids: string[] | 'all') => request<{ unread: number }>('/notifications/read', json('POST', ids === 'all' ? { all: true } : { ids })),
+  notificationPrefs: () => request<NotificationPref[]>('/notifications/preferences'),
+  saveNotificationPrefs: (b: Partial<Record<NotificationCategory, { push?: boolean; email?: boolean }>>) => request<NotificationPref[]>('/notifications/preferences', json('PUT', b)),
 
   cases: () => request<Case[]>('/requests'),
   case: (id: string) => request<Case>(`/requests/${id}`),

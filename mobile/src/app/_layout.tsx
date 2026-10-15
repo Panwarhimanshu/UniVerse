@@ -5,9 +5,9 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import { api } from '../lib/api';
-import { registerForPush, urlOf } from '../lib/push';
+import { pushTarget, registerForPush } from '../lib/push';
 import { AuthProvider, useAuth } from '../lib/auth';
-import { UpdatesProvider } from '../lib/updates';
+import { routeFor, UpdatesProvider } from '../lib/updates';
 import { InAppBanner } from '../components/InAppBanner';
 import { Loading } from '../components/ui';
 import { colors } from '../theme';
@@ -29,7 +29,10 @@ function Navigator() {
   useEffect(() => {
     if (!agent || Platform.OS === 'web') return;
     const open = (r: Notifications.NotificationResponse | null) => {
-      if (r?.actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER) router.push(urlOf(r.notification) as never);
+      if (r?.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) return;
+      const { notificationId, link } = pushTarget(r.notification);
+      if (notificationId) api.markNotificationsRead([notificationId]).catch(() => {});
+      router.push((routeFor(link) ?? '/updates') as never);
     };
     Notifications.getLastNotificationResponseAsync().then(open).catch(() => {}); // the tap that opened the app
     const sub = Notifications.addNotificationResponseReceivedListener(open);
@@ -81,6 +84,7 @@ function Navigator() {
       <Stack.Screen name="team-member" options={{ title: 'Team member', presentation: 'modal' }} />
       <Stack.Screen name="password" options={{ title: 'Change password' }} />
       <Stack.Screen name="profile" options={{ title: 'Profile' }} />
+      <Stack.Screen name="notification-settings" options={{ title: 'Notification settings' }} />
       <Stack.Screen name="analytics" options={{ title: 'Your analytics' }} />
     </Stack>
   );

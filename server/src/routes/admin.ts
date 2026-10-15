@@ -10,7 +10,7 @@ import { LAST_STEP, progressFor, stepsFor } from '../data/timelines.js';
 import { publicAgent, publicMessage, publicRequest, publicTx } from '../serialize.js';
 import { deleteFile, sendDocFile } from '../files.js';
 import { checkAttempts, clearAttempts, recordFailure } from '../limits.js';
-import { accountNotices } from '../notify.js';
+import { accountNotices, notify } from '../notify.js';
 
 /* Back office for the UniVerse service desk and relationship managers. */
 const router = Router();
@@ -284,6 +284,9 @@ const loadCase = async (id: unknown) => {
   if (!r) throw new HttpError(404, 'Case not found');
   return r;
 };
+/** "REQ-1174 · Riya Shah": the title partners see on case notifications */
+const caseTitle = (r: Awaited<ReturnType<typeof loadCase>>) => `${r.ref} · ${(r.student as unknown as { name?: string })?.name ?? ''}`.replace(/ · $/, '');
+const caseLink = (r: Awaited<ReturnType<typeof loadCase>>) => ({ kind: 'case' as const, id: String(r._id) });
 
 const caseDetail = async (r: any) => {
   const [agent, messages, credits] = await Promise.all([
@@ -333,7 +336,16 @@ router.patch('/cases/:id', async (req, res) => {
   }
   await r.save();
   for (const text of notes) await Message.create({ agent: r.agent, request: r._id, from: 'system', text });
-  if (notes.length) res.locals.audit = `${r.ref}: ${notes.join('; ')}`;
+  if (notes.length) {
+    res.locals.audit = `${r.ref}: ${notes.join('; ')}`;
+    const svc = serviceByKey(r.service)?.name ?? r.service;
+    const changedStatus = req.body?.status !== undefined;
+    await notify(r.status === 'Completed' && (changedStatus || r.step === LAST_STEP)
+      ? { agent: r.agent, category: 'case', type: 'case.completed', title: `Completed · ${caseTitle(r)}`, body: `${svc} is complete. Any commission will be credited to your wallet.`, link: caseLink(r), audience: 'requests', email: true }
+      : r.status === 'On Hold' && changedStatus
+        ? { agent: r.agent, category: 'case', type: 'case.on_hold', title: `On hold · ${caseTitle(r)}`, body: `${svc} has been put on hold. Check the case chat for what is needed.`, link: caseLink(r), audience: 'requests', email: true }
+        : { agent: r.agent, category: 'case', type: 'case.stage', title: caseTitle(r), body: `${svc}: ${notes.join('. ')}`, link: caseLink(r), audience: 'requests', email: false });
+  }
   res.json(await caseDetail(r));
 });
 
@@ -343,6 +355,7 @@ router.post('/cases/:id/messages', async (req, res) => {
   if (!text) throw new HttpError(400, 'Message is empty');
   await Message.create({ agent: r.agent, request: r._id, from: 'desk', author: adminOf(req).name, text });
   res.locals.audit = `${r.ref}: replied to partner`;
+  await notify({ agent: r.agent, category: 'message', type: 'message.desk', title: `${adminOf(req).name} replied · ${r.ref}`, body: text, link: caseLink(r), audience: 'requests' });
   res.status(201).json(await caseDetail(r));
 });
 
@@ -355,6 +368,7 @@ router.post('/cases/:id/docs', async (req, res) => {
   await r.save();
   await Message.create({ agent: r.agent, request: r._id, from: 'desk', author: adminOf(req).name, text: `Please upload: ${name}` });
   res.locals.audit = `${r.ref}: requested “${name}”`;
+  await notify({ agent: r.agent, category: 'document', type: 'document.requested', title: `Document needed · ${caseTitle(r)}`, body: `Please upload: ${name}`, link: caseLink(r), audience: 'requests' });
   res.status(201).json(await caseDetail(r));
 });
 
@@ -370,6 +384,7 @@ router.patch('/cases/:id/docs/:docId', async (req, res) => {
     await r.save();
     await Message.create({ agent: r.agent, request: r._id, from: 'system', text: `“${d.name}” verified` });
     res.locals.audit = `${r.ref}: verified “${d.name}”`;
+    await notify({ agent: r.agent, category: 'document', type: 'document.verified', title: `Document verified · ${caseTitle(r)}`, body: `“${d.name}” has been verified.`, link: caseLink(r), audience: 'requests', email: false });
   } else if (status === 'missing') {
     const reason = String(req.body?.reason ?? '').trim();
     if (d.file) await deleteFile(d.file);
@@ -380,6 +395,7 @@ router.patch('/cases/:id/docs/:docId', async (req, res) => {
       text: `We couldn't accept “${d.name}”${reason ? `: ${reason}` : ''}. Please upload it again.`,
     });
     res.locals.audit = `${r.ref}: returned “${d.name}”`;
+    await notify({ agent: r.agent, category: 'document', type: 'document.returned', title: `Upload again · ${caseTitle(r)}`, body: `We couldn't accept “${d.name}”${reason ? `: ${reason}` : ''}. Please upload it again.`, link: caseLink(r), audience: 'requests' });
   } else {
     throw new HttpError(400, 'Unknown document status');
   }
@@ -413,6 +429,12 @@ router.post('/cases/:id/credit', async (req, res) => {
     text: `Commission of ₹${amount.toLocaleString('en-IN')} ${cleared ? 'credited to your wallet' : 'added as pending clearance'}`,
   });
   res.locals.audit = `${r.ref}: credited ₹${amount.toLocaleString('en-IN')} commission${cleared ? '' : ' (pending)'}`;
+  await notify({
+    agent: r.agent, category: 'payment', type: cleared ? 'payment.commission_credited' : 'payment.commission_pending',
+    title: cleared ? `₹${amount.toLocaleString('en-IN')} commission credited` : `₹${amount.toLocaleString('en-IN')} commission on its way`,
+    body: `${svc} for ${student?.name ?? r.ref}: ${cleared ? 'credited to your wallet. You can withdraw it any time.' : 'added as pending. It moves to your balance once cleared.'}`,
+    link: { kind: 'wallet' }, audience: 'wallet',
+  });
   res.status(201).json(await caseDetail(r));
 });
 
@@ -495,6 +517,7 @@ router.post('/partners/:id/messages', async (req, res) => {
   if (!(await Agent.exists({ _id: agent }))) throw new HttpError(404, 'Partner not found');
   const m = await Message.create({ agent, request: null, from: 'rm', author: adminOf(req).name, text });
   res.locals.audit = 'Replied in an RM conversation';
+  await notify({ agent, category: 'message', type: 'message.rm', title: `Message from ${adminOf(req).name}`, body: text, link: { kind: 'rm' } });
   res.status(201).json(publicMessage(m));
 });
 
@@ -539,6 +562,15 @@ router.patch('/transactions/:id', async (req, res) => {
     throw new HttpError(400, 'That action does not apply to this transaction');
   }
   await t.save();
+  const amt = `₹${t.amount.toLocaleString('en-IN')}`;
+  await notify(action === 'clear'
+    ? { agent: t.agent, category: 'payment', type: 'payment.commission_cleared', title: `${amt} added to your balance`, body: `A pending commission of ${amt} has cleared and is ready to withdraw.`, link: { kind: 'wallet' }, audience: 'wallet' }
+    : action === 'pay'
+      ? { agent: t.agent, category: 'payment', type: 'payment.withdrawal_paid', title: `${amt} withdrawal paid`, body: `Your withdrawal of ${amt} has been paid to your bank account.`, link: { kind: 'wallet' }, audience: 'wallet' }
+      : { agent: t.agent, category: 'payment', type: t.type === 'Debit' ? 'payment.withdrawal_rejected' : 'payment.commission_rejected',
+        title: t.type === 'Debit' ? `${amt} withdrawal not processed` : `${amt} commission cancelled`,
+        body: t.type === 'Debit' ? `Your withdrawal of ${amt} couldn't be processed. The amount is back in your wallet.` : `A pending commission of ${amt} was cancelled. Ask your RM if you have questions.`,
+        link: { kind: 'wallet' }, audience: 'wallet' });
   res.locals.audit = `${t.type === 'Debit' ? 'Withdrawal' : 'Commission'} of ₹${t.amount.toLocaleString('en-IN')}: ${action === 'pay' ? 'paid' : action === 'clear' ? 'cleared' : 'rejected'}`;
   res.json(publicTx(t));
 });
@@ -558,6 +590,10 @@ router.patch('/agreement-requests/:id', async (req, res) => {
   if (!r) throw new HttpError(404, 'Request not found');
   r.status = req.body?.status === 'Open' ? 'Open' : 'Closed';
   await r.save();
+  if (r.status === 'Closed') {
+    const what = { download: 'copy of your signed agreement', discussion: 'request to discuss your agreement', termination: 'termination request' }[r.type as string] ?? 'agreement request';
+    await notify({ agent: r.agent, category: 'account', type: 'account.agreement_closed', title: 'Agreement request handled', body: `Your ${what} has been handled. Check your email or ask your RM for details.`, link: { kind: 'profile' }, audience: 'owner' });
+  }
   res.locals.audit = `Agreement request (${r.type}) ${r.status === 'Open' ? 'reopened' : 'closed'}`;
   res.json({ ok: true });
 });

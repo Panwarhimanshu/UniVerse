@@ -35,7 +35,13 @@ export interface Student {
   requests: { id: string; ref: string; service: string; status: CaseStatus; progress: number }[];
 }
 export interface Message { id: string; from: 'agent' | 'desk' | 'rm' | 'system'; author: string; text: string; createdAt: string }
-export interface Notification extends Message { ref: string | null; requestId: string | null }
+/* ---------- notifications (server notification engine, see docs/NOTIFICATIONS.md) ---------- */
+export type NotificationCategory = 'case' | 'document' | 'message' | 'payment' | 'account' | 'announcement';
+export interface NotificationLink { kind: 'case' | 'rm' | 'wallet' | 'profile' | 'whatsnew' | 'none'; id?: string }
+export interface AppNotification {
+  id: string; category: NotificationCategory; type: string; title: string; body: string; link: NotificationLink; read: boolean; createdAt: string;
+}
+export interface NotificationPref { key: NotificationCategory; label: string; description: string; push: boolean; email: boolean }
 export interface Transaction { id: string; description: string; type: 'Credit' | 'Debit'; amount: number; status: 'Pending' | 'Completed' | 'Rejected'; date: string }
 export interface Wallet { balance: number; pending: number; lifetime: number; bankAccount: string; minWithdrawal: number; transactions: Transaction[] }
 export interface Service {
@@ -140,7 +146,12 @@ export const api = {
   meta: () => request<{ destinations: string[]; countries?: string[]; minWithdrawal: number }>('/meta'),
   services: () => request<Service[]>('/services'),
   commissions: () => request<Commissions>('/commissions'),
-  notifications: () => request<Notification[]>('/notifications'),
+  notifications: (category = '', before = '') =>
+    request<{ items: AppNotification[]; unread: number; more: boolean }>(`/notifications?limit=30${category ? `&category=${category}` : ''}${before ? `&before=${encodeURIComponent(before)}` : ''}`),
+  unreadNotifications: () => request<{ count: number; latest: string | null }>('/notifications/unread'),
+  markNotificationsRead: (ids: string[] | 'all') => post<{ unread: number }>('/notifications/read', ids === 'all' ? { all: true } : { ids }),
+  notificationPrefs: () => request<NotificationPref[]>('/notifications/preferences'),
+  saveNotificationPrefs: (b: Partial<Record<NotificationCategory, { push?: boolean; email?: boolean }>>) => request<NotificationPref[]>('/notifications/preferences', json('PUT', b)),
 
   cases: (q = '', status = '') => request<Case[]>(`/requests?q=${encodeURIComponent(q)}&status=${encodeURIComponent(status)}`),
   case: (id: string) => request<Case>(`/requests/${id}`),

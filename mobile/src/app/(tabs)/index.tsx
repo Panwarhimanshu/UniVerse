@@ -64,10 +64,10 @@ export default function Home() {
 
           {updates.unread ? (
             <Pressable onPress={() => router.push('/updates')} style={({ pressed }) => [styles.banner, pressed && { opacity: 0.7 }]}>
-              <Feather name="message-square" size={18} color={colors.accent} />
+              <Feather name="bell" size={18} color={colors.accent} />
               <View style={{ flex: 1 }}>
-                <Text style={[type.body, { fontWeight: '600' }]}>{updates.unread} new update{updates.unread > 1 ? 's' : ''}</Text>
-                <Text style={type.small} numberOfLines={1}>{updates.list[0]?.text}</Text>
+                <Text style={[type.body, { fontWeight: '600' }]}>{updates.unread} unread notification{updates.unread > 1 ? 's' : ''}</Text>
+                <Text style={type.small} numberOfLines={1}>{updates.items.find((n) => !n.read)?.title ?? 'Tap to see them'}</Text>
               </View>
               <Feather name="chevron-right" size={18} color={colors.faint} />
             </Pressable>

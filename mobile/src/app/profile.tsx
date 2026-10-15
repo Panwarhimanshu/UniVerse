@@ -132,6 +132,7 @@ export default function Profile() {
           {sees('services') ? <Row icon="grid" title="Services" subtitle="Browse services and request one" onPress={() => router.push('/services')} /> : null}
           {sees('commissions') ? <Row icon="percent" title="Commission structure" onPress={() => router.push('/commissions')} /> : null}
           <Row icon="bell" title="Notifications" subtitle="Case updates, replies and account notices" onPress={() => router.push('/updates')} />
+          <Row icon="sliders" title="Notification settings" subtitle="Choose push and email for each kind" onPress={() => router.push('/notification-settings')} />
         </List>
       </Section>
 

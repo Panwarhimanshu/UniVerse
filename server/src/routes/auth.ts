@@ -11,6 +11,7 @@ import { deleteFile, MAX_AVATAR_BYTES, saveFile } from '../files.js';
 import { track } from '../usage.js';
 import { checkAttempts, clearAttempts, recordFailure } from '../limits.js';
 import { layout, sendMail, siteUrl } from '../mail.js';
+import { notify } from '../notify.js';
 
 const router = Router();
 export const SUSPENDED = 'This partner account is suspended. Please contact UniVerse support.';
@@ -42,6 +43,7 @@ router.post('/register', async (req, res) => {
     agreement: { number: `UV/AGR/${now.getFullYear()}/${seq}`, signedAt: now, validTill, autoRenew: true },
   });
   track(req, agent.id, null, 'sign_up');
+  await notify({ agent: agent._id, category: 'account', type: 'account.welcome', title: 'Welcome to UniVerse', body: `Your partner account is ready. Your agreement number is ${agent.agreement?.number}. Request your first service with the + button.`, link: { kind: 'profile' }, email: false });
   await sendMail(agent.email, 'Welcome to UniVerse', layout({
     greeting: `Welcome, ${agent.name.split(' ')[0]}!`,
     paragraphs: [

@@ -10,6 +10,7 @@ import { adminApi, adminToken, setAdminUnauthorized } from './api';
 import type { AdminPartner, AdminTx, AgreementReq, CaseDetail, Section, StaffUser, Thread } from './api';
 import AdminDashboard from './AdminDashboard';
 import { UsageView } from './UsageView';
+import { AnnouncementsView } from './AnnouncementsView';
 import { ActivityView, InsightsView, PartnerManageModal, ServicesView, SettingsView, StaffView } from './MasterViews';
 
 const ICON = {
@@ -27,17 +28,18 @@ const ICON = {
   insights: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6z"/></svg>',
   settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
   usage: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><line x1="10" y1="18" x2="14" y2="18"/><polyline points="9 12 11 10 13 12 15 8"/></svg>',
+  announcements: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>',
   activity: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>',
   check: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
 };
 
-type View = 'overview' | Section | 'usage' | 'staff' | 'services' | 'insights' | 'settings' | 'activity';
+type View = 'overview' | Section | 'usage' | 'announcements' | 'staff' | 'services' | 'insights' | 'settings' | 'activity';
 const TITLES: Record<View, string> = {
   overview: 'Dashboard', cases: 'Cases', partners: 'Partners', messages: 'RM messages', payouts: 'Payouts', agreements: 'Agreement requests',
-  usage: 'App usage', staff: 'Staff accounts', services: 'Services', insights: 'Insights', settings: 'Settings', activity: 'Activity log',
+  usage: 'App usage', announcements: 'Announcements', staff: 'Staff accounts', services: 'Services', insights: 'Insights', settings: 'Settings', activity: 'Activity log',
 };
 const DESK: View[] = ['overview', 'cases', 'partners', 'messages', 'payouts', 'agreements'];
-const MASTER: View[] = ['usage', 'staff', 'services', 'insights', 'settings', 'activity'];
+const MASTER: View[] = ['usage', 'announcements', 'staff', 'services', 'insights', 'settings', 'activity'];
 const STATUSES: CaseStatus[] = ['Pending', 'In Progress', 'On Hold', 'Completed'];
 const AGR_LABEL = { download: 'Copy of signed agreement', discussion: 'Discuss the agreement', termination: 'Terminate the agreement' } as const;
 
@@ -185,6 +187,7 @@ function Console({ staff, signOut }: { staff: StaffUser; signOut: () => void }) 
           {view === 'payouts' && <PayoutsView onChanged={overview.reload} />}
           {view === 'agreements' && <AgreementsView onChanged={overview.reload} />}
           {view === 'usage' && <UsageView />}
+          {view === 'announcements' && <AnnouncementsView />}
           {view === 'staff' && <StaffView me={staff} />}
           {view === 'services' && <ServicesView />}
           {view === 'insights' && <InsightsView />}

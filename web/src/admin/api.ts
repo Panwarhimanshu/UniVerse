@@ -102,6 +102,8 @@ export const adminApi = {
 
   /* master admin */
   usage: (days: number) => request<Usage>(`/admin/master/usage?days=${days}`),
+  announcements: () => request<Announcement[]>('/admin/master/announcements'),
+  sendAnnouncement: (b: { title: string; body: string; partnerId?: string }) => request<{ id: string; recipients: number }>('/admin/master/announcements', json('POST', b)),
   staff: () => request<StaffUser[]>('/admin/master/staff'),
   addStaff: (b: { name: string; email: string; password: string; role: 'master' | 'staff'; sections: Section[] }) => request<StaffUser>('/admin/master/staff', json('POST', b)),
   updateStaff: (id: string, b: Partial<{ name: string; email: string; password: string; role: 'master' | 'staff'; sections: Section[]; active: boolean }>) =>
@@ -128,6 +130,9 @@ export const adminApi = {
   activity: () => request<Activity[]>('/admin/master/activity'),
 };
 
+export interface Announcement {
+  id: string; title: string; body: string; sentBy: string; recipients: number; createdAt: string; partner: { id: string; name: string } | null;
+}
 export interface Usage {
   days: number;
   activeUsers: { day: number; week: number; month: number };
