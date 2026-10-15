@@ -5,6 +5,7 @@ import { Orbit } from '../../components/Orbit';
 import { api } from '../../lib/api';
 import type { Transaction } from '../../lib/api';
 import { ProfileButton } from '../../components/ProfileButton';
+import { HeaderActions } from '../../components/HeaderActions';
 import { useApi } from '../../lib/hooks';
 import { useAccess } from '../../lib/auth';
 import { inr, shortDate } from '../../lib/format';
@@ -28,7 +29,7 @@ export default function Wallet() {
 
   return (
     <Screen onRefresh={refresh} refreshing={refreshing}>
-      <Header left={<ProfileButton />} title="Wallet" />
+      <Header left={<ProfileButton />} title="Wallet" right={<HeaderActions />} />
       {error && !data ? <ErrorNote message={error} onRetry={refresh} /> : null}
 
       {data ? (

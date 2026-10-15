@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
-import { Chips, Empty, ErrorNote, Feather, Header, IconButton, List, Loading, Screen, StatusPill } from '../../components/ui';
+import { Chips, Empty, ErrorNote, Feather, Header, List, Loading, Screen, StatusPill } from '../../components/ui';
 import { api, CaseStatus } from '../../lib/api';
 import { ProfileButton } from '../../components/ProfileButton';
-import { useAccess } from '../../lib/auth';
+import { HeaderActions } from '../../components/HeaderActions';
 import { useApi } from '../../lib/hooks';
 import { shortDate } from '../../lib/format';
 import { colors, radius, space, type } from '../../theme';
@@ -14,7 +14,6 @@ const STATUSES: CaseStatus[] = ['In Progress', 'Pending', 'Completed', 'On Hold'
 export default function Students() {
   const { data, error, refreshing, refresh } = useApi(api.students);
   const services = useApi(api.services);
-  const { can } = useAccess();
   const [q, setQ] = useState('');
   const [status, setStatus] = useState<CaseStatus | ''>('');
   const nameOf = useMemo(() => Object.fromEntries((services.data ?? []).map((s) => [s.key, s.name])), [services.data]);
@@ -30,7 +29,7 @@ export default function Students() {
 
   return (
     <Screen onRefresh={refresh} refreshing={refreshing}>
-      <Header left={<ProfileButton />} title="Students" right={can('create') ? <IconButton name="plus" label="Request a service" onPress={() => router.push('/refer')} /> : undefined} />
+      <Header left={<ProfileButton />} title="Students" right={<HeaderActions request />} />
 
       <View style={styles.search}>
         <Feather name="search" size={16} color={colors.faint} />

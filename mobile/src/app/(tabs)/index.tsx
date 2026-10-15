@@ -6,6 +6,7 @@ import { CaseRow } from '../../components/CaseRow';
 import { Donut } from '../../components/Donut';
 import { Orbit } from '../../components/Orbit';
 import { ProfileButton } from '../../components/ProfileButton';
+import { NotificationBell } from '../../components/HeaderActions';
 import { api } from '../../lib/api';
 import { useAccess, useAuth } from '../../lib/auth';
 import { useApi } from '../../lib/hooks';
@@ -44,12 +45,7 @@ export default function Home() {
         left={<ProfileButton />}
         subtitle={greeting()}
         title={myName.split(' ')[0]}
-        right={
-          <Pressable onPress={() => router.push('/updates')} accessibilityLabel={`Notifications${updates.unread ? `, ${updates.unread} unread` : ''}`} hitSlop={8} style={styles.iconBtn}>
-            <Feather name="bell" size={20} color={colors.text} />
-            {updates.unread ? <View style={styles.count}><Text style={styles.countText}>{updates.unread > 9 ? '9+' : updates.unread}</Text></View> : null}
-          </Pressable>
-        }
+        right={<NotificationBell />}
       />
       {member ? <Text style={[type.small, { marginTop: -4 }]}>{member.role} at {agent?.agency || agent?.name}</Text> : null}
 

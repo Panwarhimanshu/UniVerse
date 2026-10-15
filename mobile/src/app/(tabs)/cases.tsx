@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
-import { router } from 'expo-router';
-import { Chips, Empty, ErrorNote, Feather, Header, IconButton, List, Screen } from '../../components/ui';
+import { Chips, Empty, ErrorNote, Feather, Header, List, Screen } from '../../components/ui';
 import { CaseRow } from '../../components/CaseRow';
 import { ProfileButton } from '../../components/ProfileButton';
+import { HeaderActions } from '../../components/HeaderActions';
 import { api, CaseStatus } from '../../lib/api';
 import { useApi } from '../../lib/hooks';
-import { useAccess } from '../../lib/auth';
 import { colors, radius, space } from '../../theme';
 
 const STATUSES: CaseStatus[] = ['In Progress', 'Pending', 'Completed', 'On Hold'];
@@ -22,11 +21,10 @@ export default function Cases() {
   }, [query]);
 
   const { data, error, refreshing, refresh } = useApi(() => api.cases(debounced, status), [debounced, status]);
-  const { can } = useAccess();
 
   return (
     <Screen onRefresh={refresh} refreshing={refreshing}>
-      <Header left={<ProfileButton />} title="Cases" right={can('create') ? <IconButton name="plus" label="Request a service" onPress={() => router.push('/refer')} /> : undefined} />
+      <Header left={<ProfileButton />} title="Cases" right={<HeaderActions request />} />
 
       <View style={styles.search}>
         <Feather name="search" size={16} color={colors.faint} />
