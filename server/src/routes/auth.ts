@@ -2,7 +2,7 @@ import { Router } from 'express';
 import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import multer from 'multer';
-import { Agent, Device, PasswordReset, TeamMember } from '../models/index.js';
+import { Admin, Agent, Device, PasswordReset, TeamMember } from '../models/index.js';
 import { signToken, requireAuth, agentIdOf, accessOf, ownerOnly, HttpError } from '../middleware/auth.js';
 import { ZONES } from '../data/catalog.js';
 import { publicAgent, publicTeamMember } from '../serialize.js';
@@ -75,6 +75,10 @@ router.post('/login', async (req, res) => {
 
   // team members sign in to the owner's account with the access the owner gave them
   const member = await TeamMember.findOne({ email }).select('+passwordHash');
+  if (!member) {
+    // UniVerse staff sometimes try the partner page; point them to the back office instead of "incorrect password"
+    if (await Admin.exists({ email })) throw new HttpError(401, 'This is a UniVerse back-office account. Sign in at /admin instead.');
+  }
   if (!member?.passwordHash || !(await bcrypt.compare(password, member.passwordHash))) throw await fail();
   await clearAttempts('partner', email);
   const owner = await Agent.findById(member.agent);
