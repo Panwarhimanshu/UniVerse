@@ -3,7 +3,8 @@ import multer from 'multer';
 import { Types } from 'mongoose';
 import { ServiceRequest, Student, Message, STATUSES } from '../models/index.js';
 import { accessOf, agentIdOf, HttpError, need } from '../middleware/auth.js';
-import { SERVICES, serviceByKey, DESTINATIONS } from '../data/catalog.js';
+import { SERVICES, serviceByKey, isCountry } from '../data/catalog.js';
+import { EMAIL_RE } from './auth.js';
 import { publicRequest, publicMessage } from '../serialize.js';
 import { isServiceHidden } from '../content.js';
 import { track } from '../usage.js';
@@ -53,23 +54,46 @@ router.get('/', async (req, res) => {
   res.json(list.map(publicRequest));
 });
 
-/* Refer a student into a service → creates the student and the case */
+/* Request one or more services for a student → creates the student (or uses an existing one) and a case per service.
+   Responds with the first case; `opened` says how many were created. */
 router.post('/', need('create'), async (req, res) => {
   const agentId = agentIdOf(req);
-  const { name, email, phone, country, service, note } = req.body ?? {};
-  if (!name?.trim()) throw new HttpError(400, 'Student name is required');
-  if (!phone?.trim()) throw new HttpError(400, 'Phone is required');
-  if (!DESTINATIONS.includes(country)) throw new HttpError(400, 'Select a destination');
-  const svc = serviceByKey(service);
-  if (!svc) throw new HttpError(400, 'Select a service');
+  const { studentId, note } = req.body ?? {};
+  const name = String(req.body?.name ?? '').trim();
+  const email = String(req.body?.email ?? '').trim();
+  const phone = String(req.body?.phone ?? '').trim();
+  const country = req.body?.country;
+  if (!name) throw new HttpError(400, 'Student name is required');
+  if (!phone) throw new HttpError(400, 'Phone is required');
+  if (!email) throw new HttpError(400, 'Student email is required');
+  if (!EMAIL_RE.test(email)) throw new HttpError(400, 'Enter a valid student email');
+  if (!isCountry(country)) throw new HttpError(400, 'Select a destination');
+  const keys: string[] = [...new Set<string>(Array.isArray(req.body?.services) ? req.body.services : req.body?.service ? [req.body.service] : [])];
+  if (!keys.length) throw new HttpError(400, 'Select at least one service');
+  if (keys.some((k) => !serviceByKey(k))) throw new HttpError(400, 'Unknown service');
 
-  const studentCount = await Student.countDocuments({ agent: agentId });
-  const student = await Student.create({ agent: agentId, code: `STU-${1011 + studentCount}`, name: name.trim(), email, phone, country });
-  const created = await openCase(agentId, student._id, svc.key, note ?? '');
+  let student;
+  let toOpen = keys;
+  if (studentId) {
+    if (!Types.ObjectId.isValid(String(studentId))) throw new HttpError(404, 'Student not found');
+    student = await Student.findOne({ _id: studentId, agent: agentId });
+    if (!student) throw new HttpError(404, 'Student not found');
+    student.set({ name, email, phone, country });
+    await student.save();
+    const active = await ServiceRequest.find({ agent: agentId, student: student._id, status: { $ne: 'Completed' } }).select('service');
+    const taken = new Set(active.map((r) => r.service));
+    toOpen = keys.filter((k) => !taken.has(k));
+    if (!toOpen.length) throw new HttpError(409, keys.length > 1 ? 'Those services are already active for this student' : 'That service is already active for this student');
+  } else {
+    const studentCount = await Student.countDocuments({ agent: agentId });
+    student = await Student.create({ agent: agentId, code: `STU-${1011 + studentCount}`, name, email, phone, country });
+  }
 
-  const full = await created.populate('student');
+  const created = [];
+  for (const k of toOpen) created.push(await openCase(agentId, student._id, k, String(note ?? '')));
+  const full = await created[0].populate('student');
   track(req, agentId, accessOf(req).memberId, 'referral_created');
-  res.status(201).json(publicRequest(full));
+  res.status(201).json({ ...publicRequest(full), opened: created.length });
 });
 
 router.get('/:id', async (req, res) => {

@@ -40,7 +40,7 @@ export default function Withdraw() {
         <Text style={[type.small, { marginBottom: space.xl }]}>
           Withdrawals go to the payout bank account on your profile. The account owner can add it from More, then Edit.
         </Text>
-        <Button label="Go to my details" onPress={() => router.replace('/more')} />
+        <Button label="Go to my details" onPress={() => router.replace('/profile')} />
       </Screen>
     );
   }

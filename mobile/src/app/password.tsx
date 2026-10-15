@@ -21,7 +21,7 @@ export default function Password() {
     try {
       await api.changePassword(f.current, f.next);
       notify('Password changed');
-      goBack('/more');
+      goBack('/profile');
     } catch (e) {
       setError(errorText(e));
       setBusy(false);

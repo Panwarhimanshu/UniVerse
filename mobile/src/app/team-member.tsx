@@ -17,7 +17,7 @@ const MENUS: [Menu, string, string][] = [
   ['commissions', 'Commissions', 'Payout rates and history'],
 ];
 const PERMS: [Perm, string, string][] = [
-  ['create', 'Create requests', 'Refer students and raise services'],
+  ['create', 'Create requests', 'Request services for students'],
   ['chat', 'Chat with the desk', 'Send messages on cases and to the RM'],
   ['upload', 'Upload documents', 'Attach files to cases'],
   ['edit', 'Edit student details', 'Change student records'],

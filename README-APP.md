@@ -93,11 +93,18 @@ npm install
 EXPO_PUBLIC_API_URL=http://localhost:4000/api npx expo start --web
 ```
 
-Screens: Home (figures, updates, shortcuts, recent cases, RM) · Analytics (referrals and earnings per month, cases by
+Tabs: Home · Cases · Students · Wallet. Everything else (RM chat, analytics, What's New, services, commissions,
+updates, agreement, team, password) is on the Profile page, opened from the photo at the top left.
+
+**Request a service** (the + button): choose one of your students to fill in their name, phone and email, or type a
+new student. Email is required. Pick one or more services from the grid; each opens its own case. Destinations are the
+main study countries plus "Other", which opens a searchable list of every country. A service that is already active
+for the student is not opened twice.
+
+Screens: Home (figures, updates, shortcuts, recent cases, RM) · Analytics (requests and earnings per month, cases by
 status and service, completion rate) · Profile (photo, details, sign out) · Cases · Case detail (stage timeline, documents with
 upload and download, desk chat) · Students · Student record (edit, raise several services) · Wallet + withdraw ·
-More (profile and bank account, agreement and requests, team members, change password, What's New, services,
-commissions, updates, RM chat) · Sign in / Sign up. Team members only see the tabs and actions their owner allowed.
+Sign in / Sign up. Team members only see the tabs and actions their owner allowed.
 
 **Android build:** the OneDrive path is too long for the native build (Windows 260-char limit), so the APK is built
 from a copy in `C:\uv`: copy `mobile/` there (without `node_modules` and `android`), run `npm install`, then

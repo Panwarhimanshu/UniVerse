@@ -29,7 +29,6 @@ export default function TabsLayout() {
       <Tabs.Screen name="cases" options={{ title: 'Cases', tabBarIcon: icon('folder'), href: sees('requests') ? undefined : null }} />
       <Tabs.Screen name="students" options={{ title: 'Students', tabBarIcon: icon('users'), href: sees('students') ? undefined : null }} />
       <Tabs.Screen name="wallet" options={{ title: 'Wallet', tabBarIcon: icon('credit-card'), href: sees('wallet') ? undefined : null }} />
-      <Tabs.Screen name="more" options={{ title: 'More', tabBarIcon: icon('menu') }} />
     </Tabs>
   );
 }

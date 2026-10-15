@@ -134,14 +134,16 @@ export const api = {
 
   content: () => request<SiteContent>('/content'),
   dashboard: () => request<Dashboard>('/dashboard'),
-  meta: () => request<{ destinations: string[]; minWithdrawal: number }>('/meta'),
+  meta: () => request<{ destinations: string[]; countries?: string[]; minWithdrawal: number }>('/meta'),
   services: () => request<Service[]>('/services'),
   commissions: () => request<Commissions>('/commissions'),
   notifications: () => request<Notification[]>('/notifications'),
 
   cases: (q = '', status = '') => request<Case[]>(`/requests?q=${encodeURIComponent(q)}&status=${encodeURIComponent(status)}`),
   case: (id: string) => request<Case>(`/requests/${id}`),
-  refer: (body: { name: string; email: string; phone: string; country: string; service: string; note: string }) => post<Case>('/requests', body),
+  /** Requests one or more services for a new student, or for an existing one when studentId is set */
+  refer: (body: { name: string; email: string; phone: string; country: string; services: string[]; note: string; studentId?: string }) =>
+    post<Case & { opened: number }>('/requests', body),
   caseMessages: (id: string) => request<Message[]>(`/requests/${id}/messages`),
   sendCaseMessage: (id: string, text: string) => post<Message>(`/requests/${id}/messages`, { text }),
   uploadDoc: (id: string, f: UploadFile, docId?: string) => {

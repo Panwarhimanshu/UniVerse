@@ -30,7 +30,7 @@ export default function Students() {
 
   return (
     <Screen onRefresh={refresh} refreshing={refreshing}>
-      <Header left={<ProfileButton />} title="Students" right={can('create') ? <IconButton name="plus" label="Refer a student" onPress={() => router.push('/refer')} /> : undefined} />
+      <Header left={<ProfileButton />} title="Students" right={can('create') ? <IconButton name="plus" label="Request a service" onPress={() => router.push('/refer')} /> : undefined} />
 
       <View style={styles.search}>
         <Feather name="search" size={16} color={colors.faint} />
@@ -60,7 +60,7 @@ export default function Students() {
             })}
           </List>
         ) : (
-          <Empty text={data.length ? 'No students match your search.' : 'No students yet. Refer your first one with the + button.'} />
+          <Empty text={data.length ? 'No students match your search.' : 'No students yet. Request a service with the + button to add one.'} />
         )
       ) : null}
     </Screen>

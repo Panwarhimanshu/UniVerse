@@ -1,6 +1,6 @@
 import { Children, ReactNode, useState } from 'react';
 import {
-  ActivityIndicator, Image, KeyboardAvoidingView, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, TextInputProps, View, ViewStyle,
+  ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, TextInputProps, View, ViewStyle,
 } from 'react-native';
 import { SafeAreaView, Edge } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
@@ -184,6 +184,89 @@ export function Chips<T extends string>({
   );
 }
 
+/** Multi-choice tiles in a fixed grid (no scrolling), e.g. services: three per row */
+export function TileGrid<T extends string>({
+  options, value, onChange, label, format, icon, columns = 3,
+}: {
+  options: readonly T[]; value: T[]; onChange: (v: T[]) => void; label?: string; format?: (v: T) => string; icon?: (v: T) => IconName; columns?: number;
+}) {
+  const [width, setWidth] = useState(0);
+  const gap = space.sm;
+  const tile = width ? (width - gap * (columns - 1)) / columns : 0;
+  return (
+    <View style={{ marginBottom: label ? space.lg : 0 }}>
+      {label ? <Text style={[type.small, { marginBottom: 6, color: colors.text, fontWeight: '500' }]}>{label}</Text> : null}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap }} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+        {tile ? options.map((o) => {
+          const on = value.includes(o);
+          return (
+            <Pressable
+              key={o}
+              onPress={() => onChange(on ? value.filter((x) => x !== o) : [...value, o])}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: on }}
+              style={[styles.tile, { width: tile }, on && { backgroundColor: colors.accentTint, borderColor: colors.accent }]}
+            >
+              {on ? <View style={styles.tileTick}><Feather name="check" size={11} color="#fff" /></View> : null}
+              {icon ? <Feather name={icon(o)} size={18} color={on ? colors.accent : colors.muted} /> : null}
+              <Text style={{ fontSize: 12, fontWeight: '600', textAlign: 'center', color: on ? colors.accent : colors.text }} numberOfLines={2}>{format ? format(o) : o}</Text>
+            </Pressable>
+          );
+        }) : null}
+      </View>
+    </View>
+  );
+}
+
+/** Looks like a field; opens a searchable list. Used for long lists such as countries or students. */
+export function PickerField({
+  label, value, placeholder, items, onPick, title, onClear,
+}: {
+  label: string; value: string; placeholder: string; title: string;
+  items: { key: string; label: string; sub?: string }[]; onPick: (key: string) => void; onClear?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const list = q.trim() ? items.filter((i) => `${i.label} ${i.sub ?? ''}`.toLowerCase().includes(q.trim().toLowerCase())) : items;
+  return (
+    <View style={{ marginBottom: space.lg }}>
+      <Text style={[type.small, { marginBottom: 6, color: colors.text, fontWeight: '500' }]}>{label}</Text>
+      <Pressable onPress={() => { setQ(''); setOpen(true); }} style={[styles.input, { flexDirection: 'row', alignItems: 'center' }]}>
+        <Text style={{ flex: 1, fontSize: 15, color: value ? colors.text : colors.faint }} numberOfLines={1}>{value || placeholder}</Text>
+        {value && onClear ? (
+          <Pressable onPress={onClear} hitSlop={10} accessibilityLabel={`Clear ${label}`}><Feather name="x" size={18} color={colors.muted} /></Pressable>
+        ) : <Feather name="chevron-down" size={18} color={colors.muted} />}
+      </Pressable>
+      <Modal visible={open} animationType="slide" onRequestClose={() => setOpen(false)} presentationStyle="pageSheet">
+        <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+          <View style={[styles.pad, { flex: 1 }]}>
+            <View style={styles.header}>
+              <Text style={[type.title, { flex: 1, fontSize: 20 }]}>{title}</Text>
+              <IconButton name="x" label="Close" onPress={() => setOpen(false)} />
+            </View>
+            <TextInput value={q} onChangeText={setQ} placeholder="Search" placeholderTextColor={colors.faint} autoCorrect={false} style={[styles.input, { marginBottom: space.md }]} />
+            <FlatList
+              data={list}
+              keyExtractor={(i) => i.key}
+              keyboardShouldPersistTaps="handled"
+              ListEmptyComponent={<Empty text="Nothing matches your search." />}
+              renderItem={({ item }) => (
+                <Pressable
+                  onPress={() => { onPick(item.key); setOpen(false); }}
+                  style={({ pressed }) => [styles.pickRow, pressed && { backgroundColor: colors.surface }]}
+                >
+                  <Text style={type.body}>{item.label}</Text>
+                  {item.sub ? <Text style={type.small}>{item.sub}</Text> : null}
+                </Pressable>
+              )}
+            />
+          </View>
+        </SafeAreaView>
+      </Modal>
+    </View>
+  );
+}
+
 /** On/off row with a title and a one-line explanation */
 export function Toggle({ title, subtitle, value, onChange, disabled }: { title: string; subtitle?: string; value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
@@ -293,6 +376,9 @@ const styles = StyleSheet.create({
   btn: { height: 50, borderRadius: radius.md, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm, paddingHorizontal: space.xl },
   iconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.line },
   input: { height: 48, borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, paddingHorizontal: 14, fontSize: 15, color: colors.text, backgroundColor: colors.bg },
+  tile: { minHeight: 76, alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 6, paddingVertical: space.sm, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line },
+  tileTick: { position: 'absolute', top: 6, right: 6, width: 16, height: 16, borderRadius: 8, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+  pickRow: { paddingVertical: space.md, paddingHorizontal: space.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.line, gap: 2 },
   chip: { paddingHorizontal: 14, height: 34, justifyContent: 'center', borderRadius: radius.pill, borderWidth: 1, borderColor: colors.line },
   pill: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: radius.pill },
   track: { height: 4, borderRadius: 2, backgroundColor: colors.line, overflow: 'hidden' },

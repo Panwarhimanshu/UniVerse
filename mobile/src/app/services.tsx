@@ -18,7 +18,7 @@ export default function Services() {
 
   return (
     <Screen edges={['bottom']} onRefresh={refresh} refreshing={refreshing}>
-      <Text style={type.small}>Refer a student into any service and our specialist desks take it from there.</Text>
+      <Text style={type.small}>Request any service for a student and our specialist desks take it from there.</Text>
       {error && !data ? <ErrorNote message={error} onRetry={refresh} /> : null}
 
       {Object.entries(groups).map(([category, items]) => (

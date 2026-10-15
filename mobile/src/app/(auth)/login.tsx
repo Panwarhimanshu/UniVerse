@@ -33,7 +33,7 @@ export default function Login() {
           <Image source={require('../../../assets/logo.png')} style={{ width: 132, height: 113 }} resizeMode="contain" />
           <Text style={[type.display, { marginTop: space.xxl }]}>Partner sign in</Text>
           <Text style={[type.small, { marginTop: space.xs, marginBottom: space.xxl }]}>
-            Referrals, case tracking and your wallet in one place.
+            Service requests, case tracking and your wallet in one place.
           </Text>
 
           <Field label="Email" value={email} onChangeText={setEmail} placeholder="you@agency.com" keyboardType="email-address" autoCapitalize="none" autoComplete="email" />

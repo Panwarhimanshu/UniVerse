@@ -38,7 +38,7 @@ export default function Home() {
               {updates.unread ? <View style={styles.dot} /> : null}
             </Pressable>
             {can('create') ? (
-              <Pressable onPress={() => router.push('/refer')} accessibilityLabel="Refer a student" hitSlop={8} style={styles.iconBtn}>
+              <Pressable onPress={() => router.push('/refer')} accessibilityLabel="Request a service" hitSlop={8} style={styles.iconBtn}>
                 <Feather name="plus" size={20} color={colors.text} />
               </Pressable>
             ) : null}
@@ -85,7 +85,7 @@ export default function Home() {
               {data.recent.length ? (
                 <List>{data.recent.map((c) => <CaseRow key={c.id} c={c} />)}</List>
               ) : (
-                <Empty text={can('create') ? 'No cases yet. Refer your first student.' : 'No cases yet.'} />
+                <Empty text={can('create') ? 'No cases yet. Request your first service.' : 'No cases yet.'} />
               )}
             </Section>
           ) : null}
@@ -117,7 +117,7 @@ export default function Home() {
             </Pressable>
           </Section>
 
-          {can('create') ? <Button label="Refer a student" icon="user-plus" onPress={() => router.push('/refer')} style={{ marginTop: space.xl }} /> : null}
+          {can('create') ? <Button label="Request a service" icon="plus" onPress={() => router.push('/refer')} style={{ marginTop: space.xl }} /> : null}
         </>
       ) : null}
     </Screen>

@@ -26,7 +26,7 @@ export default function Cases() {
 
   return (
     <Screen onRefresh={refresh} refreshing={refreshing}>
-      <Header left={<ProfileButton />} title="Cases" right={can('create') ? <IconButton name="plus" label="Refer a student" onPress={() => router.push('/refer')} /> : undefined} />
+      <Header left={<ProfileButton />} title="Cases" right={can('create') ? <IconButton name="plus" label="Request a service" onPress={() => router.push('/refer')} /> : undefined} />
 
       <View style={styles.search}>
         <Feather name="search" size={16} color={colors.faint} />

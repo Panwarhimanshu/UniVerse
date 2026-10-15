@@ -54,7 +54,7 @@ export function ReferModal({ open, presetService, onClose, onDone }: {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
-    if (!f.name.trim() || !f.phone.trim() || !f.country || !f.service) return setError('Fill in all required fields');
+    if (!f.name.trim() || !f.email.trim() || !f.phone.trim() || !f.country || !f.service) return setError('Fill in all required fields');
     setBusy(true);
     try {
       const c = await api.refer(f);
@@ -74,7 +74,7 @@ export function ReferModal({ open, presetService, onClose, onDone }: {
       <div className="modal-body">
         <form className="form-grid" onSubmit={submit} noValidate>
           <div className="field"><label htmlFor="sName">Student name *</label><input id="sName" placeholder="e.g. Riya Shah" value={f.name} onChange={set('name')} autoFocus /></div>
-          <div className="field"><label htmlFor="sEmail">Student email</label><input id="sEmail" type="email" placeholder="student@gmail.com" value={f.email} onChange={set('email')} /></div>
+          <div className="field"><label htmlFor="sEmail">Student email *</label><input id="sEmail" type="email" placeholder="student@gmail.com" value={f.email} onChange={set('email')} /></div>
           <div className="field"><label htmlFor="sPhone">Phone *</label><input id="sPhone" type="tel" placeholder="+91 98XXX XXXXX" value={f.phone} onChange={set('phone')} /></div>
           <div className="field">
             <label htmlFor="sCountry">Destination *</label>

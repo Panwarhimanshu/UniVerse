@@ -35,7 +35,7 @@ export default function Analytics() {
         <Stat label="Docs in review" value={String(t.docsInReview)} />
       </View>
 
-      <Section title="Referrals per month">
+      <Section title="Requests per month">
         <Columns data={data.monthly.map((m) => ({ label: monthLabel(m.month), value: m.count }))} color={colors.accent} format={String} />
         <Text style={[type.small, styles.foot]}>{data.monthly.reduce((n, m) => n + m.count, 0)} cases in the last 6 months</Text>
       </Section>
@@ -67,7 +67,7 @@ export default function Analytics() {
               );
             })}
           </View>
-        ) : <Text style={type.small}>No cases yet. Refer a student to see your mix here.</Text>}
+        ) : <Text style={type.small}>No cases yet. Request a service to see your mix here.</Text>}
       </Section>
     </Screen>
   );

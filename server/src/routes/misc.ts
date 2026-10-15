@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { Types } from 'mongoose';
 import { Agent, Message, ServiceRequest, Student, Transaction } from '../models/index.js';
 import { accessOf, agentIdOf, HttpError, need, needMenu } from '../middleware/auth.js';
-import { SERVICES, DESTINATIONS, serviceByKey } from '../data/catalog.js';
+import { SERVICES, COUNTRIES, DESTINATIONS, serviceByKey } from '../data/catalog.js';
 import { CommissionArchive } from '../models/index.js';
 import { track } from '../usage.js';
 import { publicMessage, publicRequest, publicTx } from '../serialize.js';
@@ -29,7 +29,7 @@ router.get('/commissions', async (_req, res) =>
     ],
   }),
 );
-router.get('/meta', (_req, res) => res.json({ destinations: DESTINATIONS, minWithdrawal: getSettings().minWithdrawal }));
+router.get('/meta', (_req, res) => res.json({ destinations: DESTINATIONS, countries: COUNTRIES, minWithdrawal: getSettings().minWithdrawal }));
 
 /* ---------- dashboard ---------- */
 router.get('/dashboard', async (req, res) => {

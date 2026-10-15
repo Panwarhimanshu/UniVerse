@@ -68,7 +68,7 @@ export default function ServiceDetail() {
       </Screen>
 
       <View style={styles.footer}>
-        <Button label="Refer a student" onPress={() => router.push({ pathname: '/refer', params: { service: s.key } })} />
+        <Button label="Request this service" onPress={() => router.push({ pathname: '/refer', params: { service: s.key } })} />
       </View>
     </View>
   );

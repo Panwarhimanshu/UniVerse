@@ -4,7 +4,7 @@ import { AgreementRequest, Message, MENUS, PERMS, ServiceRequest, Student, TeamM
 import bcrypt from 'bcryptjs';
 import { agentIdOf, HttpError, need, needMenu, ownerOnly } from '../middleware/auth.js';
 import { emailTaken } from './auth.js';
-import { DESTINATIONS, serviceByKey } from '../data/catalog.js';
+import { isCountry, serviceByKey } from '../data/catalog.js';
 import { publicMessage, publicStudent, publicTeamMember } from '../serialize.js';
 import { openCase } from './requests.js';
 import { track } from '../usage.js';
@@ -52,7 +52,7 @@ router.patch('/students/:id', need('edit'), async (req, res) => {
     s.phone = String(phone).trim();
   }
   if (country !== undefined) {
-    if (!DESTINATIONS.includes(country)) throw new HttpError(400, 'Select a destination');
+    if (!isCountry(country)) throw new HttpError(400, 'Select a destination');
     s.country = country;
   }
   await s.save();

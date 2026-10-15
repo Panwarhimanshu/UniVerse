@@ -14,7 +14,7 @@ const zoneLabel = (z: string) => z[0] + z.slice(1).toLowerCase();
 
 export default function Profile() {
   const { agent, setAgent, signOut } = useAuth();
-  const { isOwner, member } = useAccess();
+  const { isOwner, member, sees } = useAccess();
   const headerHeight = useHeaderHeight();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '', agency: '', city: '', bankAccount: '' });
@@ -123,11 +123,23 @@ export default function Profile() {
         </Section>
       )}
 
+      <Section title="Work">
+        <List>
+          <Row icon="message-circle" title={`Chat with ${agent.rm.name}`} subtitle="Relationship manager" onPress={() => router.push('/rm')} />
+          <Row icon="bar-chart-2" title="Your analytics" subtitle="Requests, completion and earnings" onPress={() => router.push('/analytics')} />
+          {sees('whatsnew') ? <Row icon="book-open" title="What's New" subtitle="Guides and market updates" onPress={() => router.push('/whatsnew')} /> : null}
+          {sees('services') ? <Row icon="grid" title="Services" subtitle="Browse services and request one" onPress={() => router.push('/services')} /> : null}
+          {sees('commissions') ? <Row icon="percent" title="Commission structure" onPress={() => router.push('/commissions')} /> : null}
+          <Row icon="bell" title="Updates" subtitle="Replies from the desk and your RM" onPress={() => router.push('/updates')} />
+        </List>
+      </Section>
+
       <Section title="Account">
         <List>
           {isOwner ? <Row icon="file-text" title="Partner agreement" subtitle={agent.agreement.number || 'Your signed agreement'} onPress={() => router.push('/agreement')} /> : null}
           {isOwner ? <Row icon="users" title="Team members" subtitle="Logins and permissions for your staff" onPress={() => router.push('/team')} /> : null}
           <Row icon="key" title="Change password" onPress={() => router.push('/password')} />
+          <Row icon="lock" title="Data protection" subtitle="Records are visible only to you, your team and your case desk" />
         </List>
       </Section>
 
