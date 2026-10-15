@@ -27,7 +27,7 @@ export async function openCase(agentId: string, studentId: Types.ObjectId, servi
     docs: svc.documents.map((d) => ({ name: d, status: 'missing' })),
     stepLog: [{ step: 0, at: new Date() }],
   });
-  await Message.create({ agent: agentId, request: created._id, from: 'system', text: `${created.ref} opened for ${svc.name}` });
+  await Message.create({ agent: agentId, request: created._id, from: 'system', text: `${created.ref} opened for ${svc.name}`, quiet: true });
   return created;
 }
 
@@ -134,7 +134,7 @@ router.post('/:id/documents', need('upload'), upload.single('file'), async (req,
   }
   await r.save();
   const by = accessOf(req).name;
-  await Message.create({ agent: agentId, request: r._id, from: 'system', text: `${by || 'You'} uploaded “${file.originalname}”` });
+  await Message.create({ agent: agentId, request: r._id, from: 'system', text: `${by || 'You'} uploaded “${file.originalname}”`, quiet: true });
   track(req, agentId, accessOf(req).memberId, 'document_uploaded');
   res.status(201).json(publicRequest(r));
 });

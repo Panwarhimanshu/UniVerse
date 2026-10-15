@@ -41,6 +41,21 @@ const MASTER: View[] = ['usage', 'staff', 'services', 'insights', 'settings', 'a
 const STATUSES: CaseStatus[] = ['Pending', 'In Progress', 'On Hold', 'Completed'];
 const AGR_LABEL = { download: 'Copy of signed agreement', discussion: 'Discuss the agreement', termination: 'Terminate the agreement' } as const;
 
+/* Downloads the full list as a CSV that opens in Excel */
+function ExportButton({ kind }: { kind: 'cases' | 'transactions' | 'partners' }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const run = async () => {
+    setBusy(true);
+    try { await adminApi.exportCsv(kind); } catch (e) { toast(errMsg(e)); } finally { setBusy(false); }
+  };
+  return (
+    <button className="btn btn-ghost btn-sm adm-export" onClick={run} disabled={busy}>
+      <Svg html={ICON.download} />{busy ? 'Preparing…' : 'Export to Excel'}
+    </button>
+  );
+}
+
 /* ---------- entry: sign-in gate ---------- */
 export default function AdminApp() {
   const [staff, setStaff] = useState<StaffUser | null>(null);
@@ -211,6 +226,7 @@ function CasesView({ initial, onChanged }: { initial: { queue?: string; partner?
           ))}
         </div>
         {partner ? <button className="chip-btn active" onClick={() => setPartner('')}>One partner ✕</button> : null}
+        <ExportButton kind="cases" />
       </div>
       <div className="adm-split">
         <div className="panel">
@@ -395,6 +411,7 @@ function PartnersView({ openCases, isMaster }: { openCases?: (id: string) => voi
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
           <input type="search" placeholder="Name, agency, email, city…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search partners" />
         </div>
+        <ExportButton kind="partners" />
       </div>
       <div className="panel">
         <div style={{ overflowX: 'auto' }}>
@@ -561,6 +578,7 @@ function PayoutsView({ onChanged }: { onChanged: () => void }) {
         <div className="svc-filters">
           {['Pending', 'Completed', 'Rejected', 'all'].map((s) => <button key={s} className={`chip-btn${status === s ? ' active' : ''}`} onClick={() => setStatus(s)}>{s === 'all' ? 'All' : s}</button>)}
         </div>
+        <ExportButton kind="transactions" />
       </div>
       <div className="panel">
         <div style={{ overflowX: 'auto' }}>

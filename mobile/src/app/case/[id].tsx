@@ -1,7 +1,8 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { ErrorNote, Feather, List, Loading, Progress, Row, Section, StatusPill, Timeline } from '../../components/ui';
 import { Chat } from '../../components/Chat';
@@ -25,10 +26,36 @@ export default function CaseScreen() {
   const loadMessages = useCallback(() => api.caseMessages(id), [id]);
   const sendMessage = useCallback((t: string) => api.sendCaseMessage(id, t), [id]);
 
+  // on a phone: photograph the document or pick a file; on the web: pick a file
+  const chooseSource = () => new Promise<'camera' | 'file' | null>((resolve) => {
+    if (Platform.OS === 'web') return resolve('file');
+    Alert.alert('Add a document', 'Photograph the paper document, or choose a PDF or image from your phone.', [
+      { text: 'Take a photo', onPress: () => resolve('camera') },
+      { text: 'Choose a file', onPress: () => resolve('file') },
+      { text: 'Cancel', style: 'cancel', onPress: () => resolve(null) },
+    ], { cancelable: true, onDismiss: () => resolve(null) });
+  });
+  const takePhoto = async (name: string) => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      notify('Camera not allowed', 'Allow camera access for UniVerse in your phone settings to photograph documents.');
+      return null;
+    }
+    const shot = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], allowsEditing: true, quality: 0.6 });
+    if (shot.canceled || !shot.assets[0]) return null;
+    const p = shot.assets[0];
+    return { uri: p.uri, name: `${name.replace(/[^\w\- ]+/g, '').trim() || 'document'}.jpg`, size: p.fileSize, mimeType: 'image/jpeg' };
+  };
   const upload = async (slot?: CaseDoc) => {
-    const res = await DocumentPicker.getDocumentAsync({ type: ['application/pdf', 'image/*'], copyToCacheDirectory: true });
-    if (res.canceled || !res.assets?.[0]) return;
-    const a = res.assets[0];
+    const source = await chooseSource();
+    if (!source) return;
+    let a: { uri: string; name: string; size?: number; mimeType?: string; file?: File } | null = null;
+    if (source === 'camera') a = await takePhoto(slot?.name ?? 'Document');
+    else {
+      const res = await DocumentPicker.getDocumentAsync({ type: ['application/pdf', 'image/*'], copyToCacheDirectory: true });
+      if (!res.canceled && res.assets?.[0]) a = res.assets[0];
+    }
+    if (!a) return;
     if (a.size && a.size > 4 * 1024 * 1024) return notify('File too large', 'Documents can be up to 4 MB. Try a smaller scan or photo.');
     setBusyDoc(slot?.id ?? 'new');
     try {

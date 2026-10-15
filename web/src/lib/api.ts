@@ -135,6 +135,8 @@ export const api = {
   me: () => request<Agent>('/auth/me'),
   updateMe: (b: Partial<Pick<Agent, 'name' | 'phone' | 'agency' | 'city' | 'bankAccount'>>) => request<Agent>('/auth/me', json('PATCH', b)),
   changePassword: (current: string, next: string) => request<{ ok: boolean }>('/auth/password', json('POST', { current, next })),
+  forgotPassword: (email: string) => request<{ ok: boolean }>('/auth/forgot', json('POST', { email })),
+  resetPassword: (token: string, password: string) => request<{ ok: boolean; email: string }>('/auth/reset', json('POST', { token, password })),
   uploadAvatar: (file: File) => {
     const form = new FormData();
     form.append('photo', file);

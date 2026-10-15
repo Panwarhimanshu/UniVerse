@@ -82,6 +82,8 @@ export const adminApi = {
   reviewDoc: (id: string, docId: string, status: 'verified' | 'missing', reason?: string) =>
     request<CaseDetail>(`/admin/cases/${id}/docs/${docId}`, json('PATCH', { status, reason })),
   downloadDoc: (id: string, docId: string, name: string) => download(`/admin/cases/${id}/docs/${docId}/file`, name),
+  /** Excel-friendly CSV of all cases, payouts or partners */
+  exportCsv: (kind: 'cases' | 'transactions' | 'partners') => download(`/admin/${kind}/export`, `${kind === 'transactions' ? 'payouts' : kind}-${new Date().toISOString().slice(0, 10)}.csv`),
   credit: (id: string, amount: number, cleared: boolean) => request<CaseDetail>(`/admin/cases/${id}/credit`, json('POST', { amount, cleared })),
 
   partners: () => request<AdminPartner[]>('/admin/partners'),

@@ -37,6 +37,21 @@ function SignInForm({ cta }: { cta: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [forgot, setForgot] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  const sendReset = async () => {
+    setError('');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return setError('Enter your email address above first');
+    setBusy(true);
+    try {
+      await api.forgotPassword(email.trim());
+      setSent(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not send the email');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -65,13 +80,20 @@ function SignInForm({ cta }: { cta: string }) {
       </div>
       <div className="auth-row">
         <label className="remember"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> Remember me</label>
-        <a href="#" onClick={(e) => { e.preventDefault(); setForgot(!forgot); }}>Forgot password?</a>
+        <a href="#" onClick={(e) => { e.preventDefault(); setForgot(!forgot); setSent(false); }}>Forgot password?</a>
       </div>
       {forgot ? (
-        <p className="auth-help">
-          Call your relationship manager or write to <a href={`mailto:${SITE.supportEmail}`}>{SITE.supportEmail}</a> from your registered email.
-          We'll send you a temporary password. Team members can ask their account owner to set a new one.
-        </p>
+        <div className="auth-help">
+          {sent ? (
+            <p>If <b>{email.trim()}</b> has a UniVerse account, a reset link is on its way. It works for 30 minutes. Check your spam folder too.</p>
+          ) : (
+            <>
+              <p>Enter your email above and we'll send you a link to choose a new password.</p>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={sendReset} disabled={busy} style={{ marginTop: '.5rem' }}>Email me a reset link</button>
+            </>
+          )}
+          <p style={{ marginTop: '.5rem' }}>Still stuck? Write to <a href={`mailto:${SITE.supportEmail}`}>{SITE.supportEmail}</a>.</p>
+        </div>
       ) : null}
       {error ? <p className="form-error">{error}</p> : null}
       <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={busy}>{busy ? 'Signing in…' : cta}</button>
@@ -128,6 +150,66 @@ function SignUpForm() {
       {error ? <p className="form-error">{error}</p> : null}
       <button type="submit" className="btn btn-green btn-block btn-lg" style={{ marginTop: '.4rem' }} disabled={busy}>{busy ? 'Creating account…' : 'Create Account'}</button>
     </form>
+  );
+}
+
+/** Opened from the reset email: /reset-password?token=… */
+export function ResetPassword() {
+  const [params] = useSearchParams();
+  const token = params.get('token') ?? '';
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [done, setDone] = useState(false);
+  useEffect(() => { document.title = 'Choose a new password | UniVerse'; }, []);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (password.length < 8) return setError('Password must be at least 8 characters');
+    if (password !== confirm) return setError('Passwords do not match');
+    setBusy(true);
+    try {
+      await api.resetPassword(token, password);
+      setDone(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not reset the password');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <AuthShell
+      title="Choose a new password"
+      sub="Pick something you don't use anywhere else."
+      points={['At least 8 characters', 'Works on the website and in the app', 'The link can be used once, within 30 minutes']}
+    >
+      <div className="top"><img src={LOGO} alt="UniVerse" /></div>
+      <h2>Reset password</h2>
+      {done ? (
+        <>
+          <p className="muted">Your password has been changed. You can sign in with it on the website and in the app.</p>
+          <Link to="/partner-login" className="btn btn-primary btn-block btn-lg" style={{ marginTop: '1rem' }}>Sign in</Link>
+        </>
+      ) : !token ? (
+        <p className="muted">This link is incomplete. Open the link from your email again, or ask for a new one from the sign-in page.</p>
+      ) : (
+        <form onSubmit={submit} noValidate>
+          <div className="field">
+            <label htmlFor="np">New password</label>
+            <div className="ctl">{LOCK}<input type="password" id="np" autoComplete="new-password" placeholder="At least 8 characters" value={password} onChange={(e) => setPassword(e.target.value)} autoFocus /></div>
+          </div>
+          <div className="field">
+            <label htmlFor="np2">Confirm new password</label>
+            <div className="ctl">{LOCK}<input type="password" id="np2" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} /></div>
+          </div>
+          {error ? <p className="form-error">{error}</p> : null}
+          <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={busy}>{busy ? 'Saving…' : 'Save new password'}</button>
+        </form>
+      )}
+    </AuthShell>
   );
 }
 

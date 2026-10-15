@@ -119,6 +119,9 @@ export const api = {
   me: () => request<Agent>('/auth/me'),
   updateMe: (body: Partial<Pick<Agent, 'name' | 'phone' | 'agency' | 'city' | 'bankAccount'>>) => request<Agent>('/auth/me', json('PATCH', body)),
   changePassword: (current: string, next: string) => post<{ ok: boolean }>('/auth/password', { current, next }),
+  forgotPassword: (email: string) => post<{ ok: boolean }>('/auth/forgot', { email }),
+  registerDevice: (token: string, platform: string) => post<{ ok: boolean }>('/auth/devices', { token, platform }),
+  unregisterDevice: (token: string) => request<void>('/auth/devices', json('DELETE', { token })),
   uploadAvatar: (f: UploadFile) => {
     const form = new FormData();
     if (f.file) form.append('photo', f.file);

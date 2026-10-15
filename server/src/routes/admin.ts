@@ -9,6 +9,7 @@ import { serviceByKey } from '../data/catalog.js';
 import { LAST_STEP, progressFor, stepsFor } from '../data/timelines.js';
 import { publicAgent, publicMessage, publicRequest, publicTx } from '../serialize.js';
 import { deleteFile, sendDocFile } from '../files.js';
+import { checkAttempts, clearAttempts, recordFailure } from '../limits.js';
 
 /* Back office for the UniVerse service desk and relationship managers. */
 const router = Router();
@@ -22,10 +23,13 @@ const tempPassword = () => crypto.randomBytes(6).toString('base64url');
 
 router.post('/login', async (req, res) => {
   const email = String(req.body?.email ?? '').trim().toLowerCase();
+  await checkAttempts('admin', req, email);
   const a = await Admin.findOne({ email }).select('+passwordHash');
   if (!a || !(await bcrypt.compare(String(req.body?.password ?? ''), a.passwordHash))) {
+    await recordFailure('admin', req, email);
     throw new HttpError(401, 'Incorrect email or password');
   }
+  await clearAttempts('admin', email);
   if (!a.active) throw new HttpError(403, 'This back-office account has been disabled. Ask the master admin.');
   a.lastLoginAt = new Date();
   await a.save();
@@ -64,6 +68,53 @@ router.use('/inbox', requireSection('messages'));
 router.use('/partners', (req, res, next) => requireSection(/\/messages$/.test(req.path) ? 'messages' : 'partners')(req, res, next));
 router.use('/transactions', requireSection('payouts'));
 router.use('/agreement-requests', requireSection('agreements'));
+
+/* ---------- CSV exports (open in Excel). A UTF-8 BOM keeps ₹ and names readable. ---------- */
+const csv = (rows: (string | number | boolean | null | undefined)[][]) =>
+  '\uFEFF' + rows.map((r) => r.map((v) => {
+    const t = v === null || v === undefined ? '' : String(v);
+    return /[",\n\r]/.test(t) || /^[=+\-@]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; // quoting also stops formula injection
+  }).join(',')).join('\r\n');
+const day = (d?: Date | null) => (d ? new Date(d).toISOString().slice(0, 10) : '');
+const sendCsv = (res: import('express').Response, name: string, rows: Parameters<typeof csv>[0]) => {
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${name}-${day(new Date())}.csv"`);
+  res.send(csv(rows));
+};
+
+router.get('/cases/export', async (_req, res) => {
+  const list = await ServiceRequest.find().sort({ createdAt: -1 }).populate('student').populate('agent', 'name agency');
+  sendCsv(res, 'cases', [
+    ['Case', 'Opened', 'Partner', 'Student', 'Student code', 'Phone', 'Email', 'Destination', 'Service', 'Status', 'Progress %', 'Documents needed'],
+    ...list.map((r: any) => [
+      r.ref, day(r.createdAt), r.agent?.agency || r.agent?.name, r.student?.name, r.student?.code, r.student?.phone, r.student?.email,
+      r.student?.country, serviceByKey(r.service)?.name ?? r.service, r.status, r.progress, r.docs.filter((d: any) => d.status === 'missing').length,
+    ]),
+  ]);
+});
+
+router.get('/transactions/export', async (_req, res) => {
+  const list = await Transaction.find().sort({ date: -1 }).populate('agent', 'name agency bankAccount');
+  sendCsv(res, 'payouts', [
+    ['Date', 'Partner', 'Type', 'Amount (INR)', 'Status', 'Description', 'Bank account'],
+    ...list.map((t: any) => [day(t.date), t.agent?.agency || t.agent?.name, t.type === 'Debit' ? 'Withdrawal' : 'Commission', t.amount, t.status, t.description, t.agent?.bankAccount]),
+  ]);
+});
+
+router.get('/partners/export', async (_req, res) => {
+  const [agents, counts] = await Promise.all([
+    Agent.find().sort({ createdAt: -1 }),
+    ServiceRequest.aggregate([{ $group: { _id: '$agent', total: { $sum: 1 }, done: { $sum: { $cond: [{ $eq: ['$status', 'Completed'] }, 1, 0] } } } }]),
+  ]);
+  const c = new Map(counts.map((x) => [String(x._id), x]));
+  sendCsv(res, 'partners', [
+    ['Agency', 'Owner', 'Email', 'Phone', 'Zone', 'City', 'Joined', 'Verified', 'Suspended', 'RM', 'Cases', 'Completed', 'Wallet balance', 'Pending', 'Lifetime earned'],
+    ...agents.map((a: any) => [
+      a.agency || a.name, a.name, a.email, a.phone, a.zone, a.city, day(a.createdAt), a.verified ? 'Yes' : 'No', a.suspended ? 'Yes' : 'No', a.rm?.name,
+      c.get(String(a._id))?.total ?? 0, c.get(String(a._id))?.done ?? 0, a.wallet?.balance ?? 0, a.wallet?.pending ?? 0, a.wallet?.lifetime ?? 0,
+    ]),
+  ]);
+});
 
 router.post('/password', async (req, res) => {
   const next = String(req.body?.next ?? '');
@@ -467,6 +518,10 @@ router.patch('/transactions/:id', async (req, res) => {
     await Agent.updateOne({ _id: t.agent }, { $inc: { 'wallet.pending': -t.amount, 'wallet.balance': t.amount, 'wallet.lifetime': t.amount } });
   } else if (t.type === 'Debit' && action === 'pay') {
     t.status = 'Completed';
+    await Message.create({
+      agent: t.agent, request: null, from: 'rm', author: adminOf(req).name,
+      text: `Your withdrawal of ₹${t.amount.toLocaleString('en-IN')} has been paid to your bank account.`,
+    });
   } else if (action === 'reject') {
     t.status = 'Rejected';
     await Agent.updateOne({ _id: t.agent }, t.type === 'Credit' ? { $inc: { 'wallet.pending': -t.amount } } : { $inc: { 'wallet.balance': t.amount } });

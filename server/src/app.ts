@@ -14,6 +14,7 @@ import { Admin } from './models/index.js';
 import { loadContent, refreshContentIfStale } from './content.js';
 import { requireAuth, HttpError } from './middleware/auth.js';
 import { MAX_UPLOAD_BYTES } from './files.js';
+import './notify.js'; // push and email for partner updates
 
 async function connectDb() {
   let uri = process.env.MONGODB_URI;

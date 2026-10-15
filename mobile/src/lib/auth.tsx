@@ -2,6 +2,7 @@ import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, 
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { Agent, api, Menu, Perm, setToken, setUnauthorizedHandler } from './api';
+import { unregisterPush } from './push';
 
 const KEY = 'uv_token';
 
@@ -30,6 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [notice, setNotice] = useState('');
 
   const signOut = useCallback(async (why = '') => {
+    await unregisterPush();
     setToken(null);
     setAgent(null);
     setNotice(why);

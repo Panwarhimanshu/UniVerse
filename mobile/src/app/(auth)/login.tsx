@@ -13,6 +13,21 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const sendReset = async () => {
+    setError('');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return setError('Enter your email address first');
+    setSending(true);
+    try {
+      await api.forgotPassword(email.trim());
+      setSent(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not send the email');
+    } finally {
+      setSending(false);
+    }
+  };
 
   const submit = async () => {
     setError('');
@@ -47,10 +62,18 @@ export default function Login() {
             Forgot password?
           </Text>
           {forgot ? (
-            <Text style={[type.small, { textAlign: 'center', marginTop: space.sm }]}>
-              Call your relationship manager or write to vas@universe.com from your registered email for a temporary password.
-              Team members can ask their account owner to set a new one.
-            </Text>
+            <View style={{ marginTop: space.sm, gap: space.sm }}>
+              {sent ? (
+                <Text style={[type.small, { textAlign: 'center' }]}>
+                  If {email.trim()} has a UniVerse account, a reset link is on its way. Open it on this phone within 30 minutes, then sign in here with your new password.
+                </Text>
+              ) : (
+                <>
+                  <Text style={[type.small, { textAlign: 'center' }]}>Enter your email above and we'll send you a link to choose a new password.</Text>
+                  <Button label="Email me a reset link" variant="secondary" onPress={sendReset} loading={sending} />
+                </>
+              )}
+            </View>
           ) : null}
 
           <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: space.xl, gap: 4 }}>

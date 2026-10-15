@@ -21,3 +21,11 @@ mobile/ios/
 
 # Vercel project links
 .vercel/
+
+# Firebase keys and other credential files (never commit)
+secrets/
+google-services.json
+*-firebase-adminsdk-*.json
+
+# database backups (contain personal data)
+backups/

@@ -266,3 +266,5 @@
 .d-grid.pa-grid{grid-template-columns:1fr 1fr}
 @media(max-width:860px){.d-grid.pa-grid{grid-template-columns:1fr}}
 .panel-h .t-sub{font-size:.78rem;color:var(--ink-soft);font-weight:500}
+.adm-export{margin-left:auto;display:inline-flex;align-items:center;gap:.4rem;white-space:nowrap}
+.adm-export svg{width:15px;height:15px}

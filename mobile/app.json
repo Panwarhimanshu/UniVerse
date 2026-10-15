@@ -37,10 +37,18 @@
       ],
       "expo-sharing",
       [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#0A66C2",
+          "defaultChannel": "updates"
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "photosPermission": "UniVerse uses your photos so you can choose a profile picture.",
-          "cameraPermission": false,
+          "cameraPermission": "UniVerse uses the camera so you can photograph student documents.",
           "microphonePermission": false
         }
       ]

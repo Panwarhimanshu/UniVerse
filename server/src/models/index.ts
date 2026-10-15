@@ -88,9 +88,15 @@ const messageSchema = new Schema(
     from: { type: String, enum: ['agent', 'desk', 'rm', 'system'], required: true },
     author: { type: String, default: '' }, // who wrote it: team member name on the partner side, staff name on ours
     text: { type: String, required: true },
+    quiet: { type: Boolean, default: false }, // true for notes about the partner's own actions: no push or email
   },
   { timestamps: true },
 );
+/** Set by notify.ts: sends a push (and for important ones, an email) for every message our side writes */
+export const messageHooks: { onCreate?: (m: { agent: unknown; request?: unknown; from: string; author: string; text: string; quiet?: boolean | null }) => Promise<void> } = {};
+messageSchema.post('save', async function (doc) {
+  if (doc.from !== 'agent' && !doc.quiet && messageHooks.onCreate) await messageHooks.onCreate(doc).catch((e) => console.error('notify failed', e));
+});
 export const Message = model('Message', messageSchema);
 
 /* ---------- Wallet transaction ---------- */
@@ -240,3 +246,34 @@ const usageSchema = new Schema(
 usageSchema.index({ at: 1 }, { expireAfterSeconds: 180 * 24 * 3600 }); // keep 6 months
 usageSchema.index({ event: 1, at: -1 });
 export const UsageEvent = model('UsageEvent', usageSchema);
+
+/* ---------- Phones registered for push notifications ---------- */
+const deviceSchema = new Schema(
+  {
+    agent: { type: Schema.Types.ObjectId, ref: 'Agent', required: true, index: true },
+    member: { type: Schema.Types.ObjectId, ref: 'TeamMember', default: null },
+    token: { type: String, required: true, unique: true },
+    platform: { type: String, default: 'android' },
+  },
+  { timestamps: true },
+);
+export const Device = model('Device', deviceSchema);
+
+/* ---------- Password reset links (only a hash of the token is stored) ---------- */
+const resetSchema = new Schema(
+  {
+    kind: { type: String, enum: ['agent', 'member'], required: true },
+    user: { type: Schema.Types.ObjectId, required: true },
+    tokenHash: { type: String, required: true, unique: true },
+    expiresAt: { type: Date, required: true },
+    used: { type: Boolean, default: false },
+  },
+  { versionKey: false },
+);
+resetSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 24 * 3600 });
+export const PasswordReset = model('PasswordReset', resetSchema);
+
+/* ---------- Failed sign-ins, for the attempt limit (kept 30 minutes) ---------- */
+const attemptSchema = new Schema({ key: { type: String, required: true, index: true }, at: { type: Date, default: Date.now } }, { versionKey: false });
+attemptSchema.index({ at: 1 }, { expireAfterSeconds: 30 * 60 });
+export const LoginAttempt = model('LoginAttempt', attemptSchema);

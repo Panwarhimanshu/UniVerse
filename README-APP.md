@@ -71,6 +71,21 @@ Partner owners add team members under User Management with a temporary password.
 partner login and only see the menus and actions the owner allowed; the API enforces the same rules. Removing a member
 signs them out immediately.
 
+## Notifications, email and security
+
+- **Push notifications** (Android, through Firebase): replies from the desk and the RM, stage changes, documents
+  returned, commissions and payouts. Tapping one opens the case or chat. They also show while the app is open.
+  Needs `secrets/google-services.json` (copied into `mobile/` before building) and the Firebase service account key
+  (`FIREBASE_SERVICE_ACCOUNT_FILE` locally, `FIREBASE_SERVICE_ACCOUNT` on Vercel).
+- **Email** over SMTP (`SMTP_*` in `server/.env`): welcome on sign-up, password reset links, desk and RM replies, completed
+  cases, returned documents, commissions and payouts. Routine stage changes are push-only.
+- **Forgot password**: a link valid for 30 minutes, usable once, from the sign-in page on the website and in the app.
+- **Sign-in limit**: 5 wrong passwords for one email in 15 minutes locks that email until the window passes (partner and
+  back-office logins). A password reset clears it.
+- **Exports**: Cases, Partners and Payouts have an "Export to Excel" button (CSV).
+- **Backups**: `cd server && npm run backup` saves the whole database, documents included, to `backups/<date>/`.
+  Atlas free clusters have no automatic backups, so run this regularly (or move to a paid cluster with backups on).
+
 ## Live site
 
 - Website: https://universeportal.vercel.app (back office at `/admin`)
