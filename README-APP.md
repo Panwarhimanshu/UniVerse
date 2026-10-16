@@ -71,6 +71,20 @@ Partner owners add team members under User Management with a temporary password.
 partner login and only see the menus and actions the owner allowed; the API enforces the same rules. Removing a member
 signs them out immediately.
 
+## Wallet and payouts
+
+- Every balance is recalculated from the transactions after each change, so the figures always match the history:
+  balance = cleared credits minus withdrawals that weren't rejected; pending = commissions still clearing;
+  earned = cleared commissions only (master admin corrections show as "Correction" and don't count as earnings).
+- Partners save up to five payout methods (UPI IDs or bank accounts; the IFSC fills in the bank and branch) and
+  choose one when withdrawing. Only the account owner can add or remove them; the full account number is shown
+  only to the back office.
+- A withdrawal leaves the balance at once and waits in Back office → Payouts, which shows exactly where to pay:
+  - **Pay via Razorpay** (when the RAZORPAYX_* settings are filled in) sends it by UPI, IMPS or NEFT; the
+    Razorpay webhook marks it paid or failed by itself and the partner is notified with the bank reference.
+  - **Mark paid** for a payment made by hand, with its UTR.
+  - **Reject** returns the money to the partner's balance with a reason.
+
 ## Notifications, email and security
 
 - **Notification engine**: every partner-facing event (case progress, documents, messages, payments, account changes,

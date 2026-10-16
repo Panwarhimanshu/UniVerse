@@ -28,8 +28,7 @@ export default function Students() {
   if (!data && !error) return <Loading />;
 
   return (
-    <Screen onRefresh={refresh} refreshing={refreshing}>
-      <Header left={<ProfileButton />} title="Students" right={<HeaderActions addStudent />} />
+    <Screen onRefresh={refresh} refreshing={refreshing} header={<Header left={<ProfileButton />} title="Students" right={<HeaderActions addStudent />} />}>
 
       <View style={styles.search}>
         <Feather name="search" size={16} color={colors.faint} />

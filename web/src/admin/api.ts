@@ -48,7 +48,10 @@ export interface AdminPartner extends Omit<Agent, 'member'> {
   cases: number; openCases: number; teamSize: number; suspended: boolean;
 }
 export interface Thread { partnerId: string; name: string; agency: string; rm: string; last: Message; awaitingReply: boolean }
-export interface AdminTx extends Transaction { partner: PartnerRef & { bankAccount: string } }
+export interface AdminTx extends Transaction {
+  partner: PartnerRef;
+  payTo: { type: 'upi'; upi: string } | { type: 'bank'; holder: string; accountNumber: string; ifsc: string; bankName: string; branch: string } | null;
+}
 export interface AgreementReq {
   id: string; type: 'download' | 'discussion' | 'termination'; status: 'Open' | 'Closed'; createdAt: string;
   partner: (PartnerRef & { email: string; phone: string }) | null;
@@ -94,8 +97,8 @@ export const adminApi = {
   thread: (partnerId: string) => request<Message[]>(`/admin/partners/${partnerId}/messages`),
   sendRm: (partnerId: string, text: string) => request<Message>(`/admin/partners/${partnerId}/messages`, json('POST', { text })),
 
-  transactions: (status: string) => request<AdminTx[]>(`/admin/transactions${qs({ status })}`),
-  settle: (id: string, action: 'clear' | 'pay' | 'reject', reason?: string) => request<Transaction>(`/admin/transactions/${id}`, json('PATCH', { action, reason })),
+  transactions: (status: string) => request<{ instantPayouts: boolean; items: AdminTx[] }>(`/admin/transactions${qs({ status })}`),
+  settle: (id: string, action: 'clear' | 'pay' | 'payout' | 'reject', extra: { reason?: string; utr?: string } = {}) => request<Transaction>(`/admin/transactions/${id}`, json('PATCH', { action, ...extra })),
 
   agreementRequests: (status: string) => request<AgreementReq[]>(`/admin/agreement-requests${qs({ status })}`),
   closeAgreementRequest: (id: string, status: 'Open' | 'Closed') => request<{ ok: boolean }>(`/admin/agreement-requests/${id}`, json('PATCH', { status })),

@@ -32,8 +32,20 @@ export interface Notification {
   link: { kind: 'case' | 'rm' | 'wallet' | 'profile' | 'whatsnew' | 'none'; id?: string }; read: boolean; createdAt: string;
 }
 export interface NotificationPref { key: NotificationCategory; label: string; description: string; push: boolean; email: boolean }
-export interface Transaction { id: string; description: string; type: 'Credit' | 'Debit'; amount: number; status: 'Pending' | 'Completed' | 'Rejected'; date: string }
-export interface Wallet { balance: number; pending: number; lifetime: number; bankAccount: string; minWithdrawal: number; transactions: Transaction[] }
+export interface Transaction {
+  id: string; description: string; type: 'Credit' | 'Debit'; kind: 'commission' | 'adjustment' | 'withdrawal';
+  amount: number; status: 'Pending' | 'Completed' | 'Rejected'; date: string;
+  method: { type: 'upi' | 'bank'; label: string } | null;
+  payout: { state: 'requested' | 'processing' | 'processed' | 'failed' | 'reversed'; utr: string; reason: string; paidAt: string | null } | null;
+}
+export interface PayoutMethod {
+  id: string; type: 'upi' | 'bank'; label: string; isDefault: boolean;
+  upi?: string; holder?: string; bankName?: string; branch?: string; ifsc?: string; last4?: string;
+}
+export interface Wallet {
+  balance: number; pending: number; lifetime: number; minWithdrawal: number; instantPayouts: boolean;
+  methods: PayoutMethod[]; transactions: Transaction[];
+}
 export interface Dashboard {
   stats: { activeCases: number; students: number; balance: number | null; monthEarnings: number | null };
   recent: Case[];
@@ -178,7 +190,11 @@ export const api = {
   raiseRequests: (id: string, services: string[]) => request<Student>(`/students/${id}/requests`, json('POST', { services })),
 
   wallet: () => request<Wallet>('/wallet'),
-  withdraw: (amount: number) => request<{ balance: number; transaction: Transaction }>('/wallet/withdraw', json('POST', { amount })),
+  withdraw: (amount: number, methodId: string) => request<{ balance: number; transaction: Transaction }>('/wallet/withdraw', json('POST', { amount, methodId })),
+  addPayoutMethod: (b: { type: 'upi'; upi: string } | { type: 'bank'; holder: string; accountNumber: string; ifsc: string }) => request<PayoutMethod>('/wallet/methods', json('POST', b)),
+  setDefaultPayoutMethod: (id: string) => request<PayoutMethod[]>(`/wallet/methods/${id}/default`, json('POST', {})),
+  removePayoutMethod: (id: string) => request<void>(`/wallet/methods/${id}`, json('DELETE')),
+  lookupIfsc: (code: string) => request<{ bank: string; branch: string; city: string }>(`/wallet/ifsc/${encodeURIComponent(code)}`),
 
   rmMessages: () => request<Message[]>('/rm/messages'),
   sendRmMessage: (text: string) => request<Message>('/rm/messages', json('POST', { text })),

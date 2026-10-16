@@ -76,6 +76,7 @@ function Navigator() {
       <Stack.Screen name="refer" options={{ title: 'Request a service', presentation: 'modal' }} />
       <Stack.Screen name="add-student" options={{ title: 'Add a student', presentation: 'modal' }} />
       <Stack.Screen name="withdraw" options={{ title: 'Withdraw', presentation: 'modal' }} />
+      <Stack.Screen name="payout-method" options={{ title: 'Add payout method', presentation: 'modal' }} />
       <Stack.Screen name="student/[id]" options={{ title: '' }} />
       <Stack.Screen name="services" options={{ title: 'Services' }} />
       <Stack.Screen name="whatsnew" options={{ title: "What's New" }} />

@@ -88,7 +88,10 @@ export const publicTx = (t: any) => ({
   id: String(t._id),
   description: t.description,
   type: t.type,
+  kind: t.kind ?? (t.type === 'Debit' ? 'withdrawal' : /commission/i.test(t.description) ? 'commission' : 'adjustment'),
   amount: t.amount,
   status: t.status,
   date: t.date,
+  method: t.method?.label ? { type: t.method.type, label: t.method.label } : null,
+  payout: t.payout?.state ? { state: t.payout.state, utr: t.payout.utr ?? '', reason: t.payout.reason ?? '', paidAt: t.payout.paidAt ?? null } : null,
 });

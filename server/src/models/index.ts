@@ -103,12 +103,48 @@ const txSchema = new Schema(
     type: { type: String, enum: ['Credit', 'Debit'], required: true },
     amount: { type: Number, required: true },
     status: { type: String, enum: ['Pending', 'Completed', 'Rejected'], default: 'Pending' },
+    // commission: earned on a case · adjustment: correction by the master admin · withdrawal: money sent to the partner
+    kind: { type: String, enum: ['commission', 'adjustment', 'withdrawal'], default: undefined },
     request: { type: Schema.Types.ObjectId, ref: 'ServiceRequest', default: null },
     date: { type: Date, default: Date.now },
+    // withdrawals: where the money goes (a copy, so later edits to the method don't change history)
+    methodId: { type: Schema.Types.ObjectId, ref: 'PayoutMethod', default: null },
+    method: {
+      type: { type: String, enum: ['upi', 'bank'] },
+      label: String, // "UPI · ravi@okaxis" or "HDFC Bank ••4821"
+    },
+    // how a withdrawal was paid
+    payout: {
+      provider: { type: String, enum: ['razorpay', 'manual'] },
+      id: String, // Razorpay payout id
+      state: String, // requested, processing, processed, failed, reversed
+      utr: String, // bank reference shown to the partner
+      reason: String, // why it failed or was rejected
+      paidAt: Date,
+    },
   },
   { timestamps: true },
 );
 export const Transaction = model('Transaction', txSchema);
+
+/* ---------- Where a partner receives withdrawals: a UPI ID or a bank account ---------- */
+const payoutMethodSchema = new Schema(
+  {
+    agent: { type: Schema.Types.ObjectId, ref: 'Agent', required: true, index: true },
+    type: { type: String, enum: ['upi', 'bank'], required: true },
+    upi: { type: String, default: '' },
+    holder: { type: String, default: '' },
+    accountNumber: { type: String, default: '', select: false }, // full number only leaves the server for the payout itself
+    last4: { type: String, default: '' },
+    ifsc: { type: String, default: '' },
+    bankName: { type: String, default: '' },
+    branch: { type: String, default: '' },
+    isDefault: { type: Boolean, default: false },
+    razorpay: { contactId: String, fundAccountId: String },
+  },
+  { timestamps: true },
+);
+export const PayoutMethod = model('PayoutMethod', payoutMethodSchema);
 
 /* ---------- Team member (user management) ---------- */
 export const MENUS = ['overview', 'whatsnew', 'students', 'requests', 'services', 'wallet', 'commissions'] as const;

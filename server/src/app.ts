@@ -11,6 +11,7 @@ import adminRoutes from './routes/admin.js';
 import contentRoutes from './routes/content.js';
 import analyticsRoutes from './routes/analytics.js';
 import notificationRoutes from './routes/notifications.js';
+import webhookRoutes from './routes/webhooks.js';
 import { Admin } from './models/index.js';
 import { loadContent, refreshContentIfStale } from './content.js';
 import { requireAuth, HttpError } from './middleware/auth.js';
@@ -74,7 +75,8 @@ export function init() {
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: '1mb' }));
+// keep the raw body for webhook signatures
+app.use(express.json({ limit: '1mb', verify: (req, _res, buf) => { (req as unknown as { rawBody: Buffer }).rawBody = buf; } }));
 app.use(async (_req, _res, next) => {
   await init();
   await refreshContentIfStale();
@@ -84,6 +86,7 @@ app.use(async (_req, _res, next) => {
 const api = express.Router();
 api.get('/health', (_req, res) => res.json({ ok: true }));
 api.use('/content', contentRoutes);
+api.use('/webhooks', webhookRoutes);
 api.use('/auth', authRoutes);
 api.use('/admin', adminRoutes);
 api.use('/requests', requireAuth, requestRoutes);

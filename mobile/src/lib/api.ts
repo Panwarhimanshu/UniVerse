@@ -42,8 +42,22 @@ export interface AppNotification {
   id: string; category: NotificationCategory; type: string; title: string; body: string; link: NotificationLink; read: boolean; createdAt: string;
 }
 export interface NotificationPref { key: NotificationCategory; label: string; description: string; push: boolean; email: boolean }
-export interface Transaction { id: string; description: string; type: 'Credit' | 'Debit'; amount: number; status: 'Pending' | 'Completed' | 'Rejected'; date: string }
-export interface Wallet { balance: number; pending: number; lifetime: number; bankAccount: string; minWithdrawal: number; transactions: Transaction[] }
+export interface Transaction {
+  id: string; description: string; type: 'Credit' | 'Debit'; kind: 'commission' | 'adjustment' | 'withdrawal';
+  amount: number; status: 'Pending' | 'Completed' | 'Rejected'; date: string;
+  method: { type: 'upi' | 'bank'; label: string } | null;
+  payout: { state: 'requested' | 'processing' | 'processed' | 'failed' | 'reversed'; utr: string; reason: string; paidAt: string | null } | null;
+}
+export interface PayoutMethod {
+  id: string; type: 'upi' | 'bank'; label: string; isDefault: boolean;
+  upi?: string; holder?: string; bankName?: string; branch?: string; ifsc?: string; last4?: string;
+}
+export interface Wallet {
+  balance: number; pending: number; lifetime: number; minWithdrawal: number;
+  /** true when withdrawals are paid through RazorpayX (minutes) rather than by hand (a working day) */
+  instantPayouts: boolean;
+  methods: PayoutMethod[]; transactions: Transaction[];
+}
 export interface Service {
   key: string; icon: string; category: string; name: string; short: string; about: string; tat: string; countries: string;
   kpis: [string, string][]; features: string[]; partners: string[]; steps: string[];
@@ -200,7 +214,12 @@ export const api = {
   raiseRequests: (id: string, services: string[]) => post<Student>(`/students/${id}/requests`, { services }),
 
   wallet: () => request<Wallet>('/wallet'),
-  withdraw: (amount: number) => post<{ balance: number; transaction: Transaction }>('/wallet/withdraw', { amount }),
+  withdraw: (amount: number, methodId: string) => post<{ balance: number; transaction: Transaction }>('/wallet/withdraw', { amount, methodId }),
+  payoutMethods: () => request<PayoutMethod[]>('/wallet/methods'),
+  addPayoutMethod: (b: { type: 'upi'; upi: string } | { type: 'bank'; holder: string; accountNumber: string; ifsc: string }) => post<PayoutMethod>('/wallet/methods', b),
+  setDefaultPayoutMethod: (id: string) => post<PayoutMethod[]>(`/wallet/methods/${id}/default`, {}),
+  removePayoutMethod: (id: string) => request<void>(`/wallet/methods/${id}`, json('DELETE')),
+  lookupIfsc: (code: string) => request<{ bank: string; branch: string; city: string }>(`/wallet/ifsc/${encodeURIComponent(code)}`),
 
   rmMessages: () => request<Message[]>('/rm/messages'),
   sendRmMessage: (text: string) => post<Message>('/rm/messages', { text }),

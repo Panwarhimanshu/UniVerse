@@ -23,8 +23,7 @@ export default function Cases() {
   const { data, error, refreshing, refresh } = useApi(() => api.cases(debounced, status), [debounced, status]);
 
   return (
-    <Screen onRefresh={refresh} refreshing={refreshing}>
-      <Header left={<ProfileButton />} title="Cases" right={<HeaderActions request />} />
+    <Screen onRefresh={refresh} refreshing={refreshing} header={<Header left={<ProfileButton />} title="Cases" right={<HeaderActions request />} />}>
 
       <View style={styles.search}>
         <Feather name="search" size={16} color={colors.faint} />

@@ -559,55 +559,90 @@ function PayoutsView({ onChanged }: { onChanged: () => void }) {
   const toast = useToast();
   const [status, setStatus] = useState('Pending');
   const list = useApi(() => adminApi.transactions(status), [status]);
-  const settle = async (t: AdminTx, action: 'clear' | 'pay' | 'reject') => {
-    let reason: string | undefined;
+  const [busyId, setBusyId] = useState('');
+  const settle = async (t: AdminTx, action: 'clear' | 'pay' | 'payout' | 'reject') => {
+    const extra: { reason?: string; utr?: string } = {};
     if (action === 'reject') {
-      const r = prompt(t.type === 'Debit' ? 'Why is this withdrawal being rejected? The partner will see this.' : 'Reject this pending commission?', '');
+      const r = prompt(t.type === 'Debit' ? 'Why is this withdrawal being rejected? The partner will see this.' : 'Why is this commission being cancelled?', '');
       if (r === null) return;
-      reason = r;
-    } else if (action === 'pay' && !confirm(`Confirm ${inr(t.amount)} has been sent to ${t.partner.bankAccount || 'the partner’s bank account'}?`)) {
+      extra.reason = r;
+    } else if (action === 'pay') {
+      const utr = prompt(`Enter the bank reference (UTR) for the ${inr(t.amount)} you sent to ${t.method?.label ?? 'the partner'}:`, '');
+      if (!utr) return;
+      extra.utr = utr.trim();
+    } else if (action === 'payout' && !confirm(`Send ${inr(t.amount)} to ${t.method?.label ?? 'the partner'} through Razorpay now?`)) {
       return;
     }
+    setBusyId(t.id);
     try {
-      await adminApi.settle(t.id, action, reason);
-      toast(action === 'clear' ? 'Moved to available balance' : action === 'pay' ? 'Marked as paid' : 'Rejected');
+      await adminApi.settle(t.id, action, extra);
+      toast({ clear: 'Moved to available balance', pay: 'Marked as paid', payout: 'Sent to Razorpay. It settles automatically.', reject: 'Rejected' }[action]);
       list.reload();
       onChanged();
-    } catch (e) { toast(errMsg(e)); }
+    } catch (e) { toast(errMsg(e)); } finally { setBusyId(''); }
   };
+  const copy = (text: string) => { navigator.clipboard?.writeText(text).then(() => toast('Copied')).catch(() => {}); };
+  const items = list.data?.items;
   return (
     <section className="view active">
       <div className="adm-toolbar">
         <div className="svc-filters">
           {['Pending', 'Completed', 'Rejected', 'all'].map((s) => <button key={s} className={`chip-btn${status === s ? ' active' : ''}`} onClick={() => setStatus(s)}>{s === 'all' ? 'All' : s}</button>)}
         </div>
+        <span className="adm-meta">{list.data?.instantPayouts ? 'Razorpay payouts: on' : 'Razorpay payouts: not set up (pay by hand)'}</span>
         <ExportButton kind="transactions" />
       </div>
       <div className="panel">
         <div style={{ overflowX: 'auto' }}>
           <table className="tbl">
-            <thead><tr><th>Date</th><th>Partner</th><th>Description</th><th>Amount</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>Date</th><th>Partner</th><th>Details</th><th>Amount</th><th>Status</th><th></th></tr></thead>
             <tbody>
-              {list.data?.map((t) => (
+              {items?.map((t) => (
                 <tr key={t.id}>
-                  <td>{fmtDate(t.date)}</td>
-                  <td><div className="t-name">{t.partner.agency || t.partner.name}</div>{t.type === 'Debit' ? <div className="t-sub">{t.partner.bankAccount || 'No bank account on file'}</div> : null}</td>
-                  <td>{t.description}</td>
-                  <td style={{ fontWeight: 700, color: t.type === 'Credit' ? 'var(--green-deep)' : 'var(--ink)' }}>{t.type === 'Credit' ? '+' : '−'} {inr(t.amount)}</td>
-                  <td><span className={`status ${statusClass(t.status)}`}>{t.status}</span></td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(t.date)}</td>
+                  <td><div className="t-name">{t.partner.agency || t.partner.name}</div></td>
+                  <td>
+                    {t.type === 'Debit' ? (
+                      t.payTo ? (
+                        <div className="payto">
+                          {t.payTo.type === 'upi' ? (
+                            <span>UPI <b>{t.payTo.upi}</b> <button className="link-btn" onClick={() => copy((t.payTo as { upi: string }).upi)}>copy</button></span>
+                          ) : (
+                            <>
+                              <span><b>{t.payTo.holder}</b> · {t.payTo.bankName}{t.payTo.branch ? `, ${t.payTo.branch}` : ''}</span>
+                              <span>A/c <b>{t.payTo.accountNumber}</b> <button className="link-btn" onClick={() => copy((t.payTo as { accountNumber: string }).accountNumber)}>copy</button> · IFSC <b>{t.payTo.ifsc}</b></span>
+                            </>
+                          )}
+                          {t.payout?.utr ? <span className="t-sub">Bank reference {t.payout.utr}</span> : t.payout?.reason ? <span className="t-sub">{t.payout.reason}</span> : null}
+                        </div>
+                      ) : <span className="t-sub">{t.method?.label ?? t.description}</span>
+                    ) : t.description}
+                  </td>
+                  <td style={{ fontWeight: 700, color: t.type === 'Credit' ? 'var(--green-deep)' : 'var(--ink)', whiteSpace: 'nowrap' }}>{t.type === 'Credit' ? '+' : '−'} {inr(t.amount)}</td>
+                  <td><span className={`status ${statusClass(t.status)}`}>{t.type === 'Debit' && t.status === 'Pending' && t.payout?.state === 'processing' ? 'With Razorpay' : t.status}</span></td>
                   <td>
                     {t.status === 'Pending' ? (
                       <div className="um-actions">
-                        {t.type === 'Debit'
-                          ? <button className="btn btn-green btn-sm" onClick={() => settle(t, 'pay')}>Mark paid</button>
-                          : <button className="btn btn-green btn-sm" onClick={() => settle(t, 'clear')}>Clear</button>}
-                        <button className="btn btn-ghost btn-sm" onClick={() => settle(t, 'reject')}>Reject</button>
+                        {t.type === 'Debit' ? (
+                          t.payout?.state === 'processing' ? <span className="t-sub">Settles automatically</span> : (
+                            <>
+                              {list.data?.instantPayouts && t.payTo ? <button className="btn btn-green btn-sm" disabled={busyId === t.id} onClick={() => settle(t, 'payout')}>Pay via Razorpay</button> : null}
+                              <button className={`btn ${list.data?.instantPayouts ? 'btn-ghost' : 'btn-green'} btn-sm`} disabled={busyId === t.id} onClick={() => settle(t, 'pay')}>Mark paid</button>
+                              <button className="btn btn-ghost btn-sm" disabled={busyId === t.id} onClick={() => settle(t, 'reject')}>Reject</button>
+                            </>
+                          )
+                        ) : (
+                          <>
+                            <button className="btn btn-green btn-sm" disabled={busyId === t.id} onClick={() => settle(t, 'clear')}>Clear</button>
+                            <button className="btn btn-ghost btn-sm" disabled={busyId === t.id} onClick={() => settle(t, 'reject')}>Reject</button>
+                          </>
+                        )}
                       </div>
                     ) : null}
                   </td>
                 </tr>
               ))}
-              {list.data && !list.data.length ? <tr><td colSpan={6} className="empty-row">Nothing here.</td></tr> : null}
+              {items && !items.length ? <tr><td colSpan={6} className="empty-row">Nothing here.</td></tr> : null}
             </tbody>
           </table>
         </div>

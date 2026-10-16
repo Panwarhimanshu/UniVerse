@@ -2,7 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { Types } from 'mongoose';
 import {
-  Admin, Agent, AgreementRequest, Announcement, Article, AuditLog, CommissionArchive, Device, Message, Notification, ServiceContent, ServiceRequest, Setting,
+  Admin, Agent, AgreementRequest, Announcement, Article, AuditLog, CommissionArchive, Device, Message, Notification, PayoutMethod, ServiceContent, ServiceRequest, Setting,
   UsageEvent,
   STAFF_SECTIONS, Student, TeamMember, Transaction,
 } from '../models/index.js';
@@ -14,6 +14,7 @@ import { publicArticle } from './content.js';
 import { deleteFile } from '../files.js';
 import { EMAIL_RE } from './auth.js';
 import { accountNotices, notify } from '../notify.js';
+import { syncWallet } from '../wallet.js';
 
 /* Master admin only (mounted behind masterOnly in admin.ts). */
 const router = Router();
@@ -155,13 +156,14 @@ router.post('/partners/:id/adjust', async (req, res) => {
   const note = String(req.body?.note ?? '').trim();
   if (!amount) throw new HttpError(400, 'Enter an amount (use a minus sign to deduct)');
   if (!note) throw new HttpError(400, 'Add a short reason; the partner sees it in their wallet');
-  const filter = amount < 0 ? { _id: id, 'wallet.balance': { $gte: -amount } } : { _id: id };
-  const update = amount > 0 ? { $inc: { 'wallet.balance': amount, 'wallet.lifetime': amount } } : { $inc: { 'wallet.balance': amount } };
-  const a = await Agent.findOneAndUpdate(filter, update, { new: true });
-  if (!a) throw new HttpError(400, amount < 0 ? "The partner's balance is lower than that" : 'Partner not found');
-  await Transaction.create({ agent: id, type: amount > 0 ? 'Credit' : 'Debit', amount: Math.abs(amount), status: 'Completed', description: note });
+  const a = await Agent.findById(id);
+  if (!a) throw new HttpError(404, 'Partner not found');
+  const before = await syncWallet(id);
+  if (amount < 0 && before.balance < -amount) throw new HttpError(400, "The partner's balance is lower than that");
+  await Transaction.create({ agent: id, type: amount > 0 ? 'Credit' : 'Debit', kind: 'adjustment', amount: Math.abs(amount), status: 'Completed', description: note });
+  const wallet = await syncWallet(id);
   res.locals.audit = `${a.agency || a.name}: wallet ${amount > 0 ? 'credited' : 'debited'} ₹${Math.abs(amount).toLocaleString('en-IN')} (${note})`;
-  res.json({ wallet: a.wallet });
+  res.json({ wallet });
 });
 
 /* Permanently deletes a partner and everything linked to them. The caller must repeat the partner's email. */
@@ -176,7 +178,7 @@ router.delete('/partners/:id', async (req, res) => {
   await Promise.all([
     Student.deleteMany({ agent: a._id }), ServiceRequest.deleteMany({ agent: a._id }), Message.deleteMany({ agent: a._id }),
     Transaction.deleteMany({ agent: a._id }), TeamMember.deleteMany({ agent: a._id }), AgreementRequest.deleteMany({ agent: a._id }),
-    Notification.deleteMany({ agent: a._id }), Device.deleteMany({ agent: a._id }), UsageEvent.deleteMany({ agent: a._id }),
+    Notification.deleteMany({ agent: a._id }), Device.deleteMany({ agent: a._id }), UsageEvent.deleteMany({ agent: a._id }), PayoutMethod.deleteMany({ agent: a._id }),
   ]);
   await a.deleteOne();
   res.locals.audit = `Deleted partner ${a.agency || a.name} (${a.email}) and all their data`;

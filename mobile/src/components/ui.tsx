@@ -12,15 +12,18 @@ export { Feather };
 /* ---------- layout ---------- */
 
 export function Screen({
-  children, scroll = true, onRefresh, refreshing = false, edges = ['top'], padded = true, keyboardOffset = 0,
+  children, scroll = true, onRefresh, refreshing = false, edges = ['top'], padded = true, keyboardOffset = 0, header,
 }: {
   children: ReactNode; scroll?: boolean; onRefresh?: () => void; refreshing?: boolean; edges?: Edge[]; padded?: boolean;
+  /** stays fixed at the top while the content scrolls underneath */
+  header?: ReactNode;
   /** height of any header above the screen (stack screens), so the keyboard offset is right */
   keyboardOffset?: number;
 }) {
   const pad = padded ? styles.pad : undefined;
   return (
     <SafeAreaView style={styles.screen} edges={edges}>
+      {header ? <View style={styles.fixedHead}>{header}</View> : null}
       {/* 'padding' on both platforms: with Android edge-to-edge the window no longer resizes for the keyboard */}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={keyboardOffset}>
       {scroll ? (
@@ -368,6 +371,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   pad: { paddingHorizontal: space.xl, paddingTop: space.lg },
   header: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginBottom: space.sm },
+  fixedHead: { paddingHorizontal: space.xl, paddingTop: space.lg, paddingBottom: space.xs, backgroundColor: colors.bg, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.line, zIndex: 2 },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: space.sm },
   list: { borderWidth: StyleSheet.hairlineWidth, borderColor: colors.line, borderRadius: radius.md, overflow: 'hidden', backgroundColor: colors.bg },
   listSep: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },

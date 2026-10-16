@@ -18,7 +18,7 @@ export default function Profile() {
   const { isOwner, member, sees } = useAccess();
   const headerHeight = useHeaderHeight();
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({ name: '', phone: '', agency: '', city: '', bankAccount: '' });
+  const [form, setForm] = useState({ name: '', phone: '', agency: '', city: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [photoBusy, setPhotoBusy] = useState(false);
@@ -53,7 +53,7 @@ export default function Profile() {
   };
 
   const startEdit = () => {
-    setForm({ name: agent.name, phone: agent.phone, agency: agent.agency, city: agent.city, bankAccount: agent.bankAccount });
+    setForm({ name: agent.name, phone: agent.phone, agency: agent.agency, city: agent.city });
     setError('');
     setEditing(true);
   };
@@ -102,7 +102,6 @@ export default function Profile() {
           <Field label="Agency" value={form.agency} onChangeText={set('agency')} />
           <Field label="Phone" value={form.phone} onChangeText={set('phone')} keyboardType="phone-pad" />
           <Field label="City" value={form.city} onChangeText={set('city')} />
-          <Field label="Bank account for payouts" value={form.bankAccount} onChangeText={set('bankAccount')} placeholder="e.g. HDFC Bank •••• 4821" />
           {error ? <Text style={[type.small, { color: colors.danger, marginBottom: space.md }]}>{error}</Text> : null}
           <View style={{ flexDirection: 'row', gap: space.sm }}>
             <Button label="Cancel" variant="secondary" onPress={() => setEditing(false)} style={{ flex: 1 }} />
@@ -118,7 +117,7 @@ export default function Profile() {
             <Row title={agent.agency || agent.name} subtitle="Agency" />
             <Row title={`${zoneLabel(agent.zone)}${agent.city ? `, ${agent.city}` : ''}`} subtitle="Zone" />
             {isOwner ? <Row title={agent.phone || 'Not added'} subtitle="Phone" /> : null}
-            {isOwner ? <Row title={agent.bankAccount || 'Not added yet'} subtitle="Payout bank account" /> : null}
+            {isOwner && sees('wallet') ? <Row title="UPI and bank accounts" subtitle="Where withdrawals are paid" onPress={() => router.push('/wallet')} /> : null}
             <Row title={longDate(agent.partnerSince)} subtitle="Partner since" />
           </List>
         </Section>

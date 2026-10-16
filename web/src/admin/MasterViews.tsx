@@ -233,7 +233,6 @@ export function PartnerManageModal({ id, onClose, onChanged }: { id: string | nu
                 </select>
               </div>
               <div className="field"><label htmlFor="mpCity">City</label><input id="mpCity" value={f.city} onChange={(e) => setF({ ...f, city: e.target.value })} /></div>
-              <div className="field full"><label htmlFor="mpBank">Payout bank account</label><input id="mpBank" value={f.bankAccount} onChange={(e) => setF({ ...f, bankAccount: e.target.value })} /></div>
               <div className="field"><label htmlFor="mpValid">Agreement valid till</label><input id="mpValid" type="date" value={f.validTill} onChange={(e) => setF({ ...f, validTill: e.target.value })} /></div>
               <div className="field" style={{ display: 'flex', alignItems: 'flex-end' }}>
                 <label className="remember" style={{ display: 'flex', gap: '.4rem', alignItems: 'center' }}><input type="checkbox" checked={f.autoRenew} onChange={(e) => setF({ ...f, autoRenew: e.target.checked })} /> Agreement auto-renews</label>

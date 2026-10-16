@@ -4,7 +4,7 @@ import { Svg } from '../components/site';
 import { DESTINATIONS, serviceName } from '../data/services';
 import { SITE, visibleServices } from '../lib/content';
 import { api } from '../lib/api';
-import type { Agent, Case, Commissions, Menu, Message, Perm, Student, TeamMember } from '../lib/api';
+import type { Agent, Case, Commissions, Menu, Message, Perm, Student, TeamMember, Wallet } from '../lib/api';
 import { avatarUrl } from '../lib/api';
 import { fileSize, fmtDate, fmtTime, inr, initials, statusClass, useInterval } from '../lib/hooks';
 import { useToast } from '../lib/toast';
@@ -106,25 +106,31 @@ export function ReferModal({ open, presetService, onClose, onDone }: {
 }
 
 /* ---------- withdraw ---------- */
-export function WithdrawModal({ open, agent, balance, minWithdrawal, onClose, onDone, onAddBank }: {
-  open: boolean; agent: Agent; balance: number; minWithdrawal: number; onClose: () => void; onDone: () => void; onAddBank: () => void;
+export function WithdrawModal({ open, wallet, isOwner, onClose, onDone, onAddMethod }: {
+  open: boolean; wallet: Wallet | null; isOwner: boolean; onClose: () => void; onDone: () => void; onAddMethod: () => void;
 }) {
   const toast = useToast();
   const [amount, setAmount] = useState('');
+  const [methodId, setMethodId] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  useEffect(() => { if (open) { setAmount(''); setError(''); } }, [open]);
+  useEffect(() => {
+    if (open) { setAmount(''); setError(''); setMethodId(wallet?.methods.find((m) => m.isDefault)?.id ?? wallet?.methods[0]?.id ?? ''); }
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!wallet) return null;
+  const { balance, minWithdrawal } = wallet;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     const amt = parseInt(amount, 10);
-    if (!amt || amt < minWithdrawal) return setError(`Minimum withdrawal is ₹${minWithdrawal}`);
-    if (amt > balance) return setError('Amount exceeds your available balance');
+    if (!amt || amt < minWithdrawal) return setError(`Minimum withdrawal is ${inr(minWithdrawal)}`);
+    if (amt > balance) return setError(`You can withdraw up to ${inr(balance)}`);
+    if (!methodId) return setError('Choose where to receive the money');
     setBusy(true);
     try {
-      await api.withdraw(amt);
-      toast(`Withdrawal of ${inr(amt)} requested. It usually reaches your bank within one working day.`);
+      await api.withdraw(amt, methodId);
+      toast(`Withdrawal of ${inr(amt)} requested. You'll get a notification when it's paid.`);
       onDone();
       onClose();
     } catch (err) {
@@ -136,28 +142,123 @@ export function WithdrawModal({ open, agent, balance, minWithdrawal, onClose, on
 
   return (
     <Modal open={open} onClose={onClose}>
-      <Hero title="Withdraw funds" sub="To your registered bank account · processed within 1 working day." onClose={onClose} />
+      <Hero title="Withdraw funds" sub={wallet.instantPayouts ? 'Sent by UPI or IMPS once approved, usually within minutes.' : 'Checked and paid within one working day.'} onClose={onClose} />
       <div className="modal-body">
-        {agent.bankAccount ? (
+        {wallet.methods.length ? (
           <form onSubmit={submit} noValidate>
             <div className="field"><label htmlFor="wdAmount">Amount (₹) *</label><input id="wdAmount" type="number" min={minWithdrawal} step={100} placeholder={`Minimum ₹${minWithdrawal}`} value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus /></div>
-            <div className="field"><label htmlFor="wdAccount">Bank account</label><select id="wdAccount" value="primary" onChange={() => {}}><option value="primary">{agent.bankAccount} (primary)</option></select></div>
-            <p style={{ fontSize: '.8rem', color: 'var(--ink-soft)', margin: '.4rem 0 1.1rem' }}>Available: <b style={{ color: 'var(--navy)' }}>{inr(balance)}</b></p>
+            <p style={{ fontSize: '.8rem', color: 'var(--ink-soft)', margin: '-.3rem 0 1rem' }}>
+              Available: <b style={{ color: 'var(--navy)' }}>{inr(balance)}</b>
+              {balance >= minWithdrawal ? <> · <a href="#" onClick={(e) => { e.preventDefault(); setAmount(String(balance)); }}>Withdraw all</a></> : null}
+            </p>
+            <div className="field">
+              <label>Send to *</label>
+              <div className="pm-pick">
+                {wallet.methods.map((m) => (
+                  <label key={m.id} className={`pm-opt${methodId === m.id ? ' on' : ''}`}>
+                    <input type="radio" name="wdMethod" checked={methodId === m.id} onChange={() => setMethodId(m.id)} />
+                    <span><b>{m.type === 'upi' ? m.upi : `${m.bankName || 'Bank account'} ••${m.last4}`}</b><small>{m.type === 'upi' ? 'UPI' : `${m.holder} · ${m.ifsc}`}</small></span>
+                  </label>
+                ))}
+              </div>
+            </div>
             {error ? <p className="form-error">{error}</p> : null}
             <div className="m-cta">
-              <button type="submit" className="btn btn-green btn-lg" disabled={busy}>{busy ? 'Requesting…' : 'Request Withdrawal'}</button>
+              <button type="submit" className="btn btn-green btn-lg" disabled={busy}>{busy ? 'Requesting…' : 'Request withdrawal'}</button>
               <button type="button" className="btn btn-ghost btn-lg" onClick={onClose}>Cancel</button>
             </div>
           </form>
         ) : (
           <>
-            <p style={{ fontSize: '.92rem' }}>Add the bank account your payouts should go to before requesting a withdrawal.</p>
+            <p style={{ fontSize: '.92rem' }}>{isOwner ? 'Add a UPI ID or bank account to receive your money. You only do this once.' : 'Ask your account owner to add a UPI ID or bank account.'}</p>
             <div className="m-cta">
-              <button className="btn btn-primary" onClick={() => { onClose(); onAddBank(); }}>Add bank account</button>
+              {isOwner ? <button className="btn btn-primary" onClick={() => { onClose(); onAddMethod(); }}>Add UPI or bank account</button> : null}
               <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
             </div>
           </>
         )}
+      </div>
+    </Modal>
+  );
+}
+
+const UPI_RE = /^[a-zA-Z0-9._-]{2,256}@[a-zA-Z][a-zA-Z0-9.-]{1,63}$/;
+const IFSC_RE = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+
+/* Add a UPI ID or a bank account. The IFSC code fills in the bank and branch. */
+export function PayoutMethodModal({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
+  const toast = useToast();
+  const [kind, setKind] = useState<'upi' | 'bank'>('upi');
+  const [upi, setUpi] = useState('');
+  const [b, setB] = useState({ holder: '', account: '', confirm: '', ifsc: '' });
+  const [bank, setBank] = useState<{ bank: string; branch: string } | null>(null);
+  const [ifscError, setIfscError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => { if (open) { setKind('upi'); setUpi(''); setB({ holder: '', account: '', confirm: '', ifsc: '' }); setError(''); } }, [open]);
+  const ifsc = b.ifsc.trim().toUpperCase();
+  useEffect(() => {
+    setBank(null);
+    setIfscError('');
+    if (!IFSC_RE.test(ifsc)) return;
+    let live = true;
+    api.lookupIfsc(ifsc).then((r) => { if (live) setBank(r.bank ? r : null); }).catch((e) => { if (live) setIfscError(errMsg(e)); });
+    return () => { live = false; };
+  }, [ifsc]);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError('');
+    const account = b.account.replace(/\s+/g, '');
+    if (kind === 'upi' && !UPI_RE.test(upi.trim())) return setError('Enter a valid UPI ID, like name@okaxis');
+    if (kind === 'bank') {
+      if (b.holder.trim().length < 3) return setError('Enter the account holder name');
+      if (!/^\d{9,18}$/.test(account)) return setError('Account number should be 9 to 18 digits');
+      if (b.confirm.replace(/\s+/g, '') !== account) return setError("The account numbers don't match");
+      if (!IFSC_RE.test(ifsc)) return setError('Enter a valid IFSC code, like HDFC0001234');
+    }
+    setBusy(true);
+    try {
+      await api.addPayoutMethod(kind === 'upi' ? { type: 'upi', upi: upi.trim() } : { type: 'bank', holder: b.holder.trim(), accountNumber: account, ifsc });
+      toast(kind === 'upi' ? 'UPI ID saved.' : 'Bank account saved.');
+      onDone();
+      onClose();
+    } catch (err) {
+      setError(errMsg(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose}>
+      <Hero title="Add payout method" sub="Where your withdrawals are paid. Only you can add or remove these." onClose={onClose} />
+      <div className="modal-body">
+        <div className="svc-filters" style={{ marginBottom: '1rem' }}>
+          <button type="button" className={`chip-btn${kind === 'upi' ? ' active' : ''}`} onClick={() => setKind('upi')}>UPI ID</button>
+          <button type="button" className={`chip-btn${kind === 'bank' ? ' active' : ''}`} onClick={() => setKind('bank')}>Bank account</button>
+        </div>
+        <form className="form-grid" onSubmit={submit} noValidate>
+          {kind === 'upi' ? (
+            <div className="field full"><label htmlFor="pmUpi">UPI ID *</label><input id="pmUpi" placeholder="yourname@okaxis" value={upi} onChange={(e) => setUpi(e.target.value)} autoFocus /></div>
+          ) : (
+            <>
+              <div className="field full"><label htmlFor="pmHolder">Account holder name *</label><input id="pmHolder" placeholder="As printed on the passbook" value={b.holder} onChange={(e) => setB({ ...b, holder: e.target.value })} autoFocus /></div>
+              <div className="field"><label htmlFor="pmAcc">Account number *</label><input id="pmAcc" type="password" inputMode="numeric" autoComplete="off" value={b.account} onChange={(e) => setB({ ...b, account: e.target.value.replace(/[^\d ]/g, '') })} /></div>
+              <div className="field"><label htmlFor="pmAcc2">Confirm account number *</label><input id="pmAcc2" inputMode="numeric" autoComplete="off" value={b.confirm} onChange={(e) => setB({ ...b, confirm: e.target.value.replace(/[^\d ]/g, '') })} /></div>
+              <div className="field full">
+                <label htmlFor="pmIfsc">IFSC code *</label>
+                <input id="pmIfsc" maxLength={11} placeholder="HDFC0001234" value={b.ifsc} onChange={(e) => setB({ ...b, ifsc: e.target.value.toUpperCase() })} />
+                {bank ? <small className="pm-bank">✓ {bank.bank} · {bank.branch}</small> : ifscError ? <small className="form-error">{ifscError}</small> : null}
+              </div>
+            </>
+          )}
+          {error ? <p className="form-error full">{error}</p> : null}
+          <div className="full m-cta">
+            <button type="submit" className="btn btn-primary btn-lg" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
+            <button type="button" className="btn btn-ghost btn-lg" onClick={onClose}>Cancel</button>
+          </div>
+        </form>
       </div>
     </Modal>
   );
@@ -670,11 +771,11 @@ export function PhotoModal({ open, name, photo, onClose, onSaved }: {
 /* ---------- edit profile (incl. bank account for payouts) ---------- */
 export function ProfileModal({ open, agent, onClose, onSaved }: { open: boolean; agent: Agent; onClose: () => void; onSaved: (a: Agent) => void }) {
   const toast = useToast();
-  const [f, setF] = useState({ name: '', agency: '', phone: '', city: '', bankAccount: '' });
+  const [f, setF] = useState({ name: '', agency: '', phone: '', city: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    if (open) { setF({ name: agent.name, agency: agent.agency, phone: agent.phone, city: agent.city, bankAccount: agent.bankAccount }); setError(''); }
+    if (open) { setF({ name: agent.name, agency: agent.agency, phone: agent.phone, city: agent.city }); setError(''); }
   }, [open, agent]);
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF((s) => ({ ...s, [k]: e.target.value }));
   const submit = async (e: FormEvent) => {
@@ -700,7 +801,6 @@ export function ProfileModal({ open, agent, onClose, onSaved }: { open: boolean;
           <div className="field"><label htmlFor="pAgency">Agency</label><input id="pAgency" value={f.agency} onChange={set('agency')} /></div>
           <div className="field"><label htmlFor="pPhone">Phone</label><input id="pPhone" type="tel" value={f.phone} onChange={set('phone')} /></div>
           <div className="field"><label htmlFor="pCity">City</label><input id="pCity" value={f.city} onChange={set('city')} /></div>
-          <div className="field full"><label htmlFor="pBank">Bank account for payouts</label><input id="pBank" placeholder="e.g. HDFC Bank •••• 4821" value={f.bankAccount} onChange={set('bankAccount')} /></div>
           {error ? <p className="form-error full">{error}</p> : null}
           <div className="full m-cta">
             <button type="submit" className="btn btn-primary btn-lg" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>

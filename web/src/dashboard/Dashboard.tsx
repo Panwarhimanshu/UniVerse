@@ -11,7 +11,7 @@ import { useAuth } from '../lib/auth';
 import { fmtDate, fmtTime, inr, initials, statusClass, useApi, useInterval } from '../lib/hooks';
 import { useToast } from '../lib/toast';
 import {
-  AgreementModal, Avatar, CaseModal, CommModal, MENU_LIST, PasswordModal, PERM_LIST, PhotoModal, ProfileModal, ReferModal, RmDrawer, StudentModal, UserModal, WithdrawModal,
+  AgreementModal, Avatar, CaseModal, CommModal, MENU_LIST, PasswordModal, PayoutMethodModal, PERM_LIST, PhotoModal, ProfileModal, ReferModal, RmDrawer, StudentModal, UserModal, WithdrawModal,
 } from './modals';
 import { buildTimeline } from './timeline';
 
@@ -105,6 +105,7 @@ export default function Dashboard() {
   const [wnFilter, setWnFilter] = useState('all');
   const [pwOpen, setPwOpen] = useState(false);
   const [photoOpen, setPhotoOpen] = useState(false);
+  const [methodOpen, setMethodOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifs, setNotifs] = useState<Notification[]>([]);
   const [unread, setUnread] = useState(0);
@@ -453,6 +454,34 @@ export default function Dashboard() {
                 </div>
                 {can('withdraw') ? <button className="btn btn-green btn-lg" onClick={() => setWithdrawOpen(true)}>Withdraw Funds</button> : null}
               </div>
+              <div className="panel" style={{ marginBottom: '1.4rem' }}>
+                <div className="panel-h">
+                  <h3>Receive money to</h3>
+                  {isOwner && (wallet.data?.methods.length ?? 0) < 5 ? <button className="btn btn-ghost btn-sm" onClick={() => setMethodOpen(true)}>+ Add UPI or bank</button> : null}
+                </div>
+                <div className="panel-b">
+                  {wallet.data?.methods.length ? (
+                    <div className="pm-list">
+                      {wallet.data.methods.map((m) => (
+                        <div key={m.id} className="pm-card">
+                          <div>
+                            <b>{m.type === 'upi' ? m.upi : `${m.bankName || 'Bank account'} ••${m.last4}`}</b>
+                            <small>{m.type === 'upi' ? 'UPI' : `${m.holder} · ${m.ifsc}${m.branch ? ` · ${m.branch}` : ''}`}</small>
+                          </div>
+                          {m.isDefault ? <span className="status done">Default</span> : isOwner ? (
+                            <button className="btn btn-ghost btn-sm" onClick={() => api.setDefaultPayoutMethod(m.id).then(wallet.reload).catch((e) => toast(e.message))}>Make default</button>
+                          ) : null}
+                          {isOwner ? (
+                            <button className="btn btn-ghost btn-sm" onClick={() => {
+                              if (window.confirm('Remove this payout method?')) api.removePayoutMethod(m.id).then(wallet.reload).catch((e) => toast(e.message));
+                            }}>Remove</button>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : <p className="adm-meta">{isOwner ? 'Add a UPI ID or bank account to receive withdrawals.' : 'Your account owner can add a UPI ID or bank account for withdrawals.'}</p>}
+                </div>
+              </div>
               <div className="panel">
                 <div className="panel-h"><h3>Transaction history</h3></div>
                 <div style={{ overflowX: 'auto' }}>
@@ -462,10 +491,15 @@ export default function Dashboard() {
                       {wallet.data?.transactions.map((t) => (
                         <tr key={t.id}>
                           <td>{fmtDate(t.date)}</td>
-                          <td className="t-name" style={{ fontWeight: 500 }}>{t.description}</td>
+                          <td>
+                            <div className="t-name" style={{ fontWeight: 500 }}>{t.type === 'Debit' ? `Withdrawal to ${t.method?.label ?? 'your account'}` : t.description}</div>
+                            {t.payout?.utr ? <div className="t-sub">Bank reference {t.payout.utr}</div> : t.payout?.reason ? <div className="t-sub">{t.payout.reason}</div> : null}
+                          </td>
                           <td><span className={`pill${t.type === 'Credit' ? ' ctry' : ''}`}>{t.type}</span></td>
                           <td style={{ fontWeight: 700, color: t.type === 'Credit' ? 'var(--green-deep)' : 'var(--ink)' }}>{t.type === 'Credit' ? '+' : '−'} {inr(t.amount)}</td>
-                          <td><span className={`status ${statusClass(t.status)}`}>{t.type === 'Debit' && t.status === 'Completed' ? 'Paid' : t.status}</span></td>
+                          <td><span className={`status ${statusClass(t.status)}`}>{t.type === 'Debit'
+                            ? (t.status === 'Completed' ? 'Paid' : t.status === 'Rejected' ? 'Failed' : t.payout?.state === 'processing' ? 'On its way' : 'Requested')
+                            : (t.status === 'Pending' ? 'Clearing' : t.status === 'Rejected' ? 'Cancelled' : t.kind === 'adjustment' ? 'Correction' : 'Credited')}</span></td>
                         </tr>
                       ))}
                       {wallet.data && !wallet.data.transactions.length ? (
@@ -536,7 +570,7 @@ export default function Dashboard() {
                       <ProfileField label="Zone" value={`${agent.zone[0]}${agent.zone.slice(1).toLowerCase()}${agent.city ? `, ${agent.city}` : ''}`} />
                       <ProfileField label="Email" value={agent.email} />
                       <ProfileField label="Phone" value={agent.phone} />
-                      <ProfileField label="Payout bank account" value={agent.bankAccount || 'Not added yet'} />
+                      <ProfileField label="Payouts go to" value={wallet.data?.methods.find((m) => m.isDefault)?.label ?? 'Not added yet (Wallet)'} />
                     </div>
                   </div>
                 </div>
@@ -611,8 +645,9 @@ export default function Dashboard() {
 
       {/* ===== DIALOGS ===== */}
       <ReferModal open={refer.open} presetService={refer.svc} onClose={() => setRefer({ open: false })} onDone={(c) => { refreshCases(); setPanelId(c.id); }} />
-      <WithdrawModal open={withdrawOpen} agent={agent} balance={wallet.data?.balance ?? 0} minWithdrawal={wallet.data?.minWithdrawal ?? 500}
-        onClose={() => setWithdrawOpen(false)} onDone={() => { wallet.reload(); dash.reload(); }} onAddBank={() => setProfileOpen(true)} />
+      <WithdrawModal open={withdrawOpen} wallet={wallet.data} isOwner={isOwner}
+        onClose={() => setWithdrawOpen(false)} onDone={() => { wallet.reload(); dash.reload(); }} onAddMethod={() => setMethodOpen(true)} />
+      <PayoutMethodModal open={methodOpen} onClose={() => setMethodOpen(false)} onDone={wallet.reload} />
       <CaseModal caseId={caseId} agent={agent} myName={myName} isOwner={isOwner} canChat={can('chat')} canUpload={can('upload')} onClose={() => setCaseId(null)} onChanged={refreshCases} onOpenRm={() => setRmOpen(true)} />
       <CommModal entry={commEntry} onClose={() => setCommEntry(null)} />
       <AgreementModal open={agrOpen} agent={agent} onClose={() => setAgrOpen(false)} onDownload={() => agreementAction('download')} />

@@ -40,13 +40,7 @@ export default function Home() {
   const firstUnread = updates.items.find((n) => !n.read);
 
   return (
-    <Screen onRefresh={() => { refresh(); stats.refresh(); updates.reload(); }} refreshing={refreshing}>
-      <Header
-        left={<ProfileButton />}
-        subtitle={greeting()}
-        title={myName.split(' ')[0]}
-        right={<NotificationBell />}
-      />
+    <Screen onRefresh={() => { refresh(); stats.refresh(); updates.reload(); }} refreshing={refreshing} header={<Header left={<ProfileButton />} subtitle={greeting()} title={myName.split(' ')[0]} right={<NotificationBell />} />}>
       {member ? <Text style={[type.small, { marginTop: -4 }]}>{member.role} at {agent?.agency || agent?.name}</Text> : null}
 
       {error && !data ? <ErrorNote message={error} onRetry={refresh} /> : null}

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
 import { Types } from 'mongoose';
-import { Admin, Agent, AgreementRequest, AuditLog, Message, ServiceRequest, STATUSES, Student, TeamMember, Transaction } from '../models/index.js';
+import { Admin, Agent, AgreementRequest, AuditLog, Message, PayoutMethod, ServiceRequest, STATUSES, Student, TeamMember, Transaction } from '../models/index.js';
 import { adminOf, HttpError, requireAdmin, requireSection, masterOnly, signAdminToken } from '../middleware/auth.js';
 import masterRoutes from './master.js';
 import { serviceByKey } from '../data/catalog.js';
@@ -11,6 +11,7 @@ import { publicAgent, publicMessage, publicRequest, publicTx } from '../serializ
 import { deleteFile, sendDocFile } from '../files.js';
 import { checkAttempts, clearAttempts, recordFailure } from '../limits.js';
 import { accountNotices, notify } from '../notify.js';
+import { razorpayPayout, razorpayReady, syncWallet } from '../wallet.js';
 
 /* Back office for the UniVerse service desk and relationship managers. */
 const router = Router();
@@ -95,10 +96,10 @@ router.get('/cases/export', async (_req, res) => {
 });
 
 router.get('/transactions/export', async (_req, res) => {
-  const list = await Transaction.find().sort({ date: -1 }).populate('agent', 'name agency bankAccount');
+  const list = await Transaction.find().sort({ date: -1 }).populate('agent', 'name agency');
   sendCsv(res, 'payouts', [
-    ['Date', 'Partner', 'Type', 'Amount (INR)', 'Status', 'Description', 'Bank account'],
-    ...list.map((t: any) => [day(t.date), t.agent?.agency || t.agent?.name, t.type === 'Debit' ? 'Withdrawal' : 'Commission', t.amount, t.status, t.description, t.agent?.bankAccount]),
+    ['Date', 'Partner', 'Type', 'Amount (INR)', 'Status', 'Description', 'Paid to', 'Bank reference'],
+    ...list.map((t: any) => [day(t.date), t.agent?.agency || t.agent?.name, t.type === 'Debit' ? 'Withdrawal' : 'Commission', t.amount, t.status, t.description, t.method?.label ?? '', t.payout?.utr ?? '']),
   ]);
 });
 
@@ -418,12 +419,10 @@ router.post('/cases/:id/credit', async (req, res) => {
   const svc = serviceByKey(r.service)?.name ?? r.service;
   const student: any = r.student;
   await Transaction.create({
-    agent: r.agent, request: r._id, type: 'Credit', amount, status: cleared ? 'Completed' : 'Pending',
+    agent: r.agent, request: r._id, type: 'Credit', kind: 'commission', amount, status: cleared ? 'Completed' : 'Pending',
     description: `${svc} commission · ${student?.name ?? ''} (${r.ref})`,
   });
-  await Agent.updateOne({ _id: r.agent }, cleared
-    ? { $inc: { 'wallet.balance': amount, 'wallet.lifetime': amount } }
-    : { $inc: { 'wallet.pending': amount } });
+  await syncWallet(r.agent);
   await Message.create({
     agent: r.agent, request: r._id, from: 'system',
     text: `Commission of ₹${amount.toLocaleString('en-IN')} ${cleared ? 'credited to your wallet' : 'added as pending clearance'}`,
@@ -525,54 +524,66 @@ router.post('/partners/:id/messages', async (req, res) => {
 router.get('/transactions', async (req, res) => {
   const status = String(req.query.status ?? 'Pending');
   const list = await Transaction.find(status === 'all' ? {} : { status: status as 'Pending' }).sort({ date: -1 }).limit(300);
-  const agents = await Agent.find({ _id: { $in: [...new Set(list.map((t) => String(t.agent)))] } }).select('name agency bankAccount');
+  const agents = await Agent.find({ _id: { $in: [...new Set(list.map((t) => String(t.agent)))] } }).select('name agency');
   const byId = new Map(agents.map((a) => [String(a._id), a]));
-  res.json(list.map((t) => {
-    const a = byId.get(String(t.agent));
-    return { ...publicTx(t), partner: { id: String(t.agent), name: a?.name ?? '', agency: a?.agency ?? '', bankAccount: a?.bankAccount ?? '' } };
-  }));
+  // full payout details for the desk paying withdrawals by hand
+  const methods = await PayoutMethod.find({ _id: { $in: list.map((t) => t.methodId).filter(Boolean) } }).select('+accountNumber');
+  const mById = new Map(methods.map((m) => [String(m._id), m]));
+  res.json({
+    instantPayouts: razorpayReady(),
+    items: list.map((t) => {
+      const a = byId.get(String(t.agent));
+      const m = t.methodId ? mById.get(String(t.methodId)) : null;
+      return {
+        ...publicTx(t),
+        partner: { id: String(t.agent), name: a?.name ?? '', agency: a?.agency ?? '' },
+        payTo: m ? (m.type === 'upi' ? { type: 'upi', upi: m.upi } : { type: 'bank', holder: m.holder, accountNumber: m.accountNumber, ifsc: m.ifsc, bankName: m.bankName, branch: m.branch }) : null,
+      };
+    }),
+  });
 });
 
-/* clear: pending commission → available · pay: withdrawal sent · reject: undo (withdrawals are refunded) */
+/* clear: pending commission → available · payout: send through RazorpayX · pay: paid by hand (with bank reference)
+   · reject: cancel (a withdrawal goes back to the balance) */
 router.patch('/transactions/:id', async (req, res) => {
   const t = await Transaction.findById(oid(req.params.id, 'Transaction'));
   if (!t) throw new HttpError(404, 'Transaction not found');
   if (t.status !== 'Pending') throw new HttpError(409, 'This transaction has already been settled');
   const action = req.body?.action;
+  const amt = `₹${t.amount.toLocaleString('en-IN')}`;
+  const to = t.method?.label ?? 'your account';
+
   if (t.type === 'Credit' && action === 'clear') {
     t.status = 'Completed';
-    await Agent.updateOne({ _id: t.agent }, { $inc: { 'wallet.pending': -t.amount, 'wallet.balance': t.amount, 'wallet.lifetime': t.amount } });
+    await t.save();
+    await notify({ agent: t.agent, category: 'payment', type: 'payment.commission_cleared', title: `${amt} added to your balance`, body: `A pending commission of ${amt} has cleared and is ready to withdraw.`, link: { kind: 'wallet' }, audience: 'wallet' });
+  } else if (t.type === 'Debit' && action === 'payout') {
+    if (t.payout?.state === 'processing') throw new HttpError(409, 'This withdrawal is already on its way through Razorpay');
+    await razorpayPayout(String(t._id));
+    await notify({ agent: t.agent, category: 'payment', type: 'payment.withdrawal_processing', title: `${amt} is on its way`, body: `Your withdrawal of ${amt} to ${to} has been sent. It usually arrives within minutes.`, link: { kind: 'wallet' }, audience: 'wallet', email: false });
   } else if (t.type === 'Debit' && action === 'pay') {
+    if (t.payout?.state === 'processing') throw new HttpError(409, 'This withdrawal is with Razorpay; it settles automatically');
+    const utr = String(req.body?.utr ?? '').trim().slice(0, 40);
+    if (!utr) throw new HttpError(400, 'Enter the bank reference (UTR) so the partner can trace the payment');
     t.status = 'Completed';
-    await Message.create({
-      agent: t.agent, request: null, from: 'rm', author: adminOf(req).name,
-      text: `Your withdrawal of ₹${t.amount.toLocaleString('en-IN')} has been paid to your bank account.`,
-    });
+    t.set('payout', { provider: 'manual', state: 'processed', utr, paidAt: new Date() });
+    await t.save();
+    await notify({ agent: t.agent, category: 'payment', type: 'payment.withdrawal_paid', title: `${amt} withdrawal paid`, body: `Your withdrawal of ${amt} has been paid to ${to}. Bank reference: ${utr}.`, link: { kind: 'wallet' }, audience: 'wallet' });
   } else if (action === 'reject') {
+    if (t.payout?.state === 'processing') throw new HttpError(409, 'This withdrawal is with Razorpay; it settles automatically');
+    const reason = String(req.body?.reason ?? '').trim().slice(0, 200);
     t.status = 'Rejected';
-    await Agent.updateOne({ _id: t.agent }, t.type === 'Credit' ? { $inc: { 'wallet.pending': -t.amount } } : { $inc: { 'wallet.balance': t.amount } });
-    if (t.type === 'Debit') {
-      const reason = String(req.body?.reason ?? '').trim();
-      await Message.create({
-        agent: t.agent, request: null, from: 'rm', author: adminOf(req).name,
-        text: `Your withdrawal of ₹${t.amount.toLocaleString('en-IN')} couldn't be processed${reason ? `: ${reason}` : ''}. The amount is back in your wallet.`,
-      });
-    }
+    if (t.type === 'Debit') t.set('payout', { ...(t.payout ?? {}), state: 'failed', reason });
+    await t.save();
+    await notify(t.type === 'Debit'
+      ? { agent: t.agent, category: 'payment', type: 'payment.withdrawal_rejected', title: `${amt} withdrawal not processed`, body: `Your withdrawal of ${amt} couldn't be processed${reason ? `: ${reason}` : ''}. The amount is back in your wallet.`, link: { kind: 'wallet' }, audience: 'wallet' }
+      : { agent: t.agent, category: 'payment', type: 'payment.commission_rejected', title: `${amt} commission cancelled`, body: `A pending commission of ${amt} was cancelled${reason ? `: ${reason}` : ''}. Ask your RM if you have questions.`, link: { kind: 'wallet' }, audience: 'wallet' });
   } else {
     throw new HttpError(400, 'That action does not apply to this transaction');
   }
-  await t.save();
-  const amt = `₹${t.amount.toLocaleString('en-IN')}`;
-  await notify(action === 'clear'
-    ? { agent: t.agent, category: 'payment', type: 'payment.commission_cleared', title: `${amt} added to your balance`, body: `A pending commission of ${amt} has cleared and is ready to withdraw.`, link: { kind: 'wallet' }, audience: 'wallet' }
-    : action === 'pay'
-      ? { agent: t.agent, category: 'payment', type: 'payment.withdrawal_paid', title: `${amt} withdrawal paid`, body: `Your withdrawal of ${amt} has been paid to your bank account.`, link: { kind: 'wallet' }, audience: 'wallet' }
-      : { agent: t.agent, category: 'payment', type: t.type === 'Debit' ? 'payment.withdrawal_rejected' : 'payment.commission_rejected',
-        title: t.type === 'Debit' ? `${amt} withdrawal not processed` : `${amt} commission cancelled`,
-        body: t.type === 'Debit' ? `Your withdrawal of ${amt} couldn't be processed. The amount is back in your wallet.` : `A pending commission of ${amt} was cancelled. Ask your RM if you have questions.`,
-        link: { kind: 'wallet' }, audience: 'wallet' });
-  res.locals.audit = `${t.type === 'Debit' ? 'Withdrawal' : 'Commission'} of ₹${t.amount.toLocaleString('en-IN')}: ${action === 'pay' ? 'paid' : action === 'clear' ? 'cleared' : 'rejected'}`;
-  res.json(publicTx(t));
+  await syncWallet(t.agent);
+  res.locals.audit = `${t.type === 'Debit' ? 'Withdrawal' : 'Commission'} of ${amt}: ${{ pay: 'paid by hand', payout: 'sent through Razorpay', clear: 'cleared', reject: 'rejected' }[action as string]}`;
+  res.json(publicTx(await Transaction.findById(t._id)));
 });
 
 /* ---------- agreement requests ---------- */

@@ -1,9 +1,10 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { Empty, ErrorNote, Feather, Header, Loading, Screen } from '../../components/ui';
 import { Orbit } from '../../components/Orbit';
 import { api } from '../../lib/api';
-import type { Transaction } from '../../lib/api';
+import type { PayoutMethod, Transaction } from '../../lib/api';
+import { confirm, errorText, notify } from '../../lib/dialog';
 import { ProfileButton } from '../../components/ProfileButton';
 import { HeaderActions } from '../../components/HeaderActions';
 import { useApi } from '../../lib/hooks';
@@ -15,9 +16,22 @@ const monthOf = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { mon
 
 export default function Wallet() {
   const { data, error, refreshing, refresh } = useApi(api.wallet);
-  const { can, sees } = useAccess();
+  const { can, sees, isOwner } = useAccess();
   if (!data && !error) return <Loading />;
   const canWithdraw = !!data && data.balance >= data.minWithdrawal;
+  const manage = (m: PayoutMethod) => {
+    const label = m.type === 'upi' ? m.upi : `${m.bankName || 'Bank account'} ••${m.last4}`;
+    const remove = async () => {
+      if (!(await confirm('Remove this payout method?', `${label} will no longer be available for withdrawals.`, 'Remove', true))) return;
+      try { await api.removePayoutMethod(m.id); refresh(); } catch (e) { notify('Could not remove', errorText(e)); }
+    };
+    if (m.isDefault) return remove();
+    Alert.alert(label ?? 'Payout method', undefined, [
+      { text: 'Make default', onPress: async () => { try { await api.setDefaultPayoutMethod(m.id); refresh(); } catch (e) { notify('Could not update', errorText(e)); } } },
+      { text: 'Remove', style: 'destructive', onPress: remove },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
 
   // transactions grouped by month, newest first
   const groups: { month: string; items: Transaction[] }[] = [];
@@ -28,8 +42,7 @@ export default function Wallet() {
   }
 
   return (
-    <Screen onRefresh={refresh} refreshing={refreshing}>
-      <Header left={<ProfileButton />} title="Wallet" right={<HeaderActions />} />
+    <Screen onRefresh={refresh} refreshing={refreshing} header={<Header left={<ProfileButton />} title="Wallet" right={<HeaderActions />} />}>
       {error && !data ? <ErrorNote message={error} onRetry={refresh} /> : null}
 
       {data ? (
@@ -72,6 +85,38 @@ export default function Wallet() {
             ) : null}
           </View>
 
+          <View style={{ marginTop: space.xl }}>
+            <View style={styles.sectionHead}>
+              <Text style={type.label}>Receive money to</Text>
+              {isOwner && data.methods.length < 5 ? (
+                <Pressable onPress={() => router.push('/payout-method')} hitSlop={8}><Text style={styles.link}>+ Add</Text></Pressable>
+              ) : null}
+            </View>
+            {data.methods.length ? (
+              <View style={styles.card}>
+                {data.methods.map((m, i) => (
+                  <Pressable key={m.id} onPress={isOwner ? () => manage(m) : undefined} style={({ pressed }) => [styles.tx, i > 0 && styles.sep, pressed && isOwner && { backgroundColor: colors.surface }]}>
+                    <View style={[styles.txIcon, { backgroundColor: colors.secondaryTint }]}>
+                      <Feather name={m.type === 'upi' ? 'smartphone' : 'briefcase'} size={17} color={colors.primary} />
+                    </View>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={[type.body, { fontWeight: '600' }]} numberOfLines={1}>{m.type === 'upi' ? m.upi : `${m.bankName || 'Bank account'} ••${m.last4}`}</Text>
+                      <Text style={type.small} numberOfLines={1}>{m.type === 'upi' ? 'UPI' : `${m.holder} · ${m.ifsc}`}</Text>
+                    </View>
+                    {m.isDefault ? <View style={styles.badge}><Text style={styles.badgeText}>Default</Text></View> : null}
+                  </Pressable>
+                ))}
+              </View>
+            ) : (
+              <Pressable onPress={isOwner ? () => router.push('/payout-method') : undefined} style={styles.addCard}>
+                <Feather name="plus-circle" size={18} color={colors.primary} />
+                <Text style={[type.small, { flex: 1, color: colors.text }]}>
+                  {isOwner ? 'Add a UPI ID or bank account to receive your commission.' : 'Your account owner can add a UPI ID or bank account for withdrawals.'}
+                </Text>
+              </Pressable>
+            )}
+          </View>
+
           {groups.length ? groups.map((g) => (
             <View key={g.month} style={{ marginTop: space.xl }}>
               <Text style={type.label}>{g.month}</Text>
@@ -94,8 +139,13 @@ function TxRow({ t, first }: { t: Transaction; first: boolean }) {
   const credit = t.type === 'Credit';
   const rejected = t.status === 'Rejected';
   const [title, detail] = t.description.split(' · ');
-  const state = rejected ? 'Rejected' : t.status === 'Pending' ? (credit ? 'Clearing' : 'Processing') : credit ? 'Credited' : 'Paid';
-  const tone = rejected ? colors.faint : credit ? colors.positive : colors.text;
+  const state = credit
+    ? (rejected ? 'Cancelled' : t.status === 'Pending' ? 'Clearing' : t.kind === 'adjustment' ? 'Correction' : 'Credited')
+    : (rejected ? (t.payout?.state === 'reversed' ? 'Returned' : 'Failed') : t.status === 'Completed' ? 'Paid' : t.payout?.state === 'processing' ? 'On its way' : 'Requested');
+  const stateColor = rejected ? colors.danger : t.status === 'Pending' ? colors.warning : colors.muted;
+  const sub = credit
+    ? [detail, shortDate(t.date)]
+    : [t.method?.label ?? title.replace(/^Withdrawal to /, ''), t.payout?.utr ? `Ref ${t.payout.utr}` : rejected && t.payout?.reason ? t.payout.reason : shortDate(t.date)];
   return (
     <View style={[styles.tx, !first && styles.sep]}>
       <View style={[styles.txIcon, { backgroundColor: rejected ? colors.surface : credit ? colors.positiveTint : colors.accentTint }]}>
@@ -103,13 +153,13 @@ function TxRow({ t, first }: { t: Transaction; first: boolean }) {
       </View>
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={[type.body, { fontWeight: '600' }]} numberOfLines={1}>{credit ? title : 'Withdrawal'}</Text>
-        <Text style={type.small} numberOfLines={1}>{[credit ? detail : title.replace(/^Withdrawal to /, 'To '), shortDate(t.date)].filter(Boolean).join(' · ')}</Text>
+        <Text style={type.small} numberOfLines={1}>{sub.filter(Boolean).join(' · ')}</Text>
       </View>
       <View style={{ alignItems: 'flex-end', gap: 2 }}>
-        <Text style={{ fontSize: 15, fontWeight: '700', color: tone, textDecorationLine: rejected ? 'line-through' : 'none' }}>
+        <Text style={{ fontSize: 15, fontWeight: '700', color: rejected ? colors.faint : credit ? colors.positive : colors.text, textDecorationLine: rejected ? 'line-through' : 'none' }}>
           {credit ? '+' : '−'}{inr(t.amount)}
         </Text>
-        <Text style={[styles.state, t.status === 'Pending' && { color: colors.warning }]}>{state}</Text>
+        <Text style={[styles.state, { color: stateColor }]}>{state}</Text>
       </View>
     </View>
   );
@@ -128,6 +178,11 @@ const styles = StyleSheet.create({
   primaryText: { fontSize: 14, fontWeight: '700', color: colors.primary },
   secondary: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 42, paddingHorizontal: space.lg, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.18)' },
   secondaryText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  link: { fontSize: 13, color: colors.primary, fontWeight: '700' },
+  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: colors.secondaryTint },
+  badgeText: { fontSize: 11, fontWeight: '700', color: colors.primary },
+  addCard: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginTop: space.sm, padding: space.lg, borderRadius: radius.lg, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#B9D6F2' },
   hint: { color: 'rgba(255,255,255,0.68)', fontSize: 12, marginTop: space.md },
   card: { marginTop: space.sm, borderRadius: radius.lg + 2, borderWidth: 1, borderColor: colors.line, overflow: 'hidden' },
   tx: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingVertical: 14 },
