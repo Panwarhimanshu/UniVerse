@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   system: { textAlign: 'center', fontSize: 12, marginVertical: space.sm },
   bubbleWrap: { maxWidth: '100%' },
   bubble: { maxWidth: '82%', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18 },
-  mine: { backgroundColor: colors.text, borderBottomRightRadius: 6 },
+  mine: { backgroundColor: colors.primary, borderBottomRightRadius: 6 },
   theirs: { backgroundColor: colors.surface, borderBottomLeftRadius: 6 },
   composer: {
     flexDirection: 'row', alignItems: 'flex-end', gap: space.sm, paddingHorizontal: space.md, paddingTop: space.sm,
@@ -139,5 +139,5 @@ const styles = StyleSheet.create({
     flex: 1, minHeight: 40, maxHeight: 120, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 10, fontSize: 15,
     color: colors.text, backgroundColor: colors.surface, borderRadius: radius.lg,
   },
-  send: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.text, alignItems: 'center', justifyContent: 'center' },
+  send: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
 });

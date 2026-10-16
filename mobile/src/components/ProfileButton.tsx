@@ -24,7 +24,7 @@ export function ProfileButton() {
 }
 
 const styles = StyleSheet.create({
-  btn: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.text, alignItems: 'center', justifyContent: 'center' },
+  btn: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   text: { color: '#fff', fontSize: 15, fontWeight: '700' },
   photo: { width: 42, height: 42, borderRadius: 21 },
   badge: { position: 'absolute', right: -1, bottom: -1, width: 13, height: 13, borderRadius: 7, backgroundColor: colors.positive, borderWidth: 2, borderColor: colors.bg },

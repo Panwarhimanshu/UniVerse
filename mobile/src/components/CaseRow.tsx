@@ -17,7 +17,7 @@ export function CaseRow({ c }: { c: Case }) {
       onPress={() => router.push(`/case/${c.id}`)}
       style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surface }]}
     >
-      <View style={styles.icon}><Feather name={serviceIcon(ICON_OF[c.service] ?? '')} size={17} color={colors.text} /></View>
+      <View style={styles.icon}><Feather name={serviceIcon(ICON_OF[c.service] ?? '')} size={17} color={colors.primary} /></View>
       <View style={{ flex: 1, gap: 3 }}>
         <View style={styles.top}>
           <Text style={[type.body, { fontWeight: '600', flex: 1 }]} numberOfLines={1}>{c.student.name}</Text>
@@ -37,7 +37,7 @@ export function CaseRow({ c }: { c: Case }) {
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: space.md, paddingHorizontal: space.lg, paddingVertical: 14 },
-  icon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, marginTop: 2 },
+  icon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.secondaryTint, marginTop: 2 },
   top: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   prog: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginTop: 6 },
 });

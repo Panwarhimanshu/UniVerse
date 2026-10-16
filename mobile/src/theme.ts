@@ -7,7 +7,10 @@ export const colors = {
   muted: '#6B7C90',
   faint: '#A3B1C2',
   line: '#E7ECF2',
-  accent: '#0A66C2', // brand blue — the only strong colour in the UI
+  primary: '#0A66C2', // brand blue: buttons, selected states, the main cards
+  secondary: '#13BBF9', // brand sky blue: highlights and accents next to the primary
+  secondaryTint: '#E4F7FE',
+  accent: '#0A66C2', // same as primary (older name, kept so existing screens keep working)
   accentTint: '#EAF2FB',
   positive: '#1E7E39',
   positiveTint: '#E8F5EC',

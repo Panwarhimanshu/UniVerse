@@ -106,7 +106,7 @@ export function Button({
   label: string; onPress?: () => void; variant?: 'primary' | 'secondary' | 'ghost'; loading?: boolean; disabled?: boolean; icon?: IconName; style?: ViewStyle;
 }) {
   const v = variant === 'primary'
-    ? { bg: colors.text, fg: '#fff', border: colors.text }
+    ? { bg: colors.primary, fg: '#fff', border: colors.primary }
     : variant === 'secondary'
       ? { bg: colors.bg, fg: colors.text, border: colors.line }
       : { bg: 'transparent', fg: colors.accent, border: 'transparent' };
@@ -150,7 +150,7 @@ export function Field({ label, error, ...props }: TextInputProps & { label: stri
         {...props}
         onFocus={(e) => { setFocused(true); props.onFocus?.(e); }}
         onBlur={(e) => { setFocused(false); props.onBlur?.(e); }}
-        style={[styles.input, focused && { borderColor: colors.text }, props.style]}
+        style={[styles.input, focused && { borderColor: colors.primary }, props.style]}
       />
       {error ? <Text style={[type.small, { color: colors.danger, marginTop: 4 }]}>{error}</Text> : null}
     </View>
@@ -173,7 +173,7 @@ export function Chips<T extends string>({
             <Pressable
               key={o}
               onPress={() => onChange(on ? '' : o)}
-              style={[styles.chip, on && { backgroundColor: colors.text, borderColor: colors.text }]}
+              style={[styles.chip, on && { backgroundColor: colors.primary, borderColor: colors.primary }]}
             >
               <Text style={{ fontSize: 13, fontWeight: '500', color: on ? '#fff' : colors.text }}>{format ? format(o) : o}</Text>
             </Pressable>

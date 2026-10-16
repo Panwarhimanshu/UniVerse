@@ -56,7 +56,7 @@ export default function Wallet() {
                   disabled={!canWithdraw}
                   style={({ pressed }) => [styles.primary, !canWithdraw && { opacity: 0.45 }, pressed && { opacity: 0.85 }]}
                 >
-                  <Feather name="arrow-up-right" size={16} color={colors.text} />
+                  <Feather name="arrow-up-right" size={16} color={colors.primary} />
                   <Text style={styles.primaryText}>Withdraw</Text>
                 </Pressable>
               ) : null}
@@ -116,19 +116,19 @@ function TxRow({ t, first }: { t: Transaction; first: boolean }) {
 }
 
 const styles = StyleSheet.create({
-  hero: { marginTop: space.lg, padding: space.xl, borderRadius: 22, backgroundColor: colors.text, overflow: 'hidden' },
-  heroLabel: { color: '#A9B8CC', fontSize: 13, fontWeight: '600' },
+  hero: { marginTop: space.lg, padding: space.xl, borderRadius: 22, backgroundColor: colors.primary, overflow: 'hidden' },
+  heroLabel: { color: 'rgba(255,255,255,0.78)', fontSize: 13, fontWeight: '600' },
   heroValue: { color: '#fff', fontSize: 38, fontWeight: '800', letterSpacing: -1.2, marginTop: 4 },
   facts: { flexDirection: 'row', gap: space.lg, marginTop: space.lg },
-  factLabel: { color: '#8FA1B8', fontSize: 11, fontWeight: '600' },
+  factLabel: { color: 'rgba(255,255,255,0.68)', fontSize: 11, fontWeight: '600' },
   factValue: { color: '#fff', fontSize: 15, fontWeight: '700', marginTop: 2 },
-  rule: { width: StyleSheet.hairlineWidth, backgroundColor: '#3A5070' },
+  rule: { width: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.28)' },
   heroActions: { flexDirection: 'row', gap: space.sm, marginTop: space.xl },
   primary: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 42, paddingHorizontal: space.lg, borderRadius: radius.pill, backgroundColor: '#fff' },
-  primaryText: { fontSize: 14, fontWeight: '700', color: colors.text },
-  secondary: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 42, paddingHorizontal: space.lg, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.12)' },
+  primaryText: { fontSize: 14, fontWeight: '700', color: colors.primary },
+  secondary: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 42, paddingHorizontal: space.lg, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.18)' },
   secondaryText: { fontSize: 14, fontWeight: '700', color: '#fff' },
-  hint: { color: '#8FA1B8', fontSize: 12, marginTop: space.md },
+  hint: { color: 'rgba(255,255,255,0.68)', fontSize: 12, marginTop: space.md },
   card: { marginTop: space.sm, borderRadius: radius.lg + 2, borderWidth: 1, borderColor: colors.line, overflow: 'hidden' },
   tx: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingVertical: 14 },
   sep: { borderTopWidth: StyleSheet.hairlineWidth, borderColor: colors.line },

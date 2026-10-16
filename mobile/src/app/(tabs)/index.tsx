@@ -15,10 +15,10 @@ import { colors, radius, space, type } from '../../theme';
 
 /* Case status colours, the same set the website uses, always shown with their label */
 const PIPE = [
-  { key: 'In Progress', label: 'In progress', color: '#3B9BFF' },
-  { key: 'Pending', label: 'Pending', color: '#F59E0B' },
-  { key: 'On Hold', label: 'On hold', color: '#F87171' },
-  { key: 'Completed', label: 'Done', color: '#4ADE80' },
+  { key: 'In Progress', label: 'In progress', color: '#13BBF9' },
+  { key: 'Pending', label: 'Pending', color: '#FCD34D' },
+  { key: 'On Hold', label: 'On hold', color: '#FCA5A5' },
+  { key: 'Completed', label: 'Done', color: '#86EFAC' },
 ] as const;
 
 const greeting = () => {
@@ -90,12 +90,12 @@ export default function Home() {
               {totals ? (
                 totals.docsNeeded ? (
                   <View style={styles.todo}>
-                    <Feather name="file-text" size={14} color="#FBBF24" />
+                    <Feather name="file-text" size={14} color="#FCD34D" />
                     <Text style={styles.todoText}>{totals.docsNeeded} document{totals.docsNeeded === 1 ? '' : 's'} still to upload</Text>
                   </View>
                 ) : (
                   <View style={styles.todo}>
-                    <Feather name="check-circle" size={14} color="#7BD795" />
+                    <Feather name="check-circle" size={14} color="#86EFAC" />
                     <Text style={styles.todoText}>{caseTotal ? 'All documents are in' : 'No cases yet'}</Text>
                   </View>
                 )
@@ -159,7 +159,7 @@ function Action({ icon, label, onPress, primary }: { icon: IconName; label: stri
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.action, pressed && { transform: [{ scale: 0.96 }] }]} accessibilityLabel={label}>
       <View style={[styles.actionIcon, primary && styles.actionPrimary]}>
-        <Feather name={icon} size={20} color={primary ? '#fff' : colors.text} />
+        <Feather name={icon} size={20} color={primary ? '#fff' : colors.primary} />
       </View>
       <Text style={styles.actionLabel}>{label}</Text>
     </Pressable>
@@ -187,32 +187,32 @@ const styles = StyleSheet.create({
   count: { position: 'absolute', top: -3, right: -3, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: colors.danger, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.bg },
   countText: { color: '#fff', fontSize: 10, fontWeight: '700' },
 
-  hero: { marginTop: space.lg, padding: space.xl, paddingBottom: space.lg, borderRadius: 22, backgroundColor: colors.text, overflow: 'hidden' },
-  heroLabel: { color: '#A9B8CC', fontSize: 13, fontWeight: '600' },
+  hero: { marginTop: space.lg, padding: space.xl, paddingBottom: space.lg, borderRadius: 22, backgroundColor: colors.primary, overflow: 'hidden' },
+  heroLabel: { color: 'rgba(255,255,255,0.78)', fontSize: 13, fontWeight: '600' },
   heroValue: { color: '#fff', fontSize: 36, fontWeight: '800', letterSpacing: -1.2, marginTop: 4 },
   heroTop: { flexDirection: 'row', alignItems: 'flex-start' },
   heroSide: { alignItems: 'flex-end', paddingTop: 2 },
   heroSideValue: { color: '#fff', fontSize: 20, fontWeight: '800' },
-  heroSideLabel: { color: '#8FA1B8', fontSize: 11, fontWeight: '600' },
+  heroSideLabel: { color: 'rgba(255,255,255,0.68)', fontSize: 11, fontWeight: '600' },
   pipe: { flexDirection: 'row', height: 8, borderRadius: 4, overflow: 'hidden', gap: 3, marginTop: space.lg },
   pipeLegend: { flexDirection: 'row', justifyContent: 'space-between', marginTop: space.md },
   pipeItem: { alignItems: 'flex-start', gap: 2 },
   pipeDot: { width: 8, height: 8, borderRadius: 2, marginBottom: 2 },
   pipeCount: { color: '#fff', fontSize: 16, fontWeight: '800' },
-  pipeLabel: { color: '#8FA1B8', fontSize: 11, fontWeight: '600' },
-  heroFoot: { flexDirection: 'row', alignItems: 'center', gap: space.lg, marginTop: space.lg, paddingTop: space.md, borderTopWidth: StyleSheet.hairlineWidth, borderColor: '#2A4060' },
+  pipeLabel: { color: 'rgba(255,255,255,0.68)', fontSize: 11, fontWeight: '600' },
+  heroFoot: { flexDirection: 'row', alignItems: 'center', gap: space.lg, marginTop: space.lg, paddingTop: space.md, borderTopWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.28)' },
   todo: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  todoText: { color: '#DCE5F0', fontSize: 13, fontWeight: '600' },
-  heroGo: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
+  todoText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
+  heroGo: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
 
   actions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: space.xl, paddingHorizontal: space.xs },
   action: { alignItems: 'center', gap: 6, width: 72 },
-  actionIcon: { width: 54, height: 54, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.line },
-  actionPrimary: { backgroundColor: colors.accent, borderColor: colors.accent },
+  actionIcon: { width: 54, height: 54, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.secondaryTint },
+  actionPrimary: { backgroundColor: colors.primary, borderColor: colors.primary },
   actionLabel: { fontSize: 12, fontWeight: '600', color: colors.text },
 
   notice: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginTop: space.xl, padding: space.md, paddingRight: space.lg, borderRadius: radius.lg, backgroundColor: colors.accentTint },
-  noticeIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+  noticeIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   noticeNum: { color: '#fff', fontWeight: '800', fontSize: 14 },
 
   card: { marginTop: space.lg, padding: space.lg, paddingTop: space.md, borderRadius: radius.lg + 2, backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.line },

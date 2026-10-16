@@ -130,7 +130,7 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
   link: { fontSize: 13, color: colors.accent, fontWeight: '600' },
   chip: { paddingHorizontal: 14, height: 32, justifyContent: 'center', borderRadius: radius.pill, borderWidth: 1, borderColor: colors.line },
-  chipOn: { backgroundColor: colors.text, borderColor: colors.text },
+  chipOn: { backgroundColor: colors.primary, borderColor: colors.primary },
   item: { flexDirection: 'row', gap: space.md, padding: space.md, borderRadius: radius.md, marginBottom: space.sm, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.line },
   unread: { backgroundColor: colors.accentTint, borderColor: '#C9DDF3' },
   icon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
