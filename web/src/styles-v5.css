@@ -302,3 +302,151 @@
 .pm-bank{color:var(--green-deep);font-weight:600;margin-top:.3rem;display:block}
 .payto{display:flex;flex-direction:column;gap:.15rem;font-size:.82rem}
 .link-btn{border:0;background:none;color:var(--blue);font:600 .74rem var(--font);cursor:pointer;padding:0 .2rem}
+
+/* =========================================================================
+   Partner portal (.dash.pt): light fintech shell in the brand blues.
+   Primary #0A66C2, secondary #13BBF9. The back office keeps its own look.
+   ========================================================================= */
+.dash.pt{--pt-primary:#0A66C2;--pt-secondary:#13BBF9;--pt-bg:#F4F7FB;--pt-tint:#EAF3FD;background:var(--pt-bg);grid-template-columns:252px 1fr;grid-template-rows:68px 1fr}
+
+/* sidebar */
+.dash.pt .dash-side{background:#fff;color:var(--ink);border-right:1px solid var(--line)}
+.dash.pt .dash-side .s-brand{padding:18px 20px 16px;border-bottom:1px solid var(--line)}
+.dash.pt .dash-side .s-brand a{display:flex;align-items:center;gap:.6rem}
+.dash.pt .dash-side .s-brand img{height:34px;padding:0;background:none;border-radius:0}
+.dash.pt .portal-tag{margin:0;font-size:.56rem;letter-spacing:.18em;-webkit-text-fill-color:initial;background:var(--pt-tint);color:var(--pt-primary);padding:.32rem .5rem;border-radius:6px}
+.dash.pt .s-nav{padding:12px}
+.dash.pt .s-nav .lbl{color:#8A9BB0;padding:16px 12px 6px;font-size:.62rem}
+.dash.pt .s-link{color:#40546B;font-weight:550;border-radius:10px;padding:.62rem .8rem;position:relative}
+.dash.pt .s-link svg{color:#7C8FA6}
+.dash.pt .s-link:hover{background:#F3F7FC;color:var(--navy)}
+.dash.pt .s-link.active{background:var(--pt-tint);color:var(--pt-primary);font-weight:700;box-shadow:none}
+.dash.pt .s-link.active svg{color:var(--pt-primary)}
+.dash.pt .s-link.active::before{content:"";position:absolute;left:-12px;top:8px;bottom:8px;width:3px;border-radius:0 3px 3px 0;background:var(--pt-primary)}
+.dash.pt .s-foot{border-top:1px solid var(--line);padding:14px}
+.dash.pt button.s-rm{background:linear-gradient(135deg,#F0F8FE,#E6F6FE);border:1px solid #D7ECFB}
+.dash.pt button.s-rm:hover{background:#E3F2FD}
+.dash.pt .s-rm .av{background:linear-gradient(135deg,var(--pt-primary),var(--pt-secondary))}
+.dash.pt .s-rm b{color:var(--navy)}
+.dash.pt .s-rm span{color:var(--ink-soft)}
+.dash.pt .s-rm svg{color:var(--pt-primary)}
+
+/* top bar */
+.dash.pt .dash-top{background:rgba(255,255,255,.92);padding:0 28px;gap:.8rem}
+.dash.pt .page-ttl-wrap{display:flex;flex-direction:column;line-height:1.15}
+.dash.pt .page-ttl{font-size:1.08rem}
+.dash.pt .page-date{font-size:.72rem;color:var(--ink-soft);font-weight:500}
+.dash.pt .dash-search input{background:var(--pt-bg);border-color:transparent;width:250px}
+.dash.pt .dash-search input:focus{background:#fff;border-color:var(--pt-primary)}
+.dash.pt .top-cta{white-space:nowrap}
+.dash.pt .dash-main{padding:24px 28px 40px}
+
+/* buttons and shared bits inside the portal */
+.dash.pt .btn-primary{background:var(--pt-primary);box-shadow:0 6px 16px -6px rgba(10,102,194,.55)}
+.dash.pt .btn-primary:hover{background:#0957A6}
+.dash.pt .panel{border-radius:16px;border-color:#E3EAF3;box-shadow:0 1px 2px rgba(11,36,64,.03)}
+.dash.pt .panel-h{padding:1rem 1.25rem}
+.dash.pt .panel-h h3{font-size:.95rem;letter-spacing:-.01em}
+.dash.pt .tbl th{background:#F8FAFD;color:#71839A}
+.dash.pt .tbl tr:hover td{background:#F7FBFF}
+.dash.pt .t-mono{font:600 .78rem ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--ink-soft)}
+.dash.pt .status.prog{background:#E3F6FE;color:#0779A8}
+.dash.pt .prog-fill{background:linear-gradient(90deg,var(--pt-primary),var(--pt-secondary))}
+
+/* overview */
+.ov-hello{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;margin-bottom:1.3rem;flex-wrap:wrap}
+.ov-hello h1{font:800 1.55rem/1.2 var(--font);color:var(--navy);letter-spacing:-.02em}
+.ov-hello p{color:var(--ink-soft);font-size:.9rem;margin-top:.25rem}
+.ov-actions{display:flex;gap:.6rem}
+.ov-hero{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:1rem;margin-bottom:1rem}
+.ov-wallet{position:relative;overflow:hidden;border-radius:18px;padding:1.35rem 1.4rem;color:#fff;background:linear-gradient(135deg,#0A66C2 0%,#0B5BB0 55%,#0C74D1 100%);box-shadow:0 18px 40px -18px rgba(10,102,194,.7);display:flex;flex-direction:column;min-height:210px}
+.ov-orbit{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.ov-wallet>*{position:relative}
+.ov-wallet>.ov-orbit{position:absolute}
+.ov-k{font:600 .78rem var(--font);opacity:.82}
+.ov-v{font:800 2.1rem/1.1 var(--font);letter-spacing:-.03em;margin-top:.3rem}
+.ov-split{display:flex;gap:1.6rem;margin-top:.9rem}
+.ov-split span{display:block;font-size:.7rem;opacity:.75;font-weight:600}
+.ov-split b{font-size:.98rem}
+.ov-btns{display:flex;gap:.5rem;margin-top:auto;padding-top:1rem}
+.ov-btn{border:0;border-radius:999px;padding:.5rem 1rem;font:700 .8rem var(--font);cursor:pointer;background:rgba(255,255,255,.18);color:#fff;transition:background .2s}
+.ov-btn:hover{background:rgba(255,255,255,.28)}
+.ov-btn.light{background:#fff;color:#0A66C2}
+.ov-btn.light:hover{background:#EAF3FD}
+.ov-card{background:#fff;border:1px solid #E3EAF3;border-radius:18px;padding:1.2rem 1.25rem;display:flex;flex-direction:column}
+.ov-card-h{display:flex;justify-content:space-between;align-items:center;font:700 .82rem var(--font);color:var(--ink-soft)}
+.ov-big{font:800 2rem/1.1 var(--font);color:var(--navy);letter-spacing:-.03em;margin:.5rem 0 .9rem}
+.ov-big small{font-size:.85rem;font-weight:600;color:var(--ink-soft);letter-spacing:0}
+.ov-pipe{display:flex;gap:3px;height:10px;border-radius:6px;overflow:hidden}
+.ov-legend{list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:.45rem 1rem;margin-top:.9rem}
+.ov-legend li{display:flex;align-items:center;gap:.45rem;font-size:.8rem;color:var(--ink)}
+.ov-legend i{width:8px;height:8px;border-radius:2px}
+.ov-legend b{margin-left:auto;color:var(--navy)}
+.ov-todo{list-style:none;display:flex;flex-direction:column;gap:.35rem;margin-top:.6rem}
+.ov-todo li{display:flex;gap:.7rem;align-items:center;padding:.5rem .45rem;border-radius:10px;cursor:pointer;transition:background .2s}
+.ov-todo li:hover{background:#F4F8FD}
+.ov-todo i{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;flex:0 0 auto}
+.ov-todo i svg{width:16px;height:16px}
+.ov-todo .t-amber{background:#FEF3E2;color:#B45309}
+.ov-todo .t-red{background:#FDECEC;color:#B91C1C}
+.ov-todo .t-blue{background:#E4F6FE;color:#0779A8}
+.ov-todo b{display:block;font-size:.84rem;color:var(--navy)}
+.ov-todo span{font-size:.72rem;color:var(--ink-soft)}
+.ov-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1rem}
+.ov-kpi{background:#fff;border:1px solid #E3EAF3;border-radius:16px;padding:1rem 1.15rem;display:flex;flex-direction:column;gap:.2rem;position:relative;overflow:hidden}
+.ov-kpi::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:3px;border-radius:0 3px 3px 0;background:linear-gradient(#0A66C2,#13BBF9)}
+.ov-kpi span{font:600 .74rem var(--font);color:var(--ink-soft)}
+.ov-kpi b{font:800 1.35rem var(--font);color:var(--navy);letter-spacing:-.02em}
+.ov-kpi small{font-size:.72rem;color:#8A9BB0}
+.ov .d-grid{margin-bottom:1rem}
+.ov-grid{grid-template-columns:1.6fr 1fr}
+.ov-svcs{display:grid;grid-template-columns:repeat(3,1fr);gap:.7rem;padding:1rem 1.2rem 1.2rem}
+.ov-svc{display:flex;align-items:center;gap:.75rem;padding:.8rem .9rem;border:1px solid #E3EAF3;border-radius:14px;background:#fff;cursor:pointer;text-align:left;font-family:var(--font);transition:border-color .2s,box-shadow .2s,transform .2s}
+.ov-svc:hover{border-color:#9FCBF2;box-shadow:0 8px 20px -12px rgba(10,102,194,.45);transform:translateY(-1px)}
+.ov-svc-ic{width:38px;height:38px;border-radius:11px;background:#E4F6FE;color:#0A66C2;display:grid;place-items:center;flex:0 0 auto}
+.ov-svc-ic svg{width:18px;height:18px}
+.ov-svc-t{flex:1;min-width:0;display:flex;flex-direction:column}
+.ov-svc-t b{font-size:.86rem;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ov-svc-t small{font-size:.74rem;color:#0779A8;font-weight:600}
+.ov-svc-go{font:700 .74rem var(--font);color:#0A66C2;opacity:0;transition:opacity .2s}
+.ov-svc:hover .ov-svc-go{opacity:1}
+@media(max-width:1180px){.ov-hero{grid-template-columns:1fr 1fr}.ov-wallet{grid-column:span 2}.ov-kpis{grid-template-columns:repeat(2,1fr)}.ov-svcs{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:920px){.ov-grid{grid-template-columns:1fr}.dash.pt .top-cta{display:none}.dash.pt .dash-main{padding:18px 16px 32px}}
+@media(max-width:620px){.ov-hero{grid-template-columns:1fr}.ov-wallet{grid-column:auto}.ov-svcs{grid-template-columns:1fr}.ov-kpis{grid-template-columns:1fr 1fr}.ov-hello h1{font-size:1.3rem}.dash.pt .page-date{display:none}}
+
+/* student import */
+.imp-drop{display:flex;flex-direction:column;align-items:center;gap:.35rem;padding:1.8rem 1rem;border:2px dashed #B9D6F2;border-radius:16px;background:#F6FAFE;cursor:pointer;text-align:center;transition:background .2s,border-color .2s}
+.imp-drop:hover,.imp-drop.over{background:#EAF3FD;border-color:#0A66C2}
+.imp-drop svg{width:34px;height:34px;color:#0A66C2;margin-bottom:.3rem}
+.imp-drop b{color:var(--navy)}
+.imp-drop span{font-size:.8rem;color:var(--ink-soft)}
+.imp-or{display:flex;align-items:center;gap:.7rem;margin:1rem 0 .6rem;font-size:.76rem;color:var(--ink-soft)}
+.imp-or::before,.imp-or::after{content:"";flex:1;height:1px;background:var(--line)}
+.imp-paste{width:100%;font:500 .8rem ui-monospace,Menlo,Consolas,monospace;padding:.7rem;border:1px solid var(--line-strong);border-radius:12px;resize:vertical}
+.imp-summary{display:flex;flex-wrap:wrap;gap:.4rem 1rem;align-items:center;font-size:.84rem;margin-bottom:.8rem}
+.imp-summary .ok b{color:var(--green-deep)}
+.imp-summary .bad b{color:#B91C1C}
+.imp-table{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:12px}
+.imp-table .tbl td{padding:.5rem .7rem;font-size:.8rem}
+.imp-table tr.imp-bad td{background:#FFF7F7}
+.imp-result .imp-big{display:flex;align-items:baseline;gap:.5rem}
+.imp-big b{font:800 2.2rem var(--font);color:var(--green-deep)}
+.imp-skip{list-style:none;display:flex;flex-direction:column;gap:.3rem;margin-top:.5rem;max-height:220px;overflow:auto}
+.imp-skip li{display:flex;justify-content:space-between;gap:1rem;font-size:.8rem;padding:.4rem .6rem;background:#FFF7F7;border-radius:8px}
+.imp-skip span{color:#B91C1C}
+
+/* portal fixes: logo without the old white box, readable RM avatar, phone layout */
+.dash.pt .dash-side .s-brand a{background:none;box-shadow:none;border:0;padding:0;border-radius:0}
+.dash.pt .dash-side .s-brand img{height:40px}
+.dash.pt .s-foot .s-rm .av{background:linear-gradient(135deg,#0A66C2,#13BBF9);color:#fff}
+.ov-payto{display:flex;align-items:center;gap:.4rem;margin-top:.8rem;font-size:.74rem;opacity:.85}
+.ov-payto svg{width:14px;height:14px}
+@media(max-width:920px){
+  .dash.pt{grid-template-columns:1fr;grid-template-areas:'top' 'main'}
+  .dash.pt .dash-top{padding:0 14px}
+  .dash.pt .user-chip b{display:none}
+}
+.dash.pt .wallet-hero{background:linear-gradient(135deg,#0A66C2 0%,#0B5BB0 55%,#0C74D1 100%);box-shadow:0 18px 40px -18px rgba(10,102,194,.7)}
+.dash.pt .wallet-hero .btn-green{background:#fff;color:#0A66C2;box-shadow:none}
+.dash.pt .wallet-hero .btn-green:hover{background:#EAF3FD}
+.imp-table .tbl td{white-space:nowrap}

@@ -186,6 +186,10 @@ export const api = {
   downloadDoc: (caseId: string, docId: string, name: string) => download(`/requests/${caseId}/documents/${docId}/file`, name),
 
   students: () => request<Student[]>('/students'),
+  meta: () => request<{ destinations: string[]; countries?: string[]; minWithdrawal: number }>('/meta'),
+  addStudent: (b: { name: string; email: string; phone: string; country: string }) => request<Student>('/students', json('POST', b)),
+  importStudents: (students: { name: string; email: string; phone: string; country: string }[]) =>
+    request<{ added: number; skipped: { row: number; name: string; reason: string }[]; students: Student[] }>('/students/bulk', json('POST', { students })),
   updateStudent: (id: string, b: Partial<Pick<Student, 'name' | 'email' | 'phone' | 'country'>>) => request<Student>(`/students/${id}`, json('PATCH', b)),
   raiseRequests: (id: string, services: string[]) => request<Student>(`/students/${id}/requests`, json('POST', { services })),
 

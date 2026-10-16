@@ -4,7 +4,7 @@ import { AgreementRequest, Device, Message, MENUS, Notification, PERMS, ServiceR
 import bcrypt from 'bcryptjs';
 import { agentIdOf, HttpError, need, needMenu, ownerOnly } from '../middleware/auth.js';
 import { emailTaken } from './auth.js';
-import { isCountry, serviceByKey } from '../data/catalog.js';
+import { COUNTRIES, DESTINATIONS, isCountry, serviceByKey } from '../data/catalog.js';
 import { publicMessage, publicStudent, publicTeamMember } from '../serialize.js';
 import { openCase } from './requests.js';
 import { track } from '../usage.js';
@@ -52,6 +52,57 @@ router.post('/students', needMenu('students'), need('create'), async (req, res) 
   const s = await Student.create({ agent: agentId, code: `STU-${1011 + count}`, name, email, phone, country });
   track(req, agentId, accessOf(req).memberId, 'student_added');
   res.status(201).json(publicStudent(s, []));
+});
+
+/* Import many students at once (from the website's CSV / Excel import). Each row is checked on its own:
+   good rows are added, the rest come back with the reason, so the partner can fix and re-import just those. */
+const COUNTRY_ALIASES: Record<string, string> = {
+  uk: 'United Kingdom', 'u.k.': 'United Kingdom', england: 'United Kingdom', britain: 'United Kingdom', 'great britain': 'United Kingdom',
+  us: 'United States', usa: 'United States', 'u.s.': 'United States', 'u.s.a.': 'United States', america: 'United States',
+  'united arab emirates': 'UAE', dubai: 'UAE', nz: 'New Zealand', aus: 'Australia', can: 'Canada', deutschland: 'Germany',
+};
+const matchCountry = (raw: unknown) => {
+  const v = String(raw ?? '').trim();
+  if (!v) return null;
+  const lower = v.toLowerCase();
+  if (COUNTRY_ALIASES[lower]) return COUNTRY_ALIASES[lower];
+  return [...DESTINATIONS, ...COUNTRIES].find((c) => c.toLowerCase() === lower) ?? null;
+};
+
+router.post('/students/bulk', needMenu('students'), need('create'), async (req, res) => {
+  const agentId = agentIdOf(req);
+  const rows: unknown[] = Array.isArray(req.body?.students) ? req.body.students : [];
+  if (!rows.length) throw new HttpError(400, 'No students to import');
+  if (rows.length > 500) throw new HttpError(400, 'Import up to 500 students at a time');
+
+  const existing = await Student.find({ agent: agentId }).select('email phone');
+  const seenEmail = new Set(existing.map((s) => s.email.toLowerCase()).filter(Boolean));
+  const seenPhone = new Set(existing.map((s) => s.phone.replace(/\D/g, '')).filter(Boolean));
+  let count = existing.length;
+  const added: ReturnType<typeof publicStudent>[] = [];
+  const skipped: { row: number; name: string; reason: string }[] = [];
+
+  for (const [i, r] of rows.entries()) {
+    const row = (r ?? {}) as Record<string, unknown>;
+    const name = String(row.name ?? '').trim();
+    const email = String(row.email ?? '').trim().toLowerCase();
+    const phone = String(row.phone ?? '').trim();
+    const digits = phone.replace(/\D/g, '');
+    const country = matchCountry(row.country);
+    const skip = (reason: string) => skipped.push({ row: i + 1, name: name || '(no name)', reason });
+    if (!name) { skip('Name is missing'); continue; }
+    if (digits.length < 7) { skip('Phone is missing or too short'); continue; }
+    if (!EMAIL_RE.test(email)) { skip('Email is missing or not valid'); continue; }
+    if (!country) { skip(`Unknown destination "${String(row.country ?? '').trim() || 'blank'}"`); continue; }
+    if (seenEmail.has(email) || seenPhone.has(digits)) { skip('Already in your students (same email or phone)'); continue; }
+    const s = await Student.create({ agent: agentId, code: `STU-${1011 + count}`, name, email, phone, country });
+    count += 1;
+    seenEmail.add(email);
+    seenPhone.add(digits);
+    added.push(publicStudent(s, []));
+  }
+  if (added.length) track(req, agentId, accessOf(req).memberId, 'student_added');
+  res.status(added.length ? 201 : 200).json({ added: added.length, skipped, students: added });
 });
 
 router.patch('/students/:id', need('edit'), async (req, res) => {

@@ -6,7 +6,7 @@ import { serviceByKey, serviceName } from '../data/services';
 import { SITE, visibleServices } from '../lib/content';
 import { api } from '../lib/api';
 import type { Case, Commissions, Menu, Notification, Perm, Student, TeamMember } from '../lib/api';
-import { Columns, monthLabel, Ranked, StatusStack } from '../components/charts';
+import { Columns, monthLabel } from '../components/charts';
 import { useAuth } from '../lib/auth';
 import { fmtDate, fmtTime, inr, initials, statusClass, useApi, useInterval } from '../lib/hooks';
 import { useToast } from '../lib/toast';
@@ -14,6 +14,7 @@ import {
   AgreementModal, Avatar, CaseModal, CommModal, MENU_LIST, PasswordModal, PayoutMethodModal, PERM_LIST, PhotoModal, ProfileModal, ReferModal, RmDrawer, StudentModal, UserModal, WithdrawModal,
 } from './modals';
 import { buildTimeline } from './timeline';
+import { AddStudentModal, ImportStudentsModal } from './StudentImport';
 
 /* ---------- icons ---------- */
 const I = {
@@ -106,6 +107,8 @@ export default function Dashboard() {
   const [pwOpen, setPwOpen] = useState(false);
   const [photoOpen, setPhotoOpen] = useState(false);
   const [methodOpen, setMethodOpen] = useState(false);
+  const [addStudentOpen, setAddStudentOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifs, setNotifs] = useState<Notification[]>([]);
   const [unread, setUnread] = useState(0);
@@ -191,7 +194,7 @@ export default function Dashboard() {
 
   return (
     <>
-      <div className="dash" id="dashRoot">
+      <div className="dash pt" id="dashRoot">
         {/* ===== SIDEBAR ===== */}
         <aside className={`dash-side${sideOpen ? ' open' : ''}`} id="dashSide">
           <div className="s-brand">
@@ -224,13 +227,14 @@ export default function Dashboard() {
           <button className="icon-btn menu-fab" aria-label="Menu" onClick={() => setSideOpen(!sideOpen)}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
           </button>
-          <span className="page-ttl">{TITLES[view]}</span>
+          <div className="page-ttl-wrap"><span className="page-ttl">{TITLES[view]}</span><span className="page-date">{new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</span></div>
           <span className="sp"></span>
           <div className="dash-search">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
             <input type="search" placeholder="Search students…" aria-label="Search students" value={search}
               onChange={(e) => { setSearch(e.target.value); if (e.target.value && view !== 'students' && view !== 'requests') go('students'); }} />
           </div>
+          {can('create') && view !== 'overview' ? <button className="btn btn-primary btn-sm top-cta" onClick={() => setRefer({ open: true })}>+ Request a service</button> : null}
           <button className="icon-btn" aria-label="Notifications" aria-expanded={notifOpen} onClick={toggleNotifs}><Svg html={I.bell} />{unread ? <span className="count-n">{unread > 9 ? '9+' : unread}</span> : null}</button>
           <div className="user-chip" role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); setNotifOpen(false); setMenuOpen(!menuOpen); }}>
             <Avatar name={myName} photo={member ? member.avatar : agent.avatar} /><b>{myName}</b>
@@ -263,52 +267,149 @@ export default function Dashboard() {
         {/* ===== MAIN ===== */}
         <main className="dash-main">
           {view === 'overview' && (
-            <section className="view active">
-              <div className="d-cards">
-                <StatCard ic="b" icon={I.requests} value={stats ? String(stats.activeCases) : '–'} label="Active Cases" />
-                <StatCard ic="g" icon={I.students} value={stats ? String(stats.students) : '–'} label="Students Served" />
-                {sees('wallet') ? <StatCard ic="n" icon={I.wallet} value={stats ? inr(stats.balance ?? 0) : '–'} label="Wallet Balance" /> : null}
-                {sees('wallet') ? <StatCard ic="a" icon={I.commissions} value={stats ? inr(stats.monthEarnings ?? 0) : '–'} label={`Earnings · ${month}`} /> : null}
+            <section className="view active ov">
+              <div className="ov-hello">
+                <div>
+                  <h1>{greeting()}, {myName.split(' ')[0]}</h1>
+                  <p>{stats ? `${stats.activeCases} case${stats.activeCases === 1 ? '' : 's'} in progress${analytics.data?.totals.docsNeeded ? ` · ${analytics.data.totals.docsNeeded} document${analytics.data.totals.docsNeeded === 1 ? '' : 's'} waiting on you` : ''}` : 'Loading your figures…'}</p>
+                </div>
+                <div className="ov-actions">
+                  {can('create') && sees('students') ? <button className="btn btn-ghost" onClick={() => setAddStudentOpen(true)}>Add student</button> : null}
+                  {can('create') ? <button className="btn btn-primary" onClick={() => setRefer({ open: true })}>Request a service</button> : null}
+                </div>
               </div>
 
-              {analytics.data ? <PartnerAnalytics a={analytics.data} money={sees('wallet')} /> : null}
+              <div className="ov-hero">
+                {sees('wallet') ? (
+                  <div className="ov-wallet">
+                    <svg className="ov-orbit" viewBox="0 0 300 200" preserveAspectRatio="xMaxYMin slice" aria-hidden="true">
+                      <defs><radialGradient id="ovGlow" cx="100%" cy="0%" r="90%"><stop offset="0" stopColor="#13BBF9" stopOpacity=".55" /><stop offset="1" stopColor="#13BBF9" stopOpacity="0" /></radialGradient></defs>
+                      <rect width="300" height="200" fill="url(#ovGlow)" />
+                      <circle cx="290" cy="-20" r="110" fill="none" stroke="#fff" strokeOpacity=".1" strokeWidth="20" />
+                      <circle cx="290" cy="-20" r="160" fill="none" stroke="#13BBF9" strokeOpacity=".7" strokeWidth="1.2" />
+                    </svg>
+                    <span className="ov-k">Wallet balance</span>
+                    <b className="ov-v">{stats ? inr(stats.balance ?? 0) : '–'}</b>
+                    <div className="ov-split">
+                      <div><span>Earned in {month}</span><b>{stats ? inr(stats.monthEarnings ?? 0) : '–'}</b></div>
+                      <div><span>Clearing</span><b>{wallet.data ? inr(wallet.data.pending) : '–'}</b></div>
+                    </div>
+                    {wallet.data ? (
+                      <span className="ov-payto">
+                        <Svg html={I.wallet} />
+                        {wallet.data.methods.find((m) => m.isDefault) ? `Payouts go to ${wallet.data.methods.find((m) => m.isDefault)!.label}` : 'Add a UPI ID or bank account in the wallet to withdraw'}
+                      </span>
+                    ) : null}
+                    <div className="ov-btns">
+                      {can('withdraw') ? <button className="ov-btn light" onClick={() => setWithdrawOpen(true)}>Withdraw</button> : null}
+                      <button className="ov-btn" onClick={() => go('wallet')}>View wallet</button>
+                    </div>
+                  </div>
+                ) : null}
 
-              <div className="d-grid">
+                <div className="ov-card">
+                  <div className="ov-card-h"><span>Case pipeline</span>{sees('requests') ? <button className="link-btn" onClick={() => go('requests')}>All cases</button> : null}</div>
+                  <b className="ov-big">{analytics.data?.totals.open ?? stats?.activeCases ?? '–'}<small> open</small></b>
+                  {analytics.data ? (
+                    <>
+                      <div className="ov-pipe" role="img" aria-label={PIPE.map((x) => `${x.label}: ${analytics.data!.byStatus[x.key]}`).join(', ')}>
+                        {PIPE.filter((x) => analytics.data!.byStatus[x.key]).map((x) => <span key={x.key} style={{ flex: analytics.data!.byStatus[x.key], background: x.color }} />)}
+                        {!analytics.data.totals.cases ? <span style={{ flex: 1, background: 'var(--line)' }} /> : null}
+                      </div>
+                      <ul className="ov-legend">
+                        {PIPE.map((x) => <li key={x.key}><i style={{ background: x.color }} />{x.label}<b>{analytics.data!.byStatus[x.key]}</b></li>)}
+                      </ul>
+                    </>
+                  ) : <div className="adm-skel" style={{ height: 70 }} />}
+                </div>
+
+                <div className="ov-card">
+                  <div className="ov-card-h"><span>Needs your attention</span></div>
+                  <ul className="ov-todo">
+                    <li onClick={() => sees('requests') && go('requests')}>
+                      <i className="t-amber"><Svg html={I.doc} /></i>
+                      <div><b>{analytics.data?.totals.docsNeeded ?? '–'} documents to upload</b><span>Cases can't move until these are in</span></div>
+                    </li>
+                    <li onClick={() => sees('requests') && go('requests')}>
+                      <i className="t-red"><Svg html={I.requests} /></i>
+                      <div><b>{analytics.data?.byStatus['On Hold'] ?? '–'} cases on hold</b><span>Check the case chat for what's needed</span></div>
+                    </li>
+                    <li onClick={(e) => toggleNotifs(e)}>
+                      <i className="t-blue"><Svg html={I.bell} /></i>
+                      <div><b>{unread} unread notification{unread === 1 ? '' : 's'}</b><span>Replies, payments and updates</span></div>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {analytics.data ? (
+                <div className="ov-kpis">
+                  <Kpi label="Completion rate" value={analytics.data.totals.completionRate === null ? '–' : `${Math.round(analytics.data.totals.completionRate * 100)}%`} hint={`${analytics.data.totals.completed} of ${analytics.data.totals.cases} cases done`} />
+                  <Kpi label="Average time to complete" value={analytics.data.totals.avgDaysToComplete === null ? '–' : analytics.data.totals.avgDaysToComplete < 1 ? 'Under a day' : `${Math.round(analytics.data.totals.avgDaysToComplete)} days`} hint="From request to payout step" />
+                  <Kpi label="Students" value={String(analytics.data.totals.students)} hint={`${analytics.data.monthly[analytics.data.monthly.length - 1]?.count ?? 0} new requests in ${month}`} />
+                  {sees('wallet') && analytics.data.money ? <Kpi label="Earned so far" value={inr(analytics.data.money.lifetime)} hint="Cleared commissions" /> : <Kpi label="Documents in review" value={String(analytics.data.totals.docsInReview)} hint="Being checked by the desk" />}
+                </div>
+              ) : null}
+
+              {analytics.data ? (
+                <div className="d-grid pa-grid">
+                  <div className="panel">
+                    <div className="panel-h"><h3>Requests per month</h3><span className="t-sub">Last 6 months</span></div>
+                    <div className="panel-b"><Columns data={analytics.data.monthly.map((m) => ({ label: monthLabel(m.month), value: m.count }))} color="#0A66C2" unit="cases" /></div>
+                  </div>
+                  {sees('wallet') && analytics.data.money ? (
+                    <div className="panel">
+                      <div className="panel-h"><h3>Earnings per month</h3><span className="t-sub">Last 6 months</span></div>
+                      <div className="panel-b"><Columns data={analytics.data.money.monthly.map((m) => ({ label: monthLabel(m.month), value: m.amount }))} color="#13BBF9" money /></div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <div className="d-grid ov-grid">
                 <div className="panel">
-                  <div className="panel-h"><h3>Recent students</h3>{can('create') ? <button className="btn btn-primary btn-sm" onClick={() => setRefer({ open: true })}>+ Add student</button> : null}</div>
+                  <div className="panel-h"><h3>Recent cases</h3>{sees('requests') ? <button className="btn btn-ghost btn-sm" onClick={() => go('requests')}>View all</button> : null}</div>
                   <div style={{ overflowX: 'auto' }}>
-                  <table className="tbl">
-                    <thead><tr><th>Student</th><th>Country</th><th>Service</th><th>Status</th></tr></thead>
-                    <tbody>
-                      {studentList.slice(0, 5).map((s) => {
-                        const latest = s.requests[s.requests.length - 1];
-                        return (
-                          <tr key={s.id} style={{ cursor: 'pointer' }} onClick={() => setStudentId(s.id)} title={`Open ${s.name}'s record`}>
-                            <td><div className="t-name">{s.name}</div><div className="t-sub">{s.email || s.phone}</div></td>
-                            <td>{s.country}</td><td>{latest ? serviceName(latest.service) : '—'}</td>
-                            <td>{latest ? <span className={`status ${statusClass(latest.status)}`}>{latest.status}</span> : null}</td>
+                    <table className="tbl">
+                      <thead><tr><th>Case</th><th>Student</th><th>Service</th><th>Progress</th><th>Status</th></tr></thead>
+                      <tbody>
+                        {caseList.slice(0, 6).map((c) => (
+                          <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => openCase(c)}>
+                            <td className="t-mono">{c.ref}</td>
+                            <td><div className="t-name">{c.student.name}</div><div className="t-sub">{c.student.country}</div></td>
+                            <td>{c.serviceName}</td>
+                            <td><Prog v={c.progress} /></td>
+                            <td><span className={`status ${statusClass(c.status)}`}>{c.status}</span></td>
                           </tr>
-                        );
-                      })}
-                      {students.data && !studentList.length ? (
-                        <tr><td colSpan={4} className="empty-row">No students yet. Refer your first student to get started.</td></tr>
-                      ) : null}
-                    </tbody>
-                  </table>
+                        ))}
+                        {cases.data && !caseList.length ? <tr><td colSpan={5} className="empty-row">No cases yet. Request a service for a student to get started.</td></tr> : null}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
                 <div className="panel">
-                  <div className="panel-h"><h3>Service mix</h3>{sees('requests') ? <button className="btn btn-ghost btn-sm" onClick={() => go('requests')}>View all</button> : null}</div>
+                  <div className="panel-h"><h3>Service mix</h3><span className="t-sub">All cases</span></div>
                   <Donut mix={dash.data?.mix ?? []} />
                 </div>
               </div>
 
-              {can('create') ? <div className="panel">
-                <div className="panel-h"><h3>Quick launch</h3><span className="link" style={{ fontSize: '.8rem', color: 'var(--ink-soft)' }}>Refer a student into any service</span></div>
-                <div className="comm-grid" style={{ padding: '1.2rem' }}>
-                  {visibleServices().slice(0, 3).map((s) => s.key).map((k) => <SvcTile key={k} k={k} label="Start referral" onRefer={(svc) => setRefer({ open: true, svc })} />)}
+              {can('create') && sees('services') ? (
+                <div className="panel">
+                  <div className="panel-h"><h3>Services you can offer</h3><button className="btn btn-ghost btn-sm" onClick={() => go('services')}>Details</button></div>
+                  <div className="ov-svcs">
+                    {visibleServices().map((sv) => {
+                      const rate = comms.data?.rates.find((r) => r.key === sv.key);
+                      return (
+                        <button key={sv.key} className="ov-svc" onClick={() => setRefer({ open: true, svc: sv.key })}>
+                          <span className="ov-svc-ic"><Svg html={sv.icon} /></span>
+                          <span className="ov-svc-t"><b>{sv.name}</b><small>{rate ? `Earn ${rate.amount}` : sv.tat}</small></span>
+                          <span className="ov-svc-go">Request →</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div> : null}
+              ) : null}
             </section>
           )}
 
@@ -341,7 +442,8 @@ export default function Dashboard() {
                     <select value={statusF} onChange={(e) => setStatusF(e.target.value)} style={{ font: '500 .84rem var(--font)', padding: '.55rem .8rem', border: '1px solid var(--line-strong)', borderRadius: 999, background: 'var(--surface)', color: 'var(--navy)' }}>
                       <option value="">All statuses</option><option>In Progress</option><option>Pending</option><option>Completed</option><option>On Hold</option>
                     </select>
-                    {can('create') ? <button className="btn btn-primary btn-sm" onClick={() => setRefer({ open: true })}>+ Add New Student</button> : null}
+                    {can('create') ? <button className="btn btn-ghost btn-sm" onClick={() => setImportOpen(true)}>Import from Excel</button> : null}
+                    {can('create') ? <button className="btn btn-primary btn-sm" onClick={() => setAddStudentOpen(true)}>+ Add student</button> : null}
                   </div>
                 </div>
                 <div style={{ overflowX: 'auto' }}>
@@ -355,7 +457,7 @@ export default function Dashboard() {
                             <td>{s.code}</td>
                             <td><div className="t-name">{s.name}</div><div className="t-sub">{s.phone}</div></td>
                             <td>{s.country}</td>
-                            <td>{latest ? serviceName(latest.service) : '—'}{s.requests.length > 1 ? <span className="t-sub"> +{s.requests.length - 1} more</span> : null}</td>
+                            <td>{latest ? serviceName(latest.service) : <span className="t-sub">No services yet</span>}{s.requests.length > 1 ? <span className="t-sub"> +{s.requests.length - 1} more</span> : null}</td>
                             <td>{latest ? <span className={`status ${statusClass(latest.status)}`}>{latest.status}</span> : null}</td>
                             <td>{latest ? <Prog v={latest.progress} /> : null}</td>
                             <td>{fmtDate(s.createdAt)}</td>
@@ -363,7 +465,7 @@ export default function Dashboard() {
                         );
                       })}
                       {students.data && !filteredStudents.length ? (
-                        <tr><td colSpan={7} className="empty-row">{studentList.length ? 'No students match your filters.' : 'No students yet. Use “+ Add New Student” to refer your first one.'}</td></tr>
+                        <tr><td colSpan={7} className="empty-row">{studentList.length ? 'No students match your filters.' : 'No students yet. Add one, or import your list from Excel.'}</td></tr>
                       ) : null}
                     </tbody>
                   </table>
@@ -648,6 +750,8 @@ export default function Dashboard() {
       <WithdrawModal open={withdrawOpen} wallet={wallet.data} isOwner={isOwner}
         onClose={() => setWithdrawOpen(false)} onDone={() => { wallet.reload(); dash.reload(); }} onAddMethod={() => setMethodOpen(true)} />
       <PayoutMethodModal open={methodOpen} onClose={() => setMethodOpen(false)} onDone={wallet.reload} />
+      <AddStudentModal open={addStudentOpen} onClose={() => setAddStudentOpen(false)} onDone={() => { students.reload(); dash.reload(); }} />
+      <ImportStudentsModal open={importOpen} onClose={() => setImportOpen(false)} onDone={() => { students.reload(); dash.reload(); }} />
       <CaseModal caseId={caseId} agent={agent} myName={myName} isOwner={isOwner} canChat={can('chat')} canUpload={can('upload')} onClose={() => setCaseId(null)} onChanged={refreshCases} onOpenRm={() => setRmOpen(true)} />
       <CommModal entry={commEntry} onClose={() => setCommEntry(null)} />
       <AgreementModal open={agrOpen} agent={agent} onClose={() => setAgrOpen(false)} onDownload={() => agreementAction('download')} />
@@ -663,14 +767,22 @@ export default function Dashboard() {
 }
 
 /* ---------- small pieces ---------- */
-function StatCard({ ic, icon, value, label }: { ic: string; icon: string; value: string; label: string }) {
-  return (
-    <div className="d-card">
-      <div className="dc-top"><span className={`dc-ic ${ic}`}><Svg html={icon} /></span></div>
-      <span className="num">{value}</span><span className="lbl">{label}</span>
-    </div>
-  );
-}
+/* Case status colours, the same set as the app (always shown with their label) */
+const PIPE = [
+  { key: 'In Progress', label: 'In progress', color: '#13BBF9' },
+  { key: 'Pending', label: 'Pending', color: '#F59E0B' },
+  { key: 'On Hold', label: 'On hold', color: '#EF4444' },
+  { key: 'Completed', label: 'Done', color: '#22C55E' },
+] as const;
+
+const greeting = () => {
+  const h = new Date().getHours();
+  return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+};
+
+const Kpi = ({ label, value, hint }: { label: string; value: string; hint: string }) => (
+  <div className="ov-kpi"><span>{label}</span><b>{value}</b><small>{hint}</small></div>
+);
 
 const Prog = ({ v }: { v: number }) => (
   <div className="prog-wrap"><div className="prog-track"><div className="prog-fill" style={{ width: `${v}%` }}></div></div><span>{v}%</span></div>
@@ -693,7 +805,7 @@ function SvcTile({ k, label, onRefer }: { k: string; label: string; onRefer?: (k
   );
 }
 
-const DONUT_COLORS = ['#0A66C2', '#2FA84F', '#0B2440', '#1B85E8', '#7BD795', '#F59E0B', '#5B6E84', '#B09DFF', '#0FA3B1'];
+const DONUT_COLORS = ['#0A66C2', '#2FA84F', '#0B2440', '#13BBF9', '#7BD795', '#F59E0B', '#5B6E84', '#B09DFF', '#0FA3B1'];
 function Donut({ mix }: { mix: { key: string; name: string; count: number }[] }) {
   const total = mix.reduce((n, m) => n + m.count, 0);
   const C = 2 * Math.PI * 15.9155;
@@ -763,48 +875,6 @@ function TeamRow({ name, email, role, status, menus, perms, owner, lastLoginAt, 
         )}
       </td>
     </tr>
-  );
-}
-
-/* ---------- the partner's own figures ---------- */
-function PartnerAnalytics({ a, money }: { a: import('../lib/api').Analytics; money: boolean }) {
-  const t = a.totals;
-  const pct = t.completionRate === null ? '–' : `${Math.round(t.completionRate * 100)}%`;
-  const d = t.avgDaysToComplete === null ? null : Math.round(t.avgDaysToComplete);
-  const days = d === null ? '–' : d < 1 ? 'Under a day' : `${d} day${d === 1 ? '' : 's'}`;
-  return (
-    <>
-      <div className="panel" style={{ marginBottom: '1.4rem' }}>
-        <div className="panel-h"><h3>Your performance</h3><span className="t-sub">All time</span></div>
-        <div className="panel-b pa-facts">
-          <div><b>{pct}</b><span>Cases completed</span></div>
-          <div><b>{days}</b><span>Average time to complete</span></div>
-          <div><b>{t.docsNeeded}</b><span>Documents still needed</span></div>
-          <div><b>{t.docsInReview}</b><span>Documents in review</span></div>
-          {money && a.money ? <div><b>{inr(a.money.pending)}</b><span>Commission pending</span></div> : null}
-        </div>
-      </div>
-      <div className="d-grid pa-grid">
-        <div className="panel">
-          <div className="panel-h"><h3>Referrals per month</h3><span className="t-sub">Last 6 months</span></div>
-          <div className="panel-b"><Columns data={a.monthly.map((m) => ({ label: monthLabel(m.month), value: m.count }))} color="#0A66C2" unit="cases" /></div>
-        </div>
-        {money && a.money ? (
-          <div className="panel">
-            <div className="panel-h"><h3>Earnings per month</h3><span className="t-sub">Last 6 months</span></div>
-            <div className="panel-b"><Columns data={a.money.monthly.map((m) => ({ label: monthLabel(m.month), value: m.amount }))} color="#1E7E39" money /></div>
-          </div>
-        ) : null}
-        <div className="panel">
-          <div className="panel-h"><h3>Cases by status</h3><span className="t-sub">{t.cases} in total</span></div>
-          <div className="panel-b"><StatusStack counts={a.byStatus} /></div>
-        </div>
-        <div className="panel">
-          <div className="panel-h"><h3>Cases by service</h3></div>
-          <div className="panel-b"><Ranked rows={a.byService} /></div>
-        </div>
-      </div>
-    </>
   );
 }
 
