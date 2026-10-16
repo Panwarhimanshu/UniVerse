@@ -1,7 +1,8 @@
 import { Redirect } from 'expo-router';
 import { Tabs } from 'expo-router/js-tabs';
-import { ColorValue, StyleSheet } from 'react-native';
+import { ColorValue } from 'react-native';
 import { Feather, IconName, Loading } from '../../components/ui';
+import { TabBar } from '../../components/TabBar';
 import { useAccess, useAuth } from '../../lib/auth';
 import { colors } from '../../theme';
 
@@ -15,12 +16,9 @@ export default function TabsLayout() {
 
   return (
     <Tabs
+      tabBar={(props) => <TabBar {...props} />}
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.faint,
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
-        tabBarStyle: { borderTopColor: colors.line, borderTopWidth: StyleSheet.hairlineWidth, backgroundColor: colors.bg, elevation: 0 },
         sceneStyle: { backgroundColor: colors.bg },
       }}
     >
