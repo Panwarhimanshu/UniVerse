@@ -6,7 +6,7 @@ import { adminApi } from './api';
 /* How partners use the app and the website. Counts people, not page loads, unless it says views. */
 
 const ACTION_LABEL: Record<string, string> = {
-  sign_in: 'Signed in', sign_up: 'Created an account', referral_created: 'Referred a student', message_sent: 'Sent a message',
+  sign_in: 'Signed in', sign_up: 'Created an account', student_added: 'Added a student', referral_created: 'Referred a student', message_sent: 'Sent a message',
   document_uploaded: 'Uploaded a document', services_raised: 'Raised more services', agreement_request: 'Asked about the agreement',
   withdrawal_requested: 'Requested a withdrawal', profile_photo: 'Changed their profile photo',
 };

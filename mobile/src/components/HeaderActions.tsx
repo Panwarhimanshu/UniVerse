@@ -21,14 +21,19 @@ export function NotificationBell() {
   );
 }
 
-/** Right side of a tab header: request a service (when allowed) and the bell */
-export function HeaderActions({ request = false }: { request?: boolean }) {
+/** Right side of a tab header: request a service or add a student (when allowed), and the bell */
+export function HeaderActions({ request = false, addStudent = false }: { request?: boolean; addStudent?: boolean }) {
   const { can } = useAccess();
   return (
     <View style={{ flexDirection: 'row', gap: space.sm }}>
       {request && can('create') ? (
         <Pressable onPress={() => router.push('/refer')} accessibilityLabel="Request a service" hitSlop={8} style={({ pressed }) => [styles.btn, pressed && { opacity: 0.7 }]}>
           <Feather name="plus" size={20} color={colors.text} />
+        </Pressable>
+      ) : null}
+      {addStudent && can('create') ? (
+        <Pressable onPress={() => router.push('/add-student')} accessibilityLabel="Add a student" hitSlop={8} style={({ pressed }) => [styles.btn, pressed && { opacity: 0.7 }]}>
+          <Feather name="user-plus" size={19} color={colors.text} />
         </Pressable>
       ) : null}
       <NotificationBell />

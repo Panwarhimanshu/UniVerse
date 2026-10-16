@@ -86,7 +86,7 @@ export default function StudentScreen() {
       </Section>
 
       {can('create') ? (
-        <Section title="Raise more services">
+        <Section title={student.requests.length ? "Raise more services" : "Request services"}>
           <Text style={[type.small, { marginBottom: space.md }]}>Tick everything this student needs. Each one becomes its own case.</Text>
           <View style={{ gap: space.sm }}>
             {services.data.map((s) => {

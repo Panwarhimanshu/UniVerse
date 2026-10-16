@@ -35,6 +35,25 @@ router.get('/students', needMenu('students'), async (req, res) => {
   res.json(students.map((s) => publicStudent(s, byStudent.get(String(s._id)) ?? [])));
 });
 
+/* Add a student record on its own; services are requested for them later (POST /requests with studentId) */
+router.post('/students', needMenu('students'), need('create'), async (req, res) => {
+  const agentId = agentIdOf(req);
+  const name = String(req.body?.name ?? '').trim();
+  const email = String(req.body?.email ?? '').trim().toLowerCase();
+  const phone = String(req.body?.phone ?? '').trim();
+  const country = req.body?.country;
+  if (!name) throw new HttpError(400, 'Student name is required');
+  if (!phone) throw new HttpError(400, 'Phone is required');
+  if (!EMAIL_RE.test(email)) throw new HttpError(400, 'Enter a valid student email');
+  if (!isCountry(country)) throw new HttpError(400, 'Select a destination');
+  const twin = await Student.findOne({ agent: agentId, $or: [{ email }, { phone }] }).select('name code');
+  if (twin) throw new HttpError(409, `${twin.name} (${twin.code}) already has this email or phone in your students`);
+  const count = await Student.countDocuments({ agent: agentId });
+  const s = await Student.create({ agent: agentId, code: `STU-${1011 + count}`, name, email, phone, country });
+  track(req, agentId, accessOf(req).memberId, 'student_added');
+  res.status(201).json(publicStudent(s, []));
+});
+
 router.patch('/students/:id', need('edit'), async (req, res) => {
   const agentId = agentIdOf(req);
   const s = await ownedStudent(agentId, String(req.params.id));

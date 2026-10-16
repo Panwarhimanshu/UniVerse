@@ -195,6 +195,7 @@ export const api = {
   },
 
   students: () => request<Student[]>('/students'),
+  addStudent: (b: { name: string; email: string; phone: string; country: string }) => post<Student>('/students', b),
   updateStudent: (id: string, b: Partial<Pick<Student, 'name' | 'email' | 'phone' | 'country'>>) => request<Student>(`/students/${id}`, json('PATCH', b)),
   raiseRequests: (id: string, services: string[]) => post<Student>(`/students/${id}/requests`, { services }),
 

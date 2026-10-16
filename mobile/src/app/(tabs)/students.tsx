@@ -29,7 +29,7 @@ export default function Students() {
 
   return (
     <Screen onRefresh={refresh} refreshing={refreshing}>
-      <Header left={<ProfileButton />} title="Students" right={<HeaderActions request />} />
+      <Header left={<ProfileButton />} title="Students" right={<HeaderActions addStudent />} />
 
       <View style={styles.search}>
         <Feather name="search" size={16} color={colors.faint} />
@@ -59,7 +59,7 @@ export default function Students() {
             })}
           </List>
         ) : (
-          <Empty text={data.length ? 'No students match your search.' : 'No students yet. Request a service with the + button to add one.'} />
+          <Empty text={data.length ? 'No students match your search.' : 'No students yet. Add your first one with the button at the top.'} />
         )
       ) : null}
     </Screen>
