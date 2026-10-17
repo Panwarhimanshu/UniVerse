@@ -111,13 +111,17 @@ router.patch('/me', requireAuth, ownerOnly, async (req, res) => {
 });
 
 /* Profile photo for whoever is signed in (the owner, or a team member for their own login) */
-const photo = multer({
+export const photo = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_AVATAR_BYTES },
   fileFilter: (_req, file, cb) => cb(null, /^image\/(jpeg|png|webp|heic|heif)$/.test(file.mimetype)),
 });
 
-const removePhoto = (ref: string) => (ref.startsWith('http') ? deleteImage(ref) : deleteFile(ref, 'avatars'));
+export const removePhoto = (ref: string) => (ref.startsWith('http') ? deleteImage(ref) : deleteFile(ref, 'avatars'));
+/** Cloudinary keeps photos on a fast image CDN (cropped and compressed); without it they go to MongoDB */
+export const storePhoto = (file: Express.Multer.File) => (cloudinaryReady()
+  ? uploadImage(file.buffer, file.mimetype, 'universe/avatars').catch((e) => { throw new HttpError(502, `Photo upload failed: ${e.message}`); })
+  : saveFile(file.buffer, file.originalname || 'photo', file.mimetype, 'avatars'));
 
 const meDoc = async (req: import('express').Request) => {
   const { memberId } = accessOf(req);
@@ -135,10 +139,7 @@ const meJson = async (req: import('express').Request) => {
 router.post('/me/avatar', requireAuth, photo.single('photo'), async (req, res) => {
   if (!req.file) throw new HttpError(400, 'Choose a JPG, PNG or WebP photo up to 2 MB');
   const doc = await meDoc(req);
-  // Cloudinary keeps photos on a fast image CDN (cropped and compressed); without it they go to MongoDB
-  const id = cloudinaryReady()
-    ? await uploadImage(req.file.buffer, req.file.mimetype, 'universe/avatars').catch((e) => { throw new HttpError(502, `Photo upload failed: ${e.message}`); })
-    : await saveFile(req.file.buffer, req.file.originalname || 'photo', req.file.mimetype, 'avatars');
+  const id = await storePhoto(req.file);
   const old = doc.avatar;
   doc.avatar = id;
   await doc.save();

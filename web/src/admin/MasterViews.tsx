@@ -4,11 +4,11 @@ import { SERVICES, serviceName } from '../data/services';
 import { fmtBlogDate } from '../data/blogs';
 import { builtInArticles, builtInService, loadSiteContent } from '../lib/content';
 import type { Article, ServiceOverride } from '../lib/content';
-import { fmtDate, fmtTime, inr, statusClass, useApi } from '../lib/hooks';
+import { fmtTime, useApi } from '../lib/hooks';
 import { useToast } from '../lib/toast';
 import { errMsg, Hero, Modal } from '../dashboard/modals';
 import { adminApi } from './api';
-import type { MasterSettings, PartnerFull, Section, StaffUser } from './api';
+import type { MasterSettings, Section, StaffUser } from './api';
 
 export const SECTION_LIST: [Section, string, string][] = [
   ['cases', 'Cases', 'Stages, documents, desk replies, commissions'],
@@ -165,140 +165,8 @@ function StaffModal({ open, staff, isSelf, onClose, onSaved }: { open: boolean; 
   );
 }
 
-/* ================= partner management (master) ================= */
-export function PartnerManageModal({ id, onClose, onChanged }: { id: string | null; onClose: () => void; onChanged: () => void }) {
-  const toast = useToast();
-  const [p, setP] = useState<PartnerFull | null>(null);
-  const [f, setF] = useState({ name: '', agency: '', email: '', phone: '', city: '', zone: 'WEST', bankAccount: '', validTill: '', autoRenew: true });
-  const [adj, setAdj] = useState({ amount: '', note: '' });
-  const [confirmEmail, setConfirmEmail] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  const load = () => {
-    if (!id) return;
-    adminApi.partner(id).then((x) => {
-      setP(x);
-      setF({
-        name: x.name, agency: x.agency, email: x.email, phone: x.phone, city: x.city, zone: x.zone, bankAccount: x.bankAccount,
-        validTill: x.agreement.validTill ? x.agreement.validTill.slice(0, 10) : '', autoRenew: x.agreement.autoRenew,
-      });
-    }).catch((e) => toast(errMsg(e)));
-  };
-  useEffect(() => { setP(null); setAdj({ amount: '', note: '' }); setConfirmEmail(''); load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const run = async (fn: () => Promise<unknown>, done: string) => {
-    setBusy(true);
-    try {
-      await fn();
-      toast(done);
-      load();
-      onChanged();
-    } catch (e) {
-      toast(errMsg(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-  const save = (e: FormEvent) => {
-    e.preventDefault();
-    if (!p) return;
-    const { validTill, autoRenew, ...rest } = f;
-    run(() => adminApi.editPartner(p.id, { ...rest, agreement: { validTill: validTill || undefined, autoRenew } }), 'Partner details saved');
-  };
-
-  return (
-    <Modal open={!!id} onClose={onClose}>
-      <Hero title={p ? p.agency || p.name : 'Loading…'} sub={p ? `${p.email} · joined ${fmtDate(p.partnerSince)}` : ''} onClose={onClose} />
-      {p ? (
-        <div className="modal-body">
-          <div className="adm-facts" style={{ flexWrap: 'wrap' }}>
-            <div><b>{inr(p.wallet.balance)}</b><span>Wallet balance</span></div>
-            <div><b>{inr(p.wallet.pending)}</b><span>Pending</span></div>
-            <div><b>{inr(p.wallet.lifetime)}</b><span>Lifetime earnings</span></div>
-            <div><b>{p.students}</b><span>Students</span></div>
-            <div><b><span className={`status ${p.suspended ? 'hold' : 'done'}`}>{p.suspended ? 'Suspended' : 'Active'}</span></b><span>Account</span></div>
-          </div>
-
-          <div className="m-sec">
-            <h4>Details</h4>
-            <form className="form-grid" onSubmit={save} noValidate>
-              <div className="field"><label htmlFor="mpName">Owner name</label><input id="mpName" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></div>
-              <div className="field"><label htmlFor="mpAgency">Agency</label><input id="mpAgency" value={f.agency} onChange={(e) => setF({ ...f, agency: e.target.value })} /></div>
-              <div className="field"><label htmlFor="mpEmail">Sign-in email</label><input id="mpEmail" type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></div>
-              <div className="field"><label htmlFor="mpPhone">Phone</label><input id="mpPhone" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></div>
-              <div className="field">
-                <label htmlFor="mpZone">Zone</label>
-                <select id="mpZone" value={f.zone} onChange={(e) => setF({ ...f, zone: e.target.value })}>
-                  {['NORTH', 'SOUTH', 'EAST', 'WEST'].map((z) => <option key={z} value={z}>{z[0] + z.slice(1).toLowerCase()}</option>)}
-                </select>
-              </div>
-              <div className="field"><label htmlFor="mpCity">City</label><input id="mpCity" value={f.city} onChange={(e) => setF({ ...f, city: e.target.value })} /></div>
-              <div className="field"><label htmlFor="mpValid">Agreement valid till</label><input id="mpValid" type="date" value={f.validTill} onChange={(e) => setF({ ...f, validTill: e.target.value })} /></div>
-              <div className="field" style={{ display: 'flex', alignItems: 'flex-end' }}>
-                <label className="remember" style={{ display: 'flex', gap: '.4rem', alignItems: 'center' }}><input type="checkbox" checked={f.autoRenew} onChange={(e) => setF({ ...f, autoRenew: e.target.checked })} /> Agreement auto-renews</label>
-              </div>
-              <div className="full m-cta"><button className="btn btn-primary" disabled={busy}>Save details</button></div>
-            </form>
-          </div>
-
-          <div className="m-sec">
-            <h4>Wallet correction <span className="hint">use a minus sign to deduct</span></h4>
-            <form className="adm-inline" onSubmit={(e) => {
-              e.preventDefault();
-              const amount = Math.round(Number(adj.amount));
-              if (!amount || !adj.note.trim()) return toast('Enter an amount and a reason');
-              if (!confirm(`${amount > 0 ? 'Credit' : 'Deduct'} ${inr(Math.abs(amount))} ${amount > 0 ? 'to' : 'from'} this wallet?`)) return;
-              run(() => adminApi.adjustWallet(p.id, amount, adj.note.trim()), 'Wallet updated').then(() => setAdj({ amount: '', note: '' }));
-            }}>
-              <input type="number" placeholder="Amount (₹)" value={adj.amount} onChange={(e) => setAdj({ ...adj, amount: e.target.value })} />
-              <input placeholder="Reason the partner will see" value={adj.note} onChange={(e) => setAdj({ ...adj, note: e.target.value })} />
-              <button className="btn btn-ghost btn-sm" disabled={busy}>Apply</button>
-            </form>
-            {p.transactions.length ? (
-              <ul className="adm-credits" style={{ marginTop: '.7rem' }}>
-                {p.transactions.slice(0, 8).map((t) => (
-                  <li key={t.id}><span>{fmtDate(t.date)} · {t.description} · {t.type === 'Credit' ? '+' : '−'}{inr(t.amount)}</span><span className={`status ${statusClass(t.status)}`}>{t.status}</span></li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
-
-          <div className="m-sec">
-            <h4>Team members</h4>
-            {p.team.length ? (
-              <ul className="adm-credits">
-                {p.team.map((m) => <li key={m.id}><span>{m.name} · {m.email} · {m.role}</span><span className={`status ${m.status === 'Active' ? 'done' : 'pend'}`}>{m.status}</span></li>)}
-              </ul>
-            ) : <p className="adm-meta">No team members.</p>}
-          </div>
-
-          <div className="m-sec adm-danger">
-            <h4>Account access</h4>
-            <p className="adm-meta">Suspending signs the partner and their team out and blocks sign-in. Their data is kept.</p>
-            <button className="btn btn-ghost" disabled={busy} onClick={() => {
-              if (!p.suspended && !confirm(`Suspend ${p.agency || p.name}?`)) return;
-              run(() => adminApi.editPartner(p.id, { suspended: !p.suspended }), p.suspended ? 'Partner reactivated' : 'Partner suspended');
-            }}>{p.suspended ? 'Reactivate account' : 'Suspend account'}</button>
-            <p className="adm-meta" style={{ marginTop: '1rem' }}>Deleting removes the partner, their students, cases, chats, uploads, wallet history and team for good. Type <b>{p.email}</b> to confirm.</p>
-            <div className="adm-inline">
-              <input placeholder={p.email} value={confirmEmail} onChange={(e) => setConfirmEmail(e.target.value)} />
-              <button className="btn btn-sm" style={{ background: '#B91C1C', color: '#fff' }} disabled={busy || confirmEmail.trim().toLowerCase() !== p.email}
-                onClick={async () => {
-                  setBusy(true);
-                  try {
-                    await adminApi.deletePartner(p.id, confirmEmail);
-                    toast('Partner deleted');
-                    onChanged();
-                    onClose();
-                  } catch (e) { toast(errMsg(e)); } finally { setBusy(false); }
-                }}>Delete permanently</button>
-            </div>
-          </div>
-        </div>
-      ) : <div className="modal-body"><div className="empty-state">Loading…</div></div>}
-    </Modal>
-  );
-}
+/* ================= partner management (master): see PartnerProfile.tsx ================= */
+export { PartnerManageModal } from './PartnerProfile';
 
 /* ================= services ================= */
 type ServiceRow = ServiceOverride & { current: { commission: { amount: string; note: string }; documents: string[] } };

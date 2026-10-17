@@ -1,20 +1,22 @@
 import { Router } from 'express';
+import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
+import multer from 'multer';
 import { Types } from 'mongoose';
 import {
   Admin, Agent, AgreementRequest, Announcement, Article, AuditLog, CommissionArchive, Device, Message, Notification, PayoutMethod, ServiceContent, ServiceRequest, Setting,
   UsageEvent,
-  STAFF_SECTIONS, Student, TeamMember, Transaction,
+  MENUS, PERMS, STAFF_SECTIONS, Student, TeamMember, Transaction,
 } from '../models/index.js';
 import { adminOf, HttpError } from '../middleware/auth.js';
 import { SERVICES, serviceByKey, ZONES } from '../data/catalog.js';
 import { getSettings, isServiceHidden, loadServiceContent, loadSettings, serviceOverrides } from '../content.js';
 import { publicAgent, publicTeamMember, publicTx } from '../serialize.js';
 import { publicArticle } from './content.js';
-import { deleteFile } from '../files.js';
-import { EMAIL_RE } from './auth.js';
+import { deleteFile, MAX_UPLOAD_BYTES, saveFile, sendDocFile } from '../files.js';
+import { EMAIL_RE, photo, removePhoto, storePhoto } from './auth.js';
 import { accountNotices, notify } from '../notify.js';
-import { syncWallet } from '../wallet.js';
+import { publicMethod, syncWallet } from '../wallet.js';
 
 /* Master admin only (mounted behind masterOnly in admin.ts). */
 const router = Router();
@@ -98,14 +100,28 @@ router.delete('/staff/:id', async (req, res) => {
 router.get('/partners/:id', async (req, res) => {
   const a = await Agent.findById(oid(req.params.id, 'Partner'));
   if (!a) throw new HttpError(404, 'Partner not found');
-  const [team, tx, students] = await Promise.all([
+  const [team, tx, students, methods, byStatus, recent, agreementRequests, lastSeen, devices] = await Promise.all([
     TeamMember.find({ agent: a._id }).sort({ createdAt: 1 }),
     Transaction.find({ agent: a._id }).sort({ date: -1 }).limit(50),
     Student.countDocuments({ agent: a._id }),
+    PayoutMethod.find({ agent: a._id }).sort({ isDefault: -1, createdAt: 1 }),
+    ServiceRequest.aggregate([{ $match: { agent: a._id } }, { $group: { _id: '$status', n: { $sum: 1 } } }]),
+    ServiceRequest.find({ agent: a._id }).sort({ createdAt: -1 }).limit(8).populate('student', 'name'),
+    AgreementRequest.find({ agent: a._id }).sort({ createdAt: -1 }).limit(10),
+    UsageEvent.findOne({ agent: a._id }).sort({ at: -1 }).select('at platform'),
+    Device.countDocuments({ agent: a._id }),
   ]);
   res.json({
     ...publicAgent(a), suspended: !!a.suspended, wallet: a.wallet, students,
     team: team.map(publicTeamMember), transactions: tx.map(publicTx),
+    payoutMethods: methods.map(publicMethod),
+    cases: Object.fromEntries(byStatus.map((r) => [r._id, r.n])),
+    recentCases: recent.map((r: any) => ({
+      id: String(r._id), ref: r.ref, service: serviceByKey(r.service)?.name ?? r.service, student: r.student?.name ?? '', status: r.status, createdAt: r.createdAt,
+    })),
+    agreementRequests: agreementRequests.map((r) => ({ id: String(r._id), type: r.type, status: r.status, outcome: r.outcome ?? '', createdAt: r.createdAt })),
+    lastSeen: lastSeen ? { at: lastSeen.at, platform: lastSeen.platform } : null,
+    devices,
   });
 });
 
@@ -137,6 +153,22 @@ router.patch('/partners/:id', async (req, res) => {
       a.set('agreement.validTill', d);
     }
     if (typeof b.agreement.autoRenew === 'boolean') a.set('agreement.autoRenew', b.agreement.autoRenew);
+    if (typeof b.agreement.number === 'string') a.set('agreement.number', b.agreement.number.trim());
+    if (b.agreement.signedAt) {
+      const d = new Date(b.agreement.signedAt);
+      if (Number.isNaN(d.getTime())) throw new HttpError(400, 'Enter a valid signing date');
+      a.set('agreement.signedAt', d);
+    }
+    if (b.agreement.status !== undefined) {
+      if (!['Active', 'Ending', 'Ended'].includes(b.agreement.status)) throw new HttpError(400, 'Unknown agreement status');
+      a.set('agreement.status', b.agreement.status);
+      if (b.agreement.status === 'Active') a.set('agreement.endsOn', null);
+    }
+    if (b.agreement.endsOn !== undefined && a.agreement?.status !== 'Active') {
+      const d = b.agreement.endsOn ? new Date(b.agreement.endsOn) : null;
+      if (d && Number.isNaN(d.getTime())) throw new HttpError(400, 'Enter a valid end date');
+      a.set('agreement.endsOn', d);
+    }
   }
   if (b.rm && typeof b.rm === 'object') {
     for (const k of ['name', 'email', 'phone'] as const) if (typeof b.rm[k] === 'string' && b.rm[k].trim()) a.set(`rm.${k}`, b.rm[k].trim());
@@ -147,6 +179,146 @@ router.patch('/partners/:id', async (req, res) => {
     ? `${a.agency || a.name}: ${b.suspended ? 'suspended' : 'reactivated'}`
     : `${a.agency || a.name}: details edited`;
   res.json({ ...publicAgent(a), suspended: !!a.suspended });
+});
+
+const partnerOf = async (id: unknown) => {
+  const a = await Agent.findById(oid(id, 'Partner'));
+  if (!a) throw new HttpError(404, 'Partner not found');
+  return a;
+};
+const memberOf = async (agent: Types.ObjectId, id: unknown) => {
+  const m = await TeamMember.findOne({ _id: oid(id, 'Team member'), agent });
+  if (!m) throw new HttpError(404, 'Team member not found');
+  return m;
+};
+const fullAgent = (a: any) => ({ ...publicAgent(a), suspended: !!a.suspended });
+
+/* Profile photo on the partner's behalf; ?member=<id> sets a team member's photo instead */
+router.post('/partners/:id/avatar', photo.single('photo'), async (req, res) => {
+  if (!req.file) throw new HttpError(400, 'Choose a JPG, PNG or WebP photo up to 2 MB');
+  const a = await partnerOf(req.params.id);
+  const doc: any = req.query.member ? await memberOf(a._id, req.query.member) : a;
+  const old = doc.avatar;
+  doc.avatar = await storePhoto(req.file);
+  await doc.save();
+  if (old) await removePhoto(old);
+  res.locals.audit = `${a.agency || a.name}: profile photo changed${req.query.member ? ` for ${doc.name}` : ''}`;
+  res.json({ avatar: doc.avatar });
+});
+
+router.delete('/partners/:id/avatar', async (req, res) => {
+  const a = await partnerOf(req.params.id);
+  const doc: any = req.query.member ? await memberOf(a._id, req.query.member) : a;
+  if (doc.avatar) await removePhoto(doc.avatar);
+  doc.avatar = '';
+  await doc.save();
+  res.locals.audit = `${a.agency || a.name}: profile photo removed${req.query.member ? ` for ${doc.name}` : ''}`;
+  res.json({ avatar: '' });
+});
+
+/* Signed agreement PDF: upload or replace, and remove */
+const agreementPdf = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_UPLOAD_BYTES },
+  fileFilter: (_req, file, cb) => cb(null, file.mimetype === 'application/pdf'),
+});
+router.post('/partners/:id/agreement-file', agreementPdf.single('file'), async (req, res) => {
+  if (!req.file) throw new HttpError(400, 'Choose the signed agreement as a PDF up to 4 MB');
+  const a = await partnerOf(req.params.id);
+  const old = a.agreement?.file;
+  a.set('agreement.file', await saveFile(req.file.buffer, req.file.originalname || 'agreement.pdf', 'application/pdf'));
+  a.set('agreement.fileName', req.file.originalname || `UniVerse agreement ${a.agreement?.number ?? ''}.pdf`.trim());
+  a.set('agreement.fileAt', new Date());
+  await a.save();
+  if (old) await deleteFile(old);
+  await notify({
+    agent: a._id, audience: 'owner', category: 'account', type: 'account.agreement_sent',
+    title: 'Your signed agreement is ready', body: 'Download it from Profile → Agreement.', link: { kind: 'profile' },
+  });
+  res.locals.audit = `${a.agency || a.name}: agreement PDF uploaded`;
+  res.json(fullAgent(a));
+});
+router.get('/partners/:id/agreement-file', async (req, res) => {
+  const a = await partnerOf(req.params.id);
+  if (!a.agreement?.file) throw new HttpError(404, 'No signed agreement on file');
+  await sendDocFile(res, a.agreement.file, a.agreement.fileName || 'UniVerse agreement.pdf');
+});
+router.delete('/partners/:id/agreement-file', async (req, res) => {
+  const a = await partnerOf(req.params.id);
+  if (a.agreement?.file) await deleteFile(a.agreement.file);
+  a.set('agreement.file', '');
+  a.set('agreement.fileName', '');
+  a.set('agreement.fileAt', null);
+  await a.save();
+  res.locals.audit = `${a.agency || a.name}: agreement PDF removed`;
+  res.json(fullAgent(a));
+});
+
+/* Payout methods: the desk can remove a wrong UPI ID or bank account, or change the default.
+   Partners add new ones themselves, since the account holder has to confirm the details. */
+router.delete('/partners/:id/methods/:mid', async (req, res) => {
+  const a = await partnerOf(req.params.id);
+  const m = await PayoutMethod.findOne({ _id: oid(req.params.mid, 'Payout method'), agent: a._id });
+  if (!m) throw new HttpError(404, 'Payout method not found');
+  await m.deleteOne();
+  if (m.isDefault) {
+    const next = await PayoutMethod.findOne({ agent: a._id }).sort({ createdAt: 1 });
+    if (next) await PayoutMethod.updateOne({ _id: next._id }, { isDefault: true });
+  }
+  res.locals.audit = `${a.agency || a.name}: payout method removed (${publicMethod(m).label})`;
+  res.status(204).end();
+});
+router.post('/partners/:id/methods/:mid/default', async (req, res) => {
+  const a = await partnerOf(req.params.id);
+  const m = await PayoutMethod.findOne({ _id: oid(req.params.mid, 'Payout method'), agent: a._id });
+  if (!m) throw new HttpError(404, 'Payout method not found');
+  await PayoutMethod.updateMany({ agent: a._id }, { isDefault: false });
+  await PayoutMethod.updateOne({ _id: m._id }, { isDefault: true });
+  res.locals.audit = `${a.agency || a.name}: default payout method set to ${publicMethod(m).label}`;
+  res.status(204).end();
+});
+
+/* Team members */
+router.patch('/partners/:id/team/:mid', async (req, res) => {
+  const a = await partnerOf(req.params.id);
+  const m = await memberOf(a._id, req.params.mid);
+  const b = req.body ?? {};
+  if (b.name !== undefined) {
+    if (!String(b.name).trim()) throw new HttpError(400, 'Name is required');
+    m.name = String(b.name).trim();
+  }
+  if (b.email !== undefined) {
+    const e = String(b.email).trim().toLowerCase();
+    if (!EMAIL_RE.test(e)) throw new HttpError(400, 'Enter a valid email');
+    if (e !== m.email && ((await Agent.exists({ email: e })) || (await TeamMember.exists({ email: e })))) throw new HttpError(409, 'Another account already uses this email');
+    m.email = e;
+  }
+  if (b.role !== undefined) m.role = b.role === 'Manager' ? 'Manager' : 'Staff';
+  if (Array.isArray(b.menus)) m.set('menus', b.menus.filter((x: string) => (MENUS as readonly string[]).includes(x)));
+  if (Array.isArray(b.perms)) m.set('perms', b.perms.filter((x: string) => (PERMS as readonly string[]).includes(x)));
+  await m.save();
+  res.locals.audit = `${a.agency || a.name}: team member ${m.name} edited`;
+  res.json(publicTeamMember(m));
+});
+/* Sets a temporary password and returns it once, so the desk can pass it on */
+router.post('/partners/:id/team/:mid/reset-password', async (req, res) => {
+  const a = await partnerOf(req.params.id);
+  const m = await memberOf(a._id, req.params.mid);
+  const password = crypto.randomBytes(6).toString('base64url');
+  m.passwordHash = await bcrypt.hash(password, 10);
+  m.status = 'Active';
+  await m.save();
+  res.locals.audit = `${a.agency || a.name}: password reset for team member ${m.name}`;
+  res.json({ password });
+});
+router.delete('/partners/:id/team/:mid', async (req, res) => {
+  const a = await partnerOf(req.params.id);
+  const m = await memberOf(a._id, req.params.mid);
+  if (m.avatar) await removePhoto(m.avatar);
+  await m.deleteOne();
+  await Promise.all([Notification.deleteMany({ member: m._id }), Device.deleteMany({ member: m._id })]);
+  res.locals.audit = `${a.agency || a.name}: team member ${m.name} removed`;
+  res.status(204).end();
 });
 
 /* Manual wallet correction. Positive amounts credit, negative amounts debit; both are recorded as transactions. */

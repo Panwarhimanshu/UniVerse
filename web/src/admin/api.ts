@@ -1,5 +1,5 @@
 import { json, makeRequest, tokenStore } from '../lib/api';
-import type { Agent, Case, CaseStatus, Message, TeamMember, Transaction } from '../lib/api';
+import type { Agent, Case, CaseStatus, Message, PayoutMethod, TeamMember, Transaction } from '../lib/api';
 import type { Article, ServiceOverride } from '../lib/content';
 
 export type Section = 'cases' | 'partners' | 'messages' | 'payouts' | 'agreements';
@@ -13,6 +13,12 @@ export interface MasterSettings {
 export interface PartnerFull extends Omit<Agent, 'member'> {
   suspended: boolean; wallet: { balance: number; pending: number; lifetime: number }; students: number;
   team: TeamMember[]; transactions: Transaction[];
+  payoutMethods: PayoutMethod[];
+  cases: Partial<Record<CaseStatus, number>>;
+  recentCases: { id: string; ref: string; service: string; student: string; status: CaseStatus; createdAt: string }[];
+  agreementRequests: { id: string; type: 'download' | 'discussion' | 'termination'; status: 'Open' | 'Closed'; outcome: string; createdAt: string }[];
+  lastSeen: { at: string; platform: 'app' | 'web' } | null;
+  devices: number;
 }
 export interface Stats {
   partners: { total: number; newThisMonth: number; suspended: number };
@@ -125,6 +131,24 @@ export const adminApi = {
   partner: (id: string) => request<PartnerFull>(`/admin/master/partners/${id}`),
   editPartner: (id: string, b: Record<string, unknown>) => request<Agent>(`/admin/master/partners/${id}`, json('PATCH', b)),
   adjustWallet: (id: string, amount: number, note: string) => request<{ wallet: PartnerFull['wallet'] }>(`/admin/master/partners/${id}/adjust`, json('POST', { amount, note })),
+  partnerPhoto: (id: string, file: File, member?: string) => {
+    const form = new FormData();
+    form.append('photo', file);
+    return request<{ avatar: string }>(`/admin/master/partners/${id}/avatar${member ? `?member=${member}` : ''}`, { method: 'POST', body: form });
+  },
+  removePartnerPhoto: (id: string, member?: string) => request<{ avatar: string }>(`/admin/master/partners/${id}/avatar${member ? `?member=${member}` : ''}`, json('DELETE')),
+  uploadAgreement: (id: string, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return request<Agent>(`/admin/master/partners/${id}/agreement-file`, { method: 'POST', body: form });
+  },
+  removeAgreement: (id: string) => request<Agent>(`/admin/master/partners/${id}/agreement-file`, json('DELETE')),
+  downloadAgreement: (id: string, name: string) => download(`/admin/master/partners/${id}/agreement-file`, name),
+  removeMethod: (id: string, mid: string) => request<void>(`/admin/master/partners/${id}/methods/${mid}`, json('DELETE')),
+  defaultMethod: (id: string, mid: string) => request<void>(`/admin/master/partners/${id}/methods/${mid}/default`, json('POST')),
+  editMember: (id: string, mid: string, b: Partial<Pick<TeamMember, 'name' | 'email' | 'role' | 'menus' | 'perms'>>) => request<TeamMember>(`/admin/master/partners/${id}/team/${mid}`, json('PATCH', b)),
+  resetMember: (id: string, mid: string) => request<{ password: string }>(`/admin/master/partners/${id}/team/${mid}/reset-password`, json('POST')),
+  removeMember: (id: string, mid: string) => request<void>(`/admin/master/partners/${id}/team/${mid}`, json('DELETE')),
   deletePartner: (id: string, confirm: string) => request<void>(`/admin/master/partners/${id}`, json('DELETE', { confirm })),
 
   services: () => request<ServiceOverride[]>('/admin/master/services'),

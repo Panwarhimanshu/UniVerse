@@ -10,7 +10,7 @@ import { fileSize, fmtDate, fmtTime, inr, initials, statusClass, useInterval } f
 import { useToast } from '../lib/toast';
 
 /* ---------- modal shell ---------- */
-export function Modal({ open, onClose, children }: { open: boolean; onClose: () => void; children: ReactNode }) {
+export function Modal({ open, onClose, children, className = '' }: { open: boolean; onClose: () => void; children: ReactNode; className?: string }) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -20,7 +20,7 @@ export function Modal({ open, onClose, children }: { open: boolean; onClose: () 
   }, [open, onClose]);
   return (
     <div className={`modal-veil${open ? ' open' : ''}`} role="dialog" aria-modal="true" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal">{open ? children : null}</div>
+      <div className={`modal ${className}`.trim()}>{open ? children : null}</div>
     </div>
   );
 }
