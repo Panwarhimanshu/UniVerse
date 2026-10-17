@@ -45,11 +45,11 @@ export function UsageView() {
       <div className="d-grid pa-grid">
         <div className="panel">
           <div className="panel-h"><h3>People using the app each day</h3></div>
-          <div className="panel-b">{d ? <Columns data={d.daily.map((r) => ({ label: dayLabel(r.day), value: r.app }))} color="#0A66C2" unit="daily visitors" period={period} lastNote="today" labelEvery={every} /> : <Skeleton />}</div>
+          <div className="panel-b">{d ? <Columns data={d.daily.map((r) => ({ label: dayLabel(r.day), value: r.app }))} color="#1453A5" unit="daily visitors" period={period} lastNote="today" labelEvery={every} /> : <Skeleton />}</div>
         </div>
         <div className="panel">
           <div className="panel-h"><h3>People using the website each day</h3></div>
-          <div className="panel-b">{d ? <Columns data={d.daily.map((r) => ({ label: dayLabel(r.day), value: r.web }))} color="#0A66C2" unit="daily visitors" period={period} lastNote="today" labelEvery={every} /> : <Skeleton />}</div>
+          <div className="panel-b">{d ? <Columns data={d.daily.map((r) => ({ label: dayLabel(r.day), value: r.web }))} color="#1453A5" unit="daily visitors" period={period} lastNote="today" labelEvery={every} /> : <Skeleton />}</div>
         </div>
         <div className="panel">
           <div className="panel-h"><h3>Most opened screens</h3><span className="t-sub">Views</span></div>

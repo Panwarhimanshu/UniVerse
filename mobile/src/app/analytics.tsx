@@ -11,7 +11,7 @@ import { colors, radius, space, type } from '../theme';
 
 /* Same status colours as the website charts, always shown with their label. */
 const STATUS_ORDER: CaseStatus[] = ['Completed', 'In Progress', 'Pending', 'On Hold'];
-const STATUS_COLOR: Record<CaseStatus, string> = { Completed: '#1E7E39', 'In Progress': '#0A66C2', Pending: '#D97706', 'On Hold': '#B91C1C' };
+const STATUS_COLOR: Record<CaseStatus, string> = { Completed: '#1E7E39', 'In Progress': '#1453A5', Pending: '#D97706', 'On Hold': '#B91C1C' };
 
 const monthLabel = (key: string) => new Date(`${key}-01T00:00:00`).toLocaleDateString('en-GB', { month: 'short' });
 const compact = (n: number) => (n >= 1e7 ? `${+(n / 1e7).toFixed(1)}Cr` : n >= 1e5 ? `${+(n / 1e5).toFixed(1)}L` : n >= 1000 ? `${+(n / 1000).toFixed(1)}K` : String(n));

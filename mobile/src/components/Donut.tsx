@@ -4,7 +4,7 @@ import Svg, { Circle, G, Path } from 'react-native-svg';
 import { colors, radius, space, type } from '../theme';
 
 /* Same colours, in the same order, as the service mix on the partner portal */
-export const MIX_COLORS = ['#0A66C2', '#2FA84F', '#0B2440', '#13BBF9', '#7BD795', '#F59E0B', '#5B6E84', '#B09DFF', '#0FA3B1'];
+export const MIX_COLORS = ['#1453A5', '#47B378', '#16347B', '#21BFD3', '#7BD795', '#F59E0B', '#5B6E84', '#B09DFF', '#0FA3B1'];
 
 export interface Slice { key: string; name: string; count: number }
 

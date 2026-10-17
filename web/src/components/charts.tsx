@@ -6,7 +6,7 @@ import { inr } from '../lib/hooks';
 
 /* Status colours: validated as a set (CVD + contrast) in this exact order; always shown with their label. */
 export const STATUS_ORDER: CaseStatus[] = ['Completed', 'In Progress', 'Pending', 'On Hold'];
-export const STATUS_COLOR: Record<CaseStatus, string> = { Completed: '#1E7E39', 'In Progress': '#0A66C2', Pending: '#D97706', 'On Hold': '#B91C1C' };
+export const STATUS_COLOR: Record<CaseStatus, string> = { Completed: '#1E7E39', 'In Progress': '#1453A5', Pending: '#D97706', 'On Hold': '#B91C1C' };
 
 export const monthLabel = (key: string) => new Date(`${key}-01T00:00:00`).toLocaleDateString('en-GB', { month: 'short' });
 export const compact = (n: number) => (n >= 1e7 ? `${+(n / 1e7).toFixed(1)}Cr` : n >= 1e5 ? `${+(n / 1e5).toFixed(1)}L` : n >= 1000 ? `${+(n / 1000).toFixed(1)}K` : String(n));
@@ -89,7 +89,7 @@ export function Columns({ data, color, unit = '', money = false, period = 'over 
             const r = Math.min(4, h);
             return (
               <g key={d.label} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
-                <rect x={L + band * i} y={T} width={band} height={H - T - B} fill={hover === i ? 'rgba(10,102,194,.05)' : 'transparent'} />
+                <rect x={L + band * i} y={T} width={band} height={H - T - B} fill={hover === i ? 'rgba(20,83,165,.05)' : 'transparent'} />
                 {d.value > 0 ? (
                   <path d={`M${cx - bw / 2},${H - B} V${top + r} Q${cx - bw / 2},${top} ${cx - bw / 2 + r},${top} H${cx + bw / 2 - r} Q${cx + bw / 2},${top} ${cx + bw / 2},${top + r} V${H - B} Z`}
                     fill={color} opacity={hover === null || hover === i ? 1 : 0.55} />

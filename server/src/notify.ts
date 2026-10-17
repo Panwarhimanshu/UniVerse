@@ -74,7 +74,7 @@ async function push(tokens: string[], n: { id: string; title: string; body: stri
     tokens,
     notification: { title: n.title, body: n.body.slice(0, 240) },
     data: { notificationId: n.id, kind: n.link.kind, id: n.link.id ?? '' },
-    android: { priority: 'high', notification: { channelId: 'updates', color: '#0A66C2' } },
+    android: { priority: 'high', notification: { channelId: 'updates', color: '#1453A5' } },
   });
   // forget phones that uninstalled the app or whose token expired
   const dead = res.responses

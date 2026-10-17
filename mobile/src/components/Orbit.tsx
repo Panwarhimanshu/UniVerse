@@ -15,7 +15,7 @@ export function Orbit() {
         </Defs>
         <Rect width="100%" height="100%" fill="url(#glow)" />
         <Circle cx="96%" cy="-10%" r="120" stroke="#FFFFFF" strokeOpacity={0.1} strokeWidth={22} fill="none" />
-        <Circle cx="96%" cy="-10%" r="170" stroke={colors.secondary} strokeOpacity={0.7} strokeWidth={1.5} fill="none" />
+        <Circle cx="96%" cy="-10%" r="170" stroke={colors.lime} strokeOpacity={0.55} strokeWidth={1.5} fill="none" />
       </Svg>
     </View>
   );

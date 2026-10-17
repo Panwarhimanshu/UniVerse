@@ -1,17 +1,19 @@
-/* Minimal design tokens — derived from the web prototype palette, pared back */
+/* Design tokens. Brand palette: blue #1453A5, cyan #21BFD3, navy #16347B, green #47B378, lime #7EFF00 */
 
 export const colors = {
   bg: '#FFFFFF',
   surface: '#F6F8FB',
-  text: '#0B2440', // navy
+  text: '#16347B', // navy
   muted: '#6B7C90',
   faint: '#A3B1C2',
   line: '#E7ECF2',
-  primary: '#0A66C2', // brand blue: buttons, selected states, the main cards
-  secondary: '#13BBF9', // brand sky blue: highlights and accents next to the primary
-  secondaryTint: '#E4F7FE',
-  accent: '#0A66C2', // same as primary (older name, kept so existing screens keep working)
-  accentTint: '#EAF2FB',
+  primary: '#1453A5', // brand blue: buttons, selected states, the main cards
+  secondary: '#21BFD3', // brand sky blue: highlights and accents next to the primary
+  secondaryTint: '#E2F6F9',
+  green: '#47B378', // brand green: success fills and charts
+  lime: '#7EFF00', // brand lime (the leaf in the logo): small accents on blue only
+  accent: '#1453A5', // same as primary (older name, kept so existing screens keep working)
+  accentTint: '#E8EFF9',
   positive: '#1E7E39',
   positiveTint: '#E8F5EC',
   warning: '#B45309',

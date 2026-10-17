@@ -22,14 +22,14 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 /** A plain, branded email: greeting, paragraphs, optional button. */
 export function layout({ greeting, paragraphs, button }: { greeting: string; paragraphs: string[]; button?: { label: string; url: string } }) {
   const s = getSettings();
-  const html = `<!doctype html><html><body style="margin:0;background:#F4F7FB;font-family:Arial,Helvetica,sans-serif;color:#0B2440">
+  const html = `<!doctype html><html><body style="margin:0;background:#F4F7FB;font-family:Arial,Helvetica,sans-serif;color:#16347B">
 <table width="100%" cellpadding="0" cellspacing="0" style="padding:24px 12px"><tr><td align="center">
 <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fff;border-radius:12px;border:1px solid #E7ECF2">
-<tr><td style="padding:22px 28px;border-bottom:1px solid #E7ECF2;font-weight:700;font-size:18px;color:#0A66C2">UniVerse Partner Portal</td></tr>
+<tr><td style="padding:22px 28px;border-bottom:1px solid #E7ECF2;font-weight:700;font-size:18px;color:#1453A5">UniVerse Partner Portal</td></tr>
 <tr><td style="padding:24px 28px;font-size:15px;line-height:1.6">
 <p style="margin:0 0 14px">${esc(greeting)}</p>
 ${paragraphs.map((p) => `<p style="margin:0 0 14px">${esc(p)}</p>`).join('')}
-${button ? `<p style="margin:22px 0"><a href="${esc(button.url)}" style="background:#0A66C2;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:700;display:inline-block">${esc(button.label)}</a></p>` : ''}
+${button ? `<p style="margin:22px 0"><a href="${esc(button.url)}" style="background:#1453A5;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:700;display:inline-block">${esc(button.label)}</a></p>` : ''}
 </td></tr>
 <tr><td style="padding:16px 28px;border-top:1px solid #E7ECF2;font-size:12px;color:#6B7C90">Questions? ${esc(s.supportEmail)} · ${esc(s.supportPhone)}</td></tr>
 </table></td></tr></table></body></html>`;

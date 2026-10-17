@@ -104,10 +104,10 @@ export const routeFor = (link: NotificationLink): string | null => ({
 } as Record<NotificationLink['kind'], string | null>)[link.kind] ?? null;
 
 export const CATEGORY_META: Record<NotificationCategory, { label: string; icon: IconName; color: string }> = {
-  case: { label: 'Cases', icon: 'folder', color: '#0A66C2' },
+  case: { label: 'Cases', icon: 'folder', color: '#1453A5' },
   document: { label: 'Documents', icon: 'file-text', color: '#B45309' },
-  message: { label: 'Messages', icon: 'message-circle', color: '#0A66C2' },
+  message: { label: 'Messages', icon: 'message-circle', color: '#1453A5' },
   payment: { label: 'Payments', icon: 'credit-card', color: '#1E7E39' },
-  account: { label: 'Account', icon: 'user-check', color: '#0B2440' },
+  account: { label: 'Account', icon: 'user-check', color: '#16347B' },
   announcement: { label: 'News', icon: 'volume-2', color: '#7C3AED' },
 };

@@ -22,7 +22,7 @@ export async function registerForPush() {
       await Notifications.setNotificationChannelAsync('updates', {
         name: 'Case updates and messages',
         importance: Notifications.AndroidImportance.HIGH,
-        lightColor: '#0A66C2',
+        lightColor: '#1453A5',
       });
     }
     let { status } = await Notifications.getPermissionsAsync();

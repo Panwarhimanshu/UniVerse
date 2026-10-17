@@ -99,7 +99,7 @@ export default function AdminDashboard({ go, canUse, isMaster, name, overview }:
       <div className="adm-grid">
         <div className="panel">
           <div className="panel-h"><h3>New cases per month</h3><span className="t-sub">Last 6 months</span></div>
-          <div className="panel-b">{s ? <Columns data={s.cases.monthly.map((m) => ({ label: monthLabel(m.month), value: m.count }))} color="#0A66C2" unit="cases" /> : <Skeleton />}</div>
+          <div className="panel-b">{s ? <Columns data={s.cases.monthly.map((m) => ({ label: monthLabel(m.month), value: m.count }))} color="#1453A5" unit="cases" /> : <Skeleton />}</div>
         </div>
         {s?.money ? (
           <div className="panel">

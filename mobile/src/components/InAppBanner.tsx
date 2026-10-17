@@ -48,7 +48,7 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: radius.md, backgroundColor: colors.bg,
     borderWidth: StyleSheet.hairlineWidth, borderColor: colors.line,
-    shadowColor: '#0B2440', shadowOpacity: 0.15, shadowRadius: 16, shadowOffset: { width: 0, height: 6 },
+    shadowColor: '#16347B', shadowOpacity: 0.15, shadowRadius: 16, shadowOffset: { width: 0, height: 6 },
   },
   icon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
 });

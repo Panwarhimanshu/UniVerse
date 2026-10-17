@@ -283,10 +283,10 @@ export default function Dashboard() {
                 {sees('wallet') ? (
                   <div className="ov-wallet">
                     <svg className="ov-orbit" viewBox="0 0 300 200" preserveAspectRatio="xMaxYMin slice" aria-hidden="true">
-                      <defs><radialGradient id="ovGlow" cx="100%" cy="0%" r="90%"><stop offset="0" stopColor="#13BBF9" stopOpacity=".55" /><stop offset="1" stopColor="#13BBF9" stopOpacity="0" /></radialGradient></defs>
+                      <defs><radialGradient id="ovGlow" cx="100%" cy="0%" r="90%"><stop offset="0" stopColor="#21BFD3" stopOpacity=".55" /><stop offset="1" stopColor="#21BFD3" stopOpacity="0" /></radialGradient></defs>
                       <rect width="300" height="200" fill="url(#ovGlow)" />
                       <circle cx="290" cy="-20" r="110" fill="none" stroke="#fff" strokeOpacity=".1" strokeWidth="20" />
-                      <circle cx="290" cy="-20" r="160" fill="none" stroke="#13BBF9" strokeOpacity=".7" strokeWidth="1.2" />
+                      <circle cx="290" cy="-20" r="160" fill="none" stroke="#7EFF00" strokeOpacity=".55" strokeWidth="1.2" />
                     </svg>
                     <span className="ov-k">Wallet balance</span>
                     <b className="ov-v">{stats ? inr(stats.balance ?? 0) : '–'}</b>
@@ -355,12 +355,12 @@ export default function Dashboard() {
                 <div className="d-grid pa-grid">
                   <div className="panel">
                     <div className="panel-h"><h3>Requests per month</h3><span className="t-sub">Last 6 months</span></div>
-                    <div className="panel-b"><Columns data={analytics.data.monthly.map((m) => ({ label: monthLabel(m.month), value: m.count }))} color="#0A66C2" unit="cases" /></div>
+                    <div className="panel-b"><Columns data={analytics.data.monthly.map((m) => ({ label: monthLabel(m.month), value: m.count }))} color="#1453A5" unit="cases" /></div>
                   </div>
                   {sees('wallet') && analytics.data.money ? (
                     <div className="panel">
                       <div className="panel-h"><h3>Earnings per month</h3><span className="t-sub">Last 6 months</span></div>
-                      <div className="panel-b"><Columns data={analytics.data.money.monthly.map((m) => ({ label: monthLabel(m.month), value: m.amount }))} color="#13BBF9" money /></div>
+                      <div className="panel-b"><Columns data={analytics.data.money.monthly.map((m) => ({ label: monthLabel(m.month), value: m.amount }))} color="#21BFD3" money /></div>
                     </div>
                   ) : null}
                 </div>
@@ -769,10 +769,10 @@ export default function Dashboard() {
 /* ---------- small pieces ---------- */
 /* Case status colours, the same set as the app (always shown with their label) */
 const PIPE = [
-  { key: 'In Progress', label: 'In progress', color: '#13BBF9' },
+  { key: 'In Progress', label: 'In progress', color: '#21BFD3' },
   { key: 'Pending', label: 'Pending', color: '#F59E0B' },
   { key: 'On Hold', label: 'On hold', color: '#EF4444' },
-  { key: 'Completed', label: 'Done', color: '#22C55E' },
+  { key: 'Completed', label: 'Done', color: '#47B378' },
 ] as const;
 
 const greeting = () => {
@@ -805,7 +805,7 @@ function SvcTile({ k, label, onRefer }: { k: string; label: string; onRefer?: (k
   );
 }
 
-const DONUT_COLORS = ['#0A66C2', '#2FA84F', '#0B2440', '#13BBF9', '#7BD795', '#F59E0B', '#5B6E84', '#B09DFF', '#0FA3B1'];
+const DONUT_COLORS = ['#1453A5', '#47B378', '#16347B', '#21BFD3', '#7BD795', '#F59E0B', '#5B6E84', '#B09DFF', '#0FA3B1'];
 function Donut({ mix }: { mix: { key: string; name: string; count: number }[] }) {
   const total = mix.reduce((n, m) => n + m.count, 0);
   const C = 2 * Math.PI * 15.9155;

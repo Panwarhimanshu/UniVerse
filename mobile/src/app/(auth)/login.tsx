@@ -45,7 +45,7 @@ export default function Login() {
   return (
       <Screen edges={['top', 'bottom']}>
         <View style={{ paddingTop: space.xxl * 1.5 }}>
-          <Image source={require('../../../assets/logo.png')} style={{ width: 132, height: 113 }} resizeMode="contain" />
+          <Image source={require('../../../assets/logo.png')} style={{ width: 236, height: 45 }} resizeMode="contain" accessibilityLabel="UniVerse" />
           <Text style={[type.display, { marginTop: space.xxl }]}>Partner sign in</Text>
           <Text style={[type.small, { marginTop: space.xs, marginBottom: space.xxl }]}>
             Service requests, case tracking and your wallet in one place.

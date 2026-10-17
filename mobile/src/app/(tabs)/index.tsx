@@ -15,7 +15,7 @@ import { colors, radius, space, type } from '../../theme';
 
 /* Case status colours, the same set the website uses, always shown with their label */
 const PIPE = [
-  { key: 'In Progress', label: 'In progress', color: '#13BBF9' },
+  { key: 'In Progress', label: 'In progress', color: '#21BFD3' },
   { key: 'Pending', label: 'Pending', color: '#FCD34D' },
   { key: 'On Hold', label: 'On hold', color: '#FCA5A5' },
   { key: 'Completed', label: 'Done', color: '#86EFAC' },
