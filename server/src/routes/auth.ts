@@ -12,6 +12,7 @@ import { track } from '../usage.js';
 import { checkAttempts, clearAttempts, recordFailure } from '../limits.js';
 import { layout, sendMail, siteUrl } from '../mail.js';
 import { notify } from '../notify.js';
+import { cloudinaryReady, deleteImage, uploadImage } from '../cloudinary.js';
 
 const router = Router();
 export const SUSPENDED = 'This partner account is suspended. Please contact UniVerse support.';
@@ -116,6 +117,8 @@ const photo = multer({
   fileFilter: (_req, file, cb) => cb(null, /^image\/(jpeg|png|webp|heic|heif)$/.test(file.mimetype)),
 });
 
+const removePhoto = (ref: string) => (ref.startsWith('http') ? deleteImage(ref) : deleteFile(ref, 'avatars'));
+
 const meDoc = async (req: import('express').Request) => {
   const { memberId } = accessOf(req);
   const doc = memberId ? await TeamMember.findById(memberId) : await Agent.findById(agentIdOf(req));
@@ -132,18 +135,21 @@ const meJson = async (req: import('express').Request) => {
 router.post('/me/avatar', requireAuth, photo.single('photo'), async (req, res) => {
   if (!req.file) throw new HttpError(400, 'Choose a JPG, PNG or WebP photo up to 2 MB');
   const doc = await meDoc(req);
-  const id = await saveFile(req.file.buffer, req.file.originalname || 'photo', req.file.mimetype, 'avatars');
+  // Cloudinary keeps photos on a fast image CDN (cropped and compressed); without it they go to MongoDB
+  const id = cloudinaryReady()
+    ? await uploadImage(req.file.buffer, req.file.mimetype, 'universe/avatars').catch((e) => { throw new HttpError(502, `Photo upload failed: ${e.message}`); })
+    : await saveFile(req.file.buffer, req.file.originalname || 'photo', req.file.mimetype, 'avatars');
   const old = doc.avatar;
   doc.avatar = id;
   await doc.save();
-  if (old) await deleteFile(old, 'avatars');
+  if (old) await removePhoto(old);
   track(req, agentIdOf(req), accessOf(req).memberId, 'profile_photo');
   res.json(await meJson(req));
 });
 
 router.delete('/me/avatar', requireAuth, async (req, res) => {
   const doc = await meDoc(req);
-  if (doc.avatar) await deleteFile(doc.avatar, 'avatars');
+  if (doc.avatar) await removePhoto(doc.avatar);
   doc.avatar = '';
   await doc.save();
   res.json(await meJson(req));

@@ -7,7 +7,10 @@ export interface Agent {
   rm: { name: string; email: string; phone: string };
   bankAccount: string;
   avatar: string;
-  agreement: { number: string; signedAt: string; validTill: string | null; autoRenew: boolean };
+  agreement: {
+    number: string; signedAt: string; validTill: string | null; autoRenew: boolean;
+    status: 'Active' | 'Ending' | 'Ended'; endsOn: string | null; hasFile: boolean; fileName: string;
+  };
   partnerSince: string;
   /** set when a team member (not the owner) is signed in */
   member: TeamMember | null;
@@ -51,6 +54,12 @@ export interface Dashboard {
   recent: Case[];
   mix: { key: string; name: string; count: number }[];
 }
+/** A partner's agreement request and how the desk resolved it */
+export interface AgreementRequest {
+  id: string; type: 'download' | 'discussion' | 'termination'; status: 'Open' | 'Closed';
+  outcome: '' | 'sent' | 'scheduled' | 'confirmed' | 'retained'; note: string;
+  meetingAt: string | null; endsOn: string | null; handledBy: string; handledAt: string | null; createdAt: string;
+}
 export interface Analytics {
   totals: {
     students: number; cases: number; open: number; completed: number; completionRate: number | null;
@@ -62,7 +71,7 @@ export interface Analytics {
   money: { balance: number; pending: number; lifetime: number; monthly: { month: string; amount: number }[] } | null;
 }
 /** Profile photos are public images served by the API */
-export const avatarUrl = (id: string) => (id ? `/api/content/avatar/${id}` : '');
+export const avatarUrl = (id: string) => (!id ? '' : id.startsWith('http') ? id : `/api/content/avatar/${id}`); // Cloudinary URL, or a stored photo id
 export interface Commissions {
   rates: { key: string; icon: string; name: string; amount: string; note: string }[];
   history: { id: string; title: string; effective: string; status: string; items: [string, string][] }[];
@@ -209,5 +218,7 @@ export const api = {
   removeMember: (id: string) => request<void>(`/team/${id}`, json('DELETE')),
 
   agreementRequest: (type: 'download' | 'discussion' | 'termination') =>
-    request<{ ok: boolean }>('/agreement/requests', json('POST', { type })),
+    request<AgreementRequest>('/agreement/requests', json('POST', { type })),
+  agreementRequests: () => request<AgreementRequest[]>('/agreement/requests'),
+  downloadAgreement: (name: string) => download('/agreement/file', name),
 };

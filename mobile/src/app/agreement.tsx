@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { Button, List, Row, Screen, Section, StatusPill } from '../components/ui';
 import { api } from '../lib/api';
+import type { AgreementRequest } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { confirm, errorText, notify } from '../lib/dialog';
 import { useApi } from '../lib/hooks';
@@ -10,10 +12,22 @@ import { colors, radius, space, type } from '../theme';
 
 type Req = 'download' | 'discussion' | 'termination';
 
+const REQ_LABEL: Record<Req, string> = { download: 'Signed copy', discussion: 'Call about the agreement', termination: 'Termination' };
+const outcomeText = (r: AgreementRequest) => {
+  const what = r.status === 'Open' ? 'Your RM is on it'
+    : r.outcome === 'sent' ? 'Signed copy ready to download'
+      : r.outcome === 'scheduled' ? (r.meetingAt ? `Call on ${longDate(r.meetingAt)}, ${new Date(r.meetingAt).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}` : 'Your RM replied')
+        : r.outcome === 'confirmed' ? `Termination confirmed${r.endsOn ? `, ends ${longDate(r.endsOn)}` : ''}`
+          : r.outcome === 'retained' ? 'Agreement continues' : 'Handled';
+  return `${what}${r.note ? ` · ${r.note}` : ''}`;
+};
+
 export default function Agreement() {
-  const { agent } = useAuth();
+  const { agent, refresh } = useAuth();
   const content = useApi(api.content);
-  const [busy, setBusy] = useState<Req | null>(null);
+  const requests = useApi(api.agreementRequests);
+  const [busy, setBusy] = useState<Req | 'file' | null>(null);
+  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
   if (!agent) return null;
   const a = agent.agreement;
   const signed = longDate(a.signedAt);
@@ -25,6 +39,7 @@ export default function Agreement() {
     setBusy(t);
     try {
       await api.agreementRequest(t);
+      requests.refresh();
       notify('Request sent', t === 'termination'
         ? `${agent.rm.name} will call you before anything changes.`
         : `${agent.rm.name} will get back to you within one business day.`);
@@ -40,7 +55,9 @@ export default function Agreement() {
       <View style={styles.card}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Text style={type.label}>Channel partner agreement</Text>
-          <StatusPill status="Completed" label="Active" />
+          {a.status === 'Active'
+            ? <StatusPill status="Completed" label="Active" />
+            : <StatusPill status={a.status === 'Ending' ? 'Pending' : 'On Hold'} label={a.status === 'Ending' ? `Ends ${a.endsOn ? longDate(a.endsOn) : 'soon'}` : 'Ended'} />}
         </View>
         <Text style={[type.heading, { marginTop: space.sm }]}>{party}</Text>
       </View>
@@ -52,13 +69,36 @@ export default function Agreement() {
         <Row title={a.autoRenew ? 'On' : 'Off'} subtitle="Auto-renewal" />
       </List>
 
-      <Section title="Requests">
+      {a.hasFile ? (
+        <Button
+          label="Download signed agreement"
+          icon="download"
+          style={{ marginTop: space.lg }}
+          loading={busy === 'file'}
+          onPress={async () => {
+            setBusy('file');
+            try { await api.downloadAgreement(a.fileName || 'UniVerse agreement.pdf'); } catch (e) { notify('Could not download', errorText(e)); } finally { setBusy(null); }
+          }}
+        />
+      ) : null}
+
+      <Section title="Ask your RM">
         <View style={{ gap: space.sm }}>
-          <Button label="Request a signed copy" variant="secondary" icon="download" onPress={() => send('download')} loading={busy === 'download'} />
-          <Button label="Request a discussion" variant="secondary" icon="phone" onPress={() => send('discussion')} loading={busy === 'discussion'} />
-          <Button label="Request termination" variant="ghost" onPress={() => send('termination')} loading={busy === 'termination'} />
+          {!a.hasFile ? <Button label="Request a signed copy" variant="secondary" icon="file-text" onPress={() => send('download')} loading={busy === 'download'} /> : null}
+          <Button label="Request a call about the agreement" variant="secondary" icon="phone" onPress={() => send('discussion')} loading={busy === 'discussion'} />
+          {a.status === 'Active' ? <Button label="Request termination" variant="ghost" onPress={() => send('termination')} loading={busy === 'termination'} /> : null}
         </View>
       </Section>
+
+      {requests.data?.length ? (
+        <Section title="Your requests">
+          <List>
+            {requests.data.map((r) => (
+              <Row key={r.id} title={REQ_LABEL[r.type]} subtitle={outcomeText(r)} right={<StatusPill status={r.status === 'Open' ? 'Pending' : 'Completed'} label={r.status === 'Open' ? 'Open' : 'Done'} />} />
+            ))}
+          </List>
+        </Section>
+      ) : null}
 
       <Section title="Agreement text">
         <View style={styles.doc}>

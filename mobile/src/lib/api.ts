@@ -17,7 +17,10 @@ export interface Agent {
   rm: { name: string; email: string; phone: string };
   bankAccount: string;
   avatar: string;
-  agreement: { number: string; signedAt: string; validTill: string | null; autoRenew: boolean };
+  agreement: {
+    number: string; signedAt: string; validTill: string | null; autoRenew: boolean;
+    status: 'Active' | 'Ending' | 'Ended'; endsOn: string | null; hasFile: boolean; fileName: string;
+  };
   partnerSince: string;
   /** set when a team member (not the owner) is signed in */
   member: TeamMember | null;
@@ -72,6 +75,12 @@ export interface Commissions {
   rates: { key: string; icon: string; name: string; amount: string; note: string }[];
   history: { id: string; title: string; effective: string; status: string; items: [string, string][] }[];
 }
+/** A partner's agreement request and how the desk resolved it */
+export interface AgreementRequest {
+  id: string; type: 'download' | 'discussion' | 'termination'; status: 'Open' | 'Closed';
+  outcome: '' | 'sent' | 'scheduled' | 'confirmed' | 'retained'; note: string;
+  meetingAt: string | null; endsOn: string | null; handledBy: string; handledAt: string | null; createdAt: string;
+}
 export interface Analytics {
   totals: {
     students: number; cases: number; open: number; completed: number; completionRate: number | null;
@@ -97,7 +106,7 @@ let token: string | null = null;
 let onUnauthorized: ((message: string) => void) | null = null;
 export const setToken = (t: string | null) => { token = t; };
 /** Public address of a profile photo, or '' when there is none */
-export const avatarUrl = (id?: string | null) => (id ? `${API_URL}/content/avatar/${id}` : '');
+export const avatarUrl = (id?: string | null) => (!id ? '' : id.startsWith('http') ? id : `${API_URL}/content/avatar/${id}`); // Cloudinary URL, or a stored photo id
 export const setUnauthorizedHandler = (fn: (message: string) => void) => { onUnauthorized = fn; };
 
 export class ApiError extends Error {
@@ -131,6 +140,33 @@ const post = <T>(path: string, body: unknown) => request<T>(path, json('POST', b
 
 export interface UploadFile { uri: string; name: string; size?: number; mimeType?: string; file?: File }
 type MemberInput = Pick<TeamMember, 'name' | 'email' | 'role' | 'menus' | 'perms'>;
+
+/** Downloads a protected file and opens the share sheet so it can be saved or viewed. */
+async function downloadFile(path: string, name: string) {
+  const url = `${API_URL}${path}`;
+  if (Platform.OS === 'web') {
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new ApiError(res.status, 'Download failed');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(await res.blob());
+    a.download = name;
+    a.click();
+    return;
+  }
+  const safe = name.replace(/[^\w.\- ]+/g, '_');
+  const target = `${FileSystem.cacheDirectory}${Date.now()}-${safe}`;
+  const res = await FileSystem.downloadAsync(url, target, { headers: { Authorization: `Bearer ${token}` } });
+  if (res.status !== 200) throw new ApiError(res.status, 'Download failed');
+  const type = res.headers['content-type'] ?? res.headers['Content-Type'];
+  let uri = res.uri;
+  // give the file its real extension so the viewer knows what it is
+  const ext = type?.includes('pdf') ? '.pdf' : type?.includes('png') ? '.png' : type?.includes('jpeg') ? '.jpg' : '';
+  if (ext && !safe.toLowerCase().endsWith(ext)) {
+    await FileSystem.moveAsync({ from: uri, to: uri + ext });
+    uri += ext;
+  }
+  if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: type, dialogTitle: name });
+}
 
 export const api = {
   login: (email: string, password: string) => post<{ token: string; agent: Agent }>('/auth/login', { email, password }),
@@ -182,31 +218,9 @@ export const api = {
     return request<Case>(`/requests/${id}/documents`, { method: 'POST', body: form });
   },
   /** Downloads an uploaded document and opens the share sheet so it can be saved or viewed. */
-  downloadDoc: async (caseId: string, doc: CaseDoc) => {
-    const url = `${API_URL}/requests/${caseId}/documents/${doc.id}/file`;
-    if (Platform.OS === 'web') {
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) throw new ApiError(res.status, 'Download failed');
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(await res.blob());
-      a.download = doc.name;
-      a.click();
-      return;
-    }
-    const safe = doc.name.replace(/[^\w.\- ]+/g, '_');
-    const target = `${FileSystem.cacheDirectory}${Date.now()}-${safe}`;
-    const res = await FileSystem.downloadAsync(url, target, { headers: { Authorization: `Bearer ${token}` } });
-    if (res.status !== 200) throw new ApiError(res.status, 'Download failed');
-    const type = res.headers['content-type'] ?? res.headers['Content-Type'];
-    let uri = res.uri;
-    // give the file its real extension so the viewer knows what it is
-    const ext = type?.includes('pdf') ? '.pdf' : type?.includes('png') ? '.png' : type?.includes('jpeg') ? '.jpg' : '';
-    if (ext && !safe.toLowerCase().endsWith(ext)) {
-      await FileSystem.moveAsync({ from: uri, to: uri + ext });
-      uri += ext;
-    }
-    if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: type, dialogTitle: doc.name });
-  },
+  downloadDoc: (caseId: string, doc: CaseDoc) => downloadFile(`/requests/${caseId}/documents/${doc.id}/file`, doc.name),
+  downloadAgreement: (name: string) => downloadFile('/agreement/file', name),
+  agreementRequests: () => request<AgreementRequest[]>('/agreement/requests'),
 
   students: () => request<Student[]>('/students'),
   addStudent: (b: { name: string; email: string; phone: string; country: string }) => post<Student>('/students', b),
@@ -229,5 +243,5 @@ export const api = {
   updateMember: (id: string, b: Partial<MemberInput> & { password?: string }) => request<TeamMember>(`/team/${id}`, json('PATCH', b)),
   removeMember: (id: string) => request<void>(`/team/${id}`, json('DELETE')),
 
-  agreementRequest: (type: 'download' | 'discussion' | 'termination') => post<{ ok: boolean }>('/agreement/requests', { type }),
+  agreementRequest: (type: 'download' | 'discussion' | 'termination') => post<AgreementRequest>('/agreement/requests', { type }),
 };

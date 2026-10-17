@@ -22,6 +22,11 @@ const agentSchema = new Schema(
       signedAt: { type: Date, default: Date.now },
       validTill: { type: Date },
       autoRenew: { type: Boolean, default: true },
+      status: { type: String, enum: ['Active', 'Ending', 'Ended'], default: 'Active' },
+      endsOn: { type: Date, default: null }, // set when a termination is confirmed
+      file: { type: String, default: '' }, // GridFS id of the signed agreement PDF
+      fileName: { type: String, default: '' },
+      fileAt: { type: Date, default: null },
     },
     wallet: {
       balance: { type: Number, default: 0 },
@@ -175,6 +180,13 @@ const agreementRequestSchema = new Schema(
     agent: { type: Schema.Types.ObjectId, ref: 'Agent', required: true, index: true },
     type: { type: String, enum: ['download', 'discussion', 'termination'], required: true },
     status: { type: String, enum: ['Open', 'Closed'], default: 'Open' },
+    // how it was resolved: sent (signed copy uploaded), scheduled (call booked), confirmed / retained (termination)
+    outcome: { type: String, default: '' },
+    note: { type: String, default: '' }, // the desk's reply, shown to the partner
+    meetingAt: { type: Date, default: null },
+    endsOn: { type: Date, default: null },
+    handledBy: { type: String, default: '' },
+    handledAt: { type: Date, default: null },
   },
   { timestamps: true },
 );

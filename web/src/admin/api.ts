@@ -54,7 +54,9 @@ export interface AdminTx extends Transaction {
 }
 export interface AgreementReq {
   id: string; type: 'download' | 'discussion' | 'termination'; status: 'Open' | 'Closed'; createdAt: string;
-  partner: (PartnerRef & { email: string; phone: string }) | null;
+  outcome: '' | 'sent' | 'scheduled' | 'confirmed' | 'retained'; note: string;
+  meetingAt: string | null; endsOn: string | null; handledBy: string; handledAt: string | null;
+  partner: (PartnerRef & { email: string; phone: string; agreementNumber: string; agreementStatus: string; hasFile: boolean; fileName: string }) | null;
 }
 
 const store = tokenStore('uv_admin_token');
@@ -101,7 +103,14 @@ export const adminApi = {
   settle: (id: string, action: 'clear' | 'pay' | 'payout' | 'reject', extra: { reason?: string; utr?: string } = {}) => request<Transaction>(`/admin/transactions/${id}`, json('PATCH', { action, ...extra })),
 
   agreementRequests: (status: string) => request<AgreementReq[]>(`/admin/agreement-requests${qs({ status })}`),
-  closeAgreementRequest: (id: string, status: 'Open' | 'Closed') => request<{ ok: boolean }>(`/admin/agreement-requests/${id}`, json('PATCH', { status })),
+  reopenAgreementRequest: (id: string) => request<{ ok: boolean }>(`/admin/agreement-requests/${id}`, json('PATCH', { status: 'Open' })),
+  /** fields: note, meetingAt, outcome, endsOn; file: the signed agreement PDF */
+  resolveAgreementRequest: (id: string, fields: Record<string, string>, file?: File | null) => {
+    const form = new FormData();
+    for (const [k, v] of Object.entries(fields)) if (v) form.append(k, v);
+    if (file) form.append('file', file);
+    return request<{ ok: boolean }>(`/admin/agreement-requests/${id}/resolve`, { method: 'POST', body: form });
+  },
 
   /* master admin */
   usage: (days: number) => request<Usage>(`/admin/master/usage?days=${days}`),

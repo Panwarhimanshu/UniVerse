@@ -20,6 +20,10 @@ export const publicAgent = (a: any) => ({
     signedAt: a.agreement?.signedAt ?? a.createdAt,
     validTill: a.agreement?.validTill ?? null,
     autoRenew: a.agreement?.autoRenew ?? true,
+    status: a.agreement?.status ?? 'Active',
+    endsOn: a.agreement?.endsOn ?? null,
+    hasFile: !!a.agreement?.file,
+    fileName: a.agreement?.fileName ?? '',
   },
   partnerSince: a.createdAt,
 });

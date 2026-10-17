@@ -108,6 +108,7 @@ export default function Dashboard() {
   const [photoOpen, setPhotoOpen] = useState(false);
   const [methodOpen, setMethodOpen] = useState(false);
   const [addStudentOpen, setAddStudentOpen] = useState(false);
+  const [agrKey, setAgrKey] = useState(0);
   const [importOpen, setImportOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifs, setNotifs] = useState<Notification[]>([]);
@@ -173,6 +174,7 @@ export default function Dashboard() {
   const agreementAction = async (type: 'download' | 'discussion' | 'termination') => {
     try {
       await api.agreementRequest(type);
+      setAgrKey((k) => k + 1);
       toast(type === 'termination'
         ? `Termination request sent. ${agent.rm.name} will call you before anything changes.`
         : `Request sent to ${agent.rm.name}. You'll hear back within one business day.`);
@@ -689,7 +691,10 @@ export default function Dashboard() {
               <NotificationSettings />
 
               <div className="panel" style={{ marginTop: '1.4rem' }}>
-                <div className="panel-h"><h3>Partner agreement</h3><span className="status done">Active</span></div>
+                <div className="panel-h"><h3>Partner agreement</h3>
+                  <span className={`status ${agent.agreement.status === 'Active' ? 'done' : agent.agreement.status === 'Ending' ? 'pend' : 'hold'}`}>
+                    {agent.agreement.status === 'Active' ? 'Active' : agent.agreement.status === 'Ending' ? `Ends ${agent.agreement.endsOn ? fmtDate(agent.agreement.endsOn) : 'soon'}` : 'Ended'}
+                  </span></div>
                 <div className="panel-b">
                   <div className="agree-card" style={{ position: 'relative' }}>
                     <span className="agree-stamp">SIGNED</span>
@@ -703,12 +708,17 @@ export default function Dashboard() {
                         <span>Auto-renewal <b>{agent.agreement.autoRenew ? 'On' : 'Off'}</b></span>
                       </div>
                       <div className="agree-actions">
-                        <button className="btn btn-primary btn-sm" onClick={() => setAgrOpen(true)}>View Signed Copy</button>
-                        <button className="btn btn-ghost btn-sm" onClick={() => agreementAction('download')}>Request Download</button>
-                        <button className="btn btn-ghost btn-sm" onClick={() => agreementAction('discussion')}>Request Discussion</button>
-                        <button className="btn btn-ghost btn-sm" style={{ color: '#C0392B', borderColor: 'rgba(192,57,59,.4)' }}
-                          onClick={() => confirm('Send a termination request to UniVerse? A senior manager will contact you before anything changes.') && agreementAction('termination')}>Request Termination</button>
+                        {agent.agreement.hasFile
+                          ? <button className="btn btn-primary btn-sm" onClick={() => api.downloadAgreement(agent.agreement.fileName || 'UniVerse agreement.pdf').catch((e) => toast(e.message))}>Download signed agreement</button>
+                          : <button className="btn btn-primary btn-sm" onClick={() => setAgrOpen(true)}>View agreement</button>}
+                        {!agent.agreement.hasFile ? <button className="btn btn-ghost btn-sm" onClick={() => agreementAction('download')}>Request signed copy</button> : null}
+                        <button className="btn btn-ghost btn-sm" onClick={() => agreementAction('discussion')}>Request a call</button>
+                        {agent.agreement.status === 'Active' ? (
+                          <button className="btn btn-ghost btn-sm" style={{ color: '#C0392B', borderColor: 'rgba(192,57,59,.4)' }}
+                            onClick={() => confirm('Send a termination request to UniVerse? A senior manager will contact you before anything changes.') && agreementAction('termination')}>Request termination</button>
+                        ) : null}
                       </div>
+                      <AgreementRequests key={agrKey} />
                     </div>
                   </div>
                 </div>
@@ -906,6 +916,33 @@ function NotificationSettings() {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+/* ---------- the partner's agreement requests and the desk's replies ---------- */
+const AGR_REQ: Record<string, string> = { download: 'Signed copy', discussion: 'Call about the agreement', termination: 'Termination' };
+function AgreementRequests() {
+  const list = useApi(api.agreementRequests, []);
+  if (!list.data?.length) return null;
+  const outcome = (r: import('../lib/api').AgreementRequest) =>
+    r.status === 'Open' ? 'Your RM is on it'
+      : r.outcome === 'sent' ? 'Signed copy ready to download'
+        : r.outcome === 'scheduled' ? (r.meetingAt ? `Call on ${fmtTime(r.meetingAt)}` : 'Your RM replied')
+          : r.outcome === 'confirmed' ? `Termination confirmed${r.endsOn ? ` · ends ${fmtDate(r.endsOn)}` : ''}`
+            : r.outcome === 'retained' ? 'Agreement continues' : 'Handled';
+  return (
+    <div className="agr-reqs">
+      <b>Your requests</b>
+      {list.data.map((r) => (
+        <div key={r.id} className="agr-req">
+          <div>
+            <span className="t-name">{AGR_REQ[r.type]}</span> <span className="t-sub">· {fmtDate(r.createdAt)}</span>
+            <div className="t-sub">{outcome(r)}{r.note ? ` · ${r.note}` : ''}</div>
+          </div>
+          <span className={`status ${r.status === 'Open' ? 'pend' : 'done'}`}>{r.status === 'Open' ? 'Open' : 'Done'}</span>
+        </div>
+      ))}
     </div>
   );
 }

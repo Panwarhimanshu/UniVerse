@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { Types } from 'mongoose';
-import { AgreementRequest, Device, Message, MENUS, Notification, PERMS, ServiceRequest, Student, TeamMember } from '../models/index.js';
+import { Agent, AgreementRequest, Device, Message, MENUS, Notification, PERMS, ServiceRequest, Student, TeamMember } from '../models/index.js';
+import { sendDocFile } from '../files.js';
 import bcrypt from 'bcryptjs';
 import { agentIdOf, HttpError, need, needMenu, ownerOnly } from '../middleware/auth.js';
 import { emailTaken } from './auth.js';
@@ -215,17 +216,39 @@ const AGREEMENT_TEXT = {
   termination: 'Requested termination of the partner agreement.',
 } as const;
 
+/* The partner's agreement requests and the desk's replies */
+export const publicAgreementRequest = (r: InstanceType<typeof AgreementRequest>) => ({
+  id: String(r._id), type: r.type, status: r.status, outcome: r.outcome, note: r.note,
+  meetingAt: r.meetingAt, endsOn: r.endsOn, handledBy: r.handledBy, handledAt: r.handledAt, createdAt: (r as unknown as { createdAt: Date }).createdAt,
+});
+
+router.get('/agreement/requests', ownerOnly, async (req, res) => {
+  const list = await AgreementRequest.find({ agent: agentIdOf(req) }).sort({ createdAt: -1 }).limit(30);
+  res.json(list.map(publicAgreementRequest));
+});
+
+/* The signed agreement PDF, once the desk has uploaded it */
+router.get('/agreement/file', ownerOnly, async (req, res) => {
+  const a = await Agent.findById(agentIdOf(req)).select('agreement');
+  if (!a?.agreement?.file) throw new HttpError(404, 'Your signed agreement has not been uploaded yet. Request a copy and your RM will send it.');
+  await sendDocFile(res, a.agreement.file, a.agreement.fileName || `UniVerse agreement ${a.agreement.number || ''}.pdf`.trim());
+});
+
 router.post('/agreement/requests', ownerOnly, async (req, res) => {
   const agentId = agentIdOf(req);
   const type = req.body?.type as keyof typeof AGREEMENT_TEXT;
   if (!AGREEMENT_TEXT[type]) throw new HttpError(400, 'Unknown request type');
+  if (type === 'termination') {
+    const me = await Agent.findById(agentId).select('agreement');
+    if (me?.agreement?.status && me.agreement.status !== 'Active') throw new HttpError(409, 'Your agreement is already ending. Your RM has the details.');
+  }
   if (await AgreementRequest.exists({ agent: agentId, type, status: 'Open' })) {
     throw new HttpError(409, 'You already have this request open. Your relationship manager will be in touch.');
   }
-  await AgreementRequest.create({ agent: agentId, type });
+  const created = await AgreementRequest.create({ agent: agentId, type });
   await Message.create({ agent: agentId, request: null, from: 'system', text: AGREEMENT_TEXT[type] });
   track(req, agentId, null, 'agreement_request');
-  res.status(201).json({ ok: true });
+  res.status(201).json(publicAgreementRequest(created));
 });
 
 /* ---------- notifications: latest desk / RM messages ---------- */

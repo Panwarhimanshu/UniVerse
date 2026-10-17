@@ -463,3 +463,7 @@
 .dash.pt .dash-side .s-brand a{flex-direction:column;align-items:flex-start;gap:.45rem}
 .dash.pt .dash-side .s-brand img{height:34px;max-height:none;max-width:100%}
 .dash.pt .s-link.active::before{background:linear-gradient(#1453A5,#21BFD3)}
+
+.agr-reqs{margin-top:1rem;padding-top:.9rem;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:.5rem}
+.agr-reqs>b{font-size:.8rem;color:var(--ink-soft)}
+.agr-req{display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.55rem .75rem;border:1px solid var(--line);border-radius:10px;background:#fff}

@@ -8,7 +8,8 @@ import masterRoutes from './master.js';
 import { serviceByKey } from '../data/catalog.js';
 import { LAST_STEP, progressFor, stepsFor } from '../data/timelines.js';
 import { publicAgent, publicMessage, publicRequest, publicTx } from '../serialize.js';
-import { deleteFile, sendDocFile } from '../files.js';
+import { deleteFile, MAX_UPLOAD_BYTES, saveFile, sendDocFile } from '../files.js';
+import multer from 'multer';
 import { checkAttempts, clearAttempts, recordFailure } from '../limits.js';
 import { accountNotices, notify } from '../notify.js';
 import { razorpayPayout, razorpayReady, syncWallet } from '../wallet.js';
@@ -589,23 +590,107 @@ router.patch('/transactions/:id', async (req, res) => {
 /* ---------- agreement requests ---------- */
 router.get('/agreement-requests', async (req, res) => {
   const status = req.query.status === 'Closed' ? 'Closed' : req.query.status === 'all' ? null : 'Open';
-  const list = await AgreementRequest.find(status ? { status } : {}).sort({ createdAt: -1 }).populate('agent', 'name agency email phone');
+  const list = await AgreementRequest.find(status ? { status } : {}).sort({ createdAt: -1 }).populate('agent', 'name agency email phone agreement');
   res.json(list.map((r: any) => ({
     id: String(r._id), type: r.type, status: r.status, createdAt: r.createdAt,
-    partner: r.agent ? { id: String(r.agent._id), name: r.agent.name, agency: r.agent.agency, email: r.agent.email, phone: r.agent.phone } : null,
+    outcome: r.outcome, note: r.note, meetingAt: r.meetingAt, endsOn: r.endsOn, handledBy: r.handledBy, handledAt: r.handledAt,
+    partner: r.agent ? {
+      id: String(r.agent._id), name: r.agent.name, agency: r.agent.agency, email: r.agent.email, phone: r.agent.phone,
+      agreementNumber: r.agent.agreement?.number ?? '', agreementStatus: r.agent.agreement?.status ?? 'Active',
+      hasFile: !!r.agent.agreement?.file, fileName: r.agent.agreement?.fileName ?? '',
+    } : null,
   })));
 });
 
+/* Resolve a request. Each type has its own outcome:
+   download    → upload the signed PDF (or resend the one on file)      outcome "sent"
+   discussion  → book a call (meetingAt) with a note                    outcome "scheduled"
+   termination → "confirmed" with an end date, or "retained" with a note
+   Multipart (field "file", PDF up to 4 MB) when a PDF is attached. */
+const agreementPdf = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_UPLOAD_BYTES },
+  fileFilter: (_req, file, cb) => cb(null, file.mimetype === 'application/pdf'),
+});
+const fmtDay = (d: Date) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' });
+const fmtWhen = (d: Date) => d.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' });
+
+router.post('/agreement-requests/:id/resolve', agreementPdf.single('file'), async (req, res) => {
+  const r = await AgreementRequest.findById(oid(req.params.id, 'Request'));
+  if (!r) throw new HttpError(404, 'Request not found');
+  if (r.status !== 'Open') throw new HttpError(409, 'This request has already been handled');
+  const agent = await Agent.findById(r.agent);
+  if (!agent) throw new HttpError(404, 'Partner not found');
+  const note = String(req.body?.note ?? '').trim().slice(0, 600);
+  const by = adminOf(req).name;
+  let title = '';
+  let body = '';
+
+  if (r.type === 'download') {
+    if (req.file) {
+      const id = await saveFile(req.file.buffer, req.file.originalname || 'agreement.pdf', 'application/pdf');
+      const old = agent.agreement?.file;
+      agent.set('agreement.file', id);
+      agent.set('agreement.fileName', req.file.originalname || `UniVerse agreement ${agent.agreement?.number ?? ''}.pdf`);
+      agent.set('agreement.fileAt', new Date());
+      await agent.save();
+      if (old) await deleteFile(old);
+    } else if (!agent.agreement?.file) {
+      throw new HttpError(400, 'Attach the signed agreement as a PDF');
+    }
+    r.outcome = 'sent';
+    title = 'Your signed agreement is ready';
+    body = `You can download your signed partner agreement any time from the Agreement page.${note ? ` ${note}` : ''}`;
+  } else if (r.type === 'discussion') {
+    const when = req.body?.meetingAt ? new Date(String(req.body.meetingAt)) : null;
+    if (when && Number.isNaN(when.getTime())) throw new HttpError(400, 'Enter a valid date and time for the call');
+    if (!when && !note) throw new HttpError(400, 'Add the call time or a note for the partner');
+    r.outcome = 'scheduled';
+    r.meetingAt = when;
+    title = when ? `Agreement call on ${fmtWhen(when)}` : 'About your agreement';
+    body = when ? `${by} will call you on ${fmtWhen(when)} to discuss your agreement.${note ? ` ${note}` : ''}` : note;
+  } else {
+    const decision = String(req.body?.outcome ?? '');
+    if (decision === 'confirmed') {
+      const ends = req.body?.endsOn ? new Date(String(req.body.endsOn)) : new Date(Date.now() + 30 * 864e5);
+      if (Number.isNaN(ends.getTime())) throw new HttpError(400, 'Enter a valid end date');
+      agent.set('agreement.status', ends <= new Date() ? 'Ended' : 'Ending');
+      agent.set('agreement.endsOn', ends);
+      agent.set('agreement.autoRenew', false);
+      await agent.save();
+      r.outcome = 'confirmed';
+      r.endsOn = ends;
+      title = 'Termination confirmed';
+      body = `Your partner agreement ends on ${fmtDay(ends)}. Commissions earned up to that date are settled within 15 working days.${note ? ` ${note}` : ''}`;
+    } else if (decision === 'retained') {
+      if (!note) throw new HttpError(400, 'Add a short note about what was agreed');
+      r.outcome = 'retained';
+      title = 'Your agreement continues';
+      body = note;
+    } else {
+      throw new HttpError(400, 'Choose to confirm the termination or keep the agreement');
+    }
+  }
+
+  r.status = 'Closed';
+  r.note = note;
+  r.handledBy = by;
+  r.handledAt = new Date();
+  await r.save();
+  await Message.create({ agent: r.agent, request: null, from: 'rm', author: by, text: `${title}. ${body}`.slice(0, 2000), quiet: true });
+  await notify({ agent: r.agent, category: 'account', type: `account.agreement_${r.outcome}`, title, body, link: { kind: 'profile' }, audience: 'owner' });
+  res.locals.audit = `Agreement request (${r.type}) for ${agent.agency || agent.name}: ${r.outcome}`;
+  res.json({ ok: true });
+});
+
+/* Reopen a handled request (for corrections) */
 router.patch('/agreement-requests/:id', async (req, res) => {
   const r = await AgreementRequest.findById(oid(req.params.id, 'Request'));
   if (!r) throw new HttpError(404, 'Request not found');
-  r.status = req.body?.status === 'Open' ? 'Open' : 'Closed';
+  if (req.body?.status !== 'Open') throw new HttpError(400, 'Use Handle to resolve a request');
+  r.status = 'Open';
   await r.save();
-  if (r.status === 'Closed') {
-    const what = { download: 'copy of your signed agreement', discussion: 'request to discuss your agreement', termination: 'termination request' }[r.type as string] ?? 'agreement request';
-    await notify({ agent: r.agent, category: 'account', type: 'account.agreement_closed', title: 'Agreement request handled', body: `Your ${what} has been handled. Check your email or ask your RM for details.`, link: { kind: 'profile' }, audience: 'owner' });
-  }
-  res.locals.audit = `Agreement request (${r.type}) ${r.status === 'Open' ? 'reopened' : 'closed'}`;
+  res.locals.audit = `Agreement request (${r.type}) reopened`;
   res.json({ ok: true });
 });
 

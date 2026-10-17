@@ -652,43 +652,154 @@ function PayoutsView({ onChanged }: { onChanged: () => void }) {
 }
 
 /* ---------- agreement requests ---------- */
+const OUTCOME_TEXT: Record<string, string> = { sent: 'Signed copy sent', scheduled: 'Call booked', confirmed: 'Termination confirmed', retained: 'Partner retained' };
+
 function AgreementsView({ onChanged }: { onChanged: () => void }) {
   const toast = useToast();
   const [status, setStatus] = useState('Open');
   const list = useApi(() => adminApi.agreementRequests(status), [status]);
-  const toggle = async (r: AgreementReq) => {
-    try {
-      await adminApi.closeAgreementRequest(r.id, r.status === 'Open' ? 'Closed' : 'Open');
-      list.reload();
-      onChanged();
-    } catch (e) { toast(errMsg(e)); }
+  const [handling, setHandling] = useState<AgreementReq | null>(null);
+  const reopen = async (r: AgreementReq) => {
+    try { await adminApi.reopenAgreementRequest(r.id); list.reload(); onChanged(); } catch (e) { toast(errMsg(e)); }
   };
   return (
     <section className="view active">
       <div className="adm-toolbar">
         <div className="svc-filters">
-          {['Open', 'Closed', 'all'].map((s) => <button key={s} className={`chip-btn${status === s ? ' active' : ''}`} onClick={() => setStatus(s)}>{s === 'all' ? 'All' : s}</button>)}
+          {['Open', 'Closed', 'all'].map((s) => <button key={s} className={`chip-btn${status === s ? ' active' : ''}`} onClick={() => setStatus(s)}>{s === 'all' ? 'All' : s === 'Closed' ? 'Handled' : s}</button>)}
         </div>
       </div>
       <div className="panel">
         <div style={{ overflowX: 'auto' }}>
           <table className="tbl">
-            <thead><tr><th>Received</th><th>Partner</th><th>Request</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>Received</th><th>Partner</th><th>Request</th><th>Status</th><th>Outcome</th><th></th></tr></thead>
             <tbody>
               {list.data?.map((r) => (
                 <tr key={r.id}>
-                  <td>{fmtDate(r.createdAt)}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(r.createdAt)}</td>
                   <td><div className="t-name">{r.partner?.agency || r.partner?.name}</div><div className="t-sub">{r.partner?.email} · {r.partner?.phone}</div></td>
-                  <td>{r.type === 'termination' ? <b style={{ color: '#B91C1C' }}>{AGR_LABEL[r.type]}</b> : AGR_LABEL[r.type]}</td>
-                  <td><span className={`status ${r.status === 'Open' ? 'pend' : 'done'}`}>{r.status}</span></td>
-                  <td><button className="btn btn-ghost btn-sm" onClick={() => toggle(r)}>{r.status === 'Open' ? 'Mark handled' : 'Reopen'}</button></td>
+                  <td>{r.type === 'termination' ? <b style={{ color: '#B91C1C' }}>{AGR_LABEL[r.type]}</b> : AGR_LABEL[r.type]}<div className="t-sub">{r.partner?.agreementNumber}</div></td>
+                  <td><span className={`status ${r.status === 'Open' ? 'pend' : 'done'}`}>{r.status === 'Open' ? 'Open' : 'Handled'}</span></td>
+                  <td>
+                    {r.status === 'Closed' ? (
+                      <>
+                        <div className="t-name" style={{ fontWeight: 600 }}>{OUTCOME_TEXT[r.outcome] ?? 'Handled'}{r.meetingAt ? ` · ${fmtTime(r.meetingAt)}` : ''}{r.endsOn ? ` · ends ${fmtDate(r.endsOn)}` : ''}</div>
+                        {r.note ? <div className="t-sub">{r.note}</div> : null}
+                        {r.handledBy ? <div className="t-sub">by {r.handledBy}{r.handledAt ? ` on ${fmtDate(r.handledAt)}` : ''}</div> : null}
+                      </>
+                    ) : <span className="t-sub">Waiting</span>}
+                  </td>
+                  <td>
+                    {r.status === 'Open'
+                      ? <button className="btn btn-primary btn-sm" onClick={() => setHandling(r)}>Handle</button>
+                      : <button className="btn btn-ghost btn-sm" onClick={() => reopen(r)}>Reopen</button>}
+                  </td>
                 </tr>
               ))}
-              {list.data && !list.data.length ? <tr><td colSpan={5} className="empty-row">Nothing here.</td></tr> : null}
+              {list.data && !list.data.length ? <tr><td colSpan={6} className="empty-row">Nothing here.</td></tr> : null}
             </tbody>
           </table>
         </div>
       </div>
+      <HandleAgreementModal req={handling} onClose={() => setHandling(null)} onDone={() => { setHandling(null); list.reload(); onChanged(); }} />
     </section>
+  );
+}
+
+function HandleAgreementModal({ req, onClose, onDone }: { req: AgreementReq | null; onClose: () => void; onDone: () => void }) {
+  const toast = useToast();
+  const [note, setNote] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+  const [meetingAt, setMeetingAt] = useState('');
+  const [decision, setDecision] = useState<'confirmed' | 'retained' | ''>('');
+  const [endsOn, setEndsOn] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    setNote(''); setFile(null); setMeetingAt(''); setDecision(''); setError('');
+    setEndsOn(new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10));
+  }, [req?.id]);
+  if (!req) return null;
+  const who = req.partner?.agency || req.partner?.name || 'the partner';
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError('');
+    const fields: Record<string, string> = { note };
+    if (req.type === 'download' && !file && !req.partner?.hasFile) return setError('Attach the signed agreement PDF');
+    if (req.type === 'discussion') {
+      if (!meetingAt && !note.trim()) return setError('Add the call time or a note');
+      if (meetingAt) fields.meetingAt = new Date(meetingAt).toISOString();
+    }
+    if (req.type === 'termination') {
+      if (!decision) return setError('Choose an outcome');
+      if (decision === 'retained' && !note.trim()) return setError('Add a short note about what was agreed');
+      fields.outcome = decision;
+      if (decision === 'confirmed') fields.endsOn = endsOn;
+    }
+    setBusy(true);
+    try {
+      await adminApi.resolveAgreementRequest(req.id, fields, file);
+      toast(`Done. ${who} has been notified.`);
+      onDone();
+    } catch (err) {
+      setError(errMsg(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal open={!!req} onClose={onClose}>
+      <Hero title={AGR_LABEL[req.type]} sub={`${who} · ${req.partner?.agreementNumber || 'agreement'} · received ${fmtDate(req.createdAt)}`} onClose={onClose} />
+      <div className="modal-body">
+        <form className="form-grid" onSubmit={submit} noValidate>
+          {req.type === 'download' ? (
+            <div className="field full">
+              <label htmlFor="agFile">Signed agreement (PDF){req.partner?.hasFile ? ' · optional' : ' *'}</label>
+              <input id="agFile" type="file" accept="application/pdf" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+              <small className="t-sub">{req.partner?.hasFile ? `On file: ${req.partner.fileName}. Attach a new PDF to replace it, or send the one on file.` : 'The partner can download it from their Agreement page.'}</small>
+            </div>
+          ) : null}
+          {req.type === 'discussion' ? (
+            <div className="field full">
+              <label htmlFor="agWhen">Call date and time</label>
+              <input id="agWhen" type="datetime-local" value={meetingAt} onChange={(e) => setMeetingAt(e.target.value)} />
+            </div>
+          ) : null}
+          {req.type === 'termination' ? (
+            <>
+              <div className="field full">
+                <label>Outcome *</label>
+                <div className="pm-pick">
+                  <label className={`pm-opt${decision === 'confirmed' ? ' on' : ''}`}>
+                    <input type="radio" name="agDecision" checked={decision === 'confirmed'} onChange={() => setDecision('confirmed')} />
+                    <span><b>Confirm termination</b><small>The agreement ends on the date below and auto-renewal stops.</small></span>
+                  </label>
+                  <label className={`pm-opt${decision === 'retained' ? ' on' : ''}`}>
+                    <input type="radio" name="agDecision" checked={decision === 'retained'} onChange={() => setDecision('retained')} />
+                    <span><b>Partner stays</b><small>The partner withdrew the request after talking to us.</small></span>
+                  </label>
+                </div>
+              </div>
+              {decision === 'confirmed' ? (
+                <div className="field"><label htmlFor="agEnds">Agreement ends on *</label><input id="agEnds" type="date" value={endsOn} onChange={(e) => setEndsOn(e.target.value)} /></div>
+              ) : null}
+            </>
+          ) : null}
+          <div className="field full">
+            <label htmlFor="agNote">Note to the partner{req.type === 'download' ? ' (optional)' : ''}</label>
+            <textarea id="agNote" rows={3} maxLength={600} value={note} onChange={(e) => setNote(e.target.value)}
+              placeholder={req.type === 'discussion' ? 'e.g. Priya will call from +91 63596 66055' : req.type === 'termination' ? 'e.g. Final commissions will be paid by 30 Nov' : 'Anything the partner should know'} />
+          </div>
+          {error ? <p className="form-error full">{error}</p> : null}
+          <div className="full m-cta">
+            <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? 'Saving…' : req.type === 'download' ? 'Send to partner' : req.type === 'discussion' ? 'Confirm and notify' : 'Save outcome'}</button>
+            <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          </div>
+          <p className="adm-meta full">The partner gets a notification (app and email) and sees this on their Agreement page.</p>
+        </form>
+      </div>
+    </Modal>
   );
 }
