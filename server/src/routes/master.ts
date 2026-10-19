@@ -10,7 +10,8 @@ import {
 } from '../models/index.js';
 import { adminOf, HttpError } from '../middleware/auth.js';
 import { SERVICES, serviceByKey, ZONES } from '../data/catalog.js';
-import { getSettings, isServiceHidden, loadServiceContent, loadSettings, serviceOverrides } from '../content.js';
+import { COMPANY_KEYS, getSettings, isServiceHidden, loadServiceContent, loadSettings, serviceOverrides } from '../content.js';
+import { GSTIN_RE } from '../kyc.js';
 import { publicAgent, publicTeamMember, publicTx } from '../serialize.js';
 import { publicArticle } from './content.js';
 import { deleteFile, MAX_UPLOAD_BYTES, saveFile, sendDocFile } from '../files.js';
@@ -378,6 +379,16 @@ async function archiveIfRatesChanged(before: string[][], rates: Map<string, stri
   await CommissionArchive.create({ effective: `${getSettings().commissionEffective} – ${now}`, items: before });
   await Setting.updateOne({ key: 'site' }, { commissionEffective: now });
   await loadSettings();
+  // clause 8.1 of the partner agreement: every revision is notified by email, app and in-app
+  const partners = await Agent.find({ $or: [{ onboarding: 'active' }, { onboarding: { $exists: false } }, { onboarding: null }] }).select('_id');
+  for (let i = 0; i < partners.length; i += 20) {
+    await Promise.all(partners.slice(i, i + 20).map((p) => notify({
+      agent: p._id, category: 'account', type: 'account.commission_revised', audience: 'all',
+      title: 'Commission structure revised',
+      body: `UniVerse has published a revised commission structure (effective ${now}). See the Commissions section for the new rates and the history of every revision.`,
+      link: { kind: 'none' },
+    })));
+  }
 }
 const currentRates = () => new Map(SERVICES.map((s) => [s.key, `${s.commission.amount} ${s.commission.note}`]));
 
@@ -496,6 +507,23 @@ router.patch('/settings', async (req, res) => {
     for (const k of ['name', 'email', 'phone'] as const) {
       if (typeof b.defaultRm[k] === 'string' && b.defaultRm[k].trim()) set[`defaultRm.${k}`] = b.defaultRm[k].trim();
     }
+  }
+  for (const k of ['tdsRate', 'gstRate'] as const) {
+    if (b[k] === undefined) continue;
+    const n = Number(b[k]);
+    if (!(n >= 0 && n <= 40)) throw new HttpError(400, `${k === 'tdsRate' ? 'TDS' : 'GST'} rate must be between 0 and 40%`);
+    set[k] = n;
+  }
+  if (typeof b.sac === 'string') {
+    if (!/^\d{4,8}$/.test(b.sac.trim())) throw new HttpError(400, 'SAC must be 4 to 8 digits');
+    set.sac = b.sac.trim();
+  }
+  if (typeof b.agreementVersion === 'string' && b.agreementVersion.trim()) set.agreementVersion = b.agreementVersion.trim().slice(0, 20);
+  if (b.company && typeof b.company === 'object') {
+    for (const k of COMPANY_KEYS) if (typeof b.company[k] === 'string') set[`company.${k}`] = b.company[k].trim().slice(0, 300);
+    const g = String(b.company.gstin ?? '').trim().toUpperCase();
+    if (g && !GSTIN_RE.test(g)) throw new HttpError(400, 'Company GSTIN is not valid');
+    if (g) set['company.gstin'] = g;
   }
   await Setting.updateOne({ key: 'site' }, { $set: set });
   res.locals.audit = 'Updated site settings';

@@ -1,3 +1,5 @@
+import { WithdrawModal } from './Withdraw';
+import { KycBanner, KycPanel } from './KycPanel';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { BlogItem, Svg } from '../components/site';
@@ -11,7 +13,7 @@ import { useAuth } from '../lib/auth';
 import { fmtDate, fmtTime, inr, initials, statusClass, useApi, useInterval } from '../lib/hooks';
 import { useToast } from '../lib/toast';
 import {
-  AgreementModal, Avatar, CaseModal, CommModal, MENU_LIST, PasswordModal, PayoutMethodModal, PERM_LIST, PhotoModal, ProfileModal, ReferModal, RmDrawer, StudentModal, UserModal, WithdrawModal,
+  AgreementModal, Avatar, CaseModal, CommModal, MENU_LIST, PasswordModal, PayoutMethodModal, PERM_LIST, PhotoModal, ProfileModal, ReferModal, RmDrawer, StudentModal, UserModal,
 } from './modals';
 import { buildTimeline } from './timeline';
 import { AddStudentModal, ImportStudentsModal } from './StudentImport';
@@ -280,6 +282,8 @@ export default function Dashboard() {
                   {can('create') ? <button className="btn btn-primary" onClick={() => setRefer({ open: true })}>Request a service</button> : null}
                 </div>
               </div>
+
+              {isOwner ? <KycBanner kycStatus={agent.kyc?.status ?? 'none'} signed={!!agent.agreementSigned} onOpen={() => go('profile')} /> : null}
 
               <div className="ov-hero">
                 {sees('wallet') ? (
@@ -558,6 +562,10 @@ export default function Dashboard() {
                 </div>
                 {can('withdraw') ? <button className="btn btn-green btn-lg" onClick={() => setWithdrawOpen(true)}>Withdraw Funds</button> : null}
               </div>
+              {wallet.data && !wallet.data.canWithdraw ? (
+                <div className="kyc-banner" style={{ marginBottom: '1.4rem' }}><span>{wallet.data.withdrawBlock}</span>{isOwner ? <button className="btn btn-primary btn-sm" onClick={() => go('profile')}>Open KYC & agreement</button> : null}</div>
+              ) : null}
+              <p className="adm-meta" style={{ margin: '-.6rem 0 1.2rem' }}>Commission is credited after {wallet.data?.tdsRate ?? 2}% TDS (Income-tax Act 2025, s.393). Registered under GST? Withdraw "with GST" and we pay {wallet.data?.gstRate ?? 18}% GST on top against your signed invoice.</p>
               <div className="panel" style={{ marginBottom: '1.4rem' }}>
                 <div className="panel-h">
                   <h3>Receive money to</h3>
@@ -590,24 +598,32 @@ export default function Dashboard() {
                 <div className="panel-h"><h3>Transaction history</h3></div>
                 <div style={{ overflowX: 'auto' }}>
                   <table className="tbl">
-                    <thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Amount</th><th>Status</th></tr></thead>
+                    <thead><tr><th>Date</th><th>Description</th><th>Type</th><th className="r">Gross</th><th className="r">TDS {wallet.data?.tdsRate ?? 2}%</th><th className="r">Net amount</th><th>Status</th></tr></thead>
                     <tbody>
                       {wallet.data?.transactions.map((t) => (
                         <tr key={t.id}>
                           <td>{fmtDate(t.date)}</td>
                           <td>
                             <div className="t-name" style={{ fontWeight: 500 }}>{t.type === 'Debit' ? `Withdrawal to ${t.method?.label ?? 'your account'}` : t.description}</div>
+                            {t.invoice ? (
+                              <div className="t-sub">
+                                GST invoice {t.invoice.number} · {inr(t.invoice.taxable)} + GST {inr(t.invoice.gst)} · you receive {inr(t.invoice.payable)}{t.invoice.verified ? ' · verified' : ''}{' '}
+                                <a href="#" onClick={(e) => { e.preventDefault(); api.downloadInvoice(t.id, `Invoice ${t.invoice!.number}.pdf`).catch((er) => toast(er.message)); }}>Download</a>
+                              </div>
+                            ) : null}
                             {t.payout?.utr ? <div className="t-sub">Bank reference {t.payout.utr}</div> : t.payout?.reason ? <div className="t-sub">{t.payout.reason}</div> : null}
                           </td>
                           <td><span className={`pill${t.type === 'Credit' ? ' ctry' : ''}`}>{t.type}</span></td>
-                          <td style={{ fontWeight: 700, color: t.type === 'Credit' ? 'var(--green-deep)' : 'var(--ink)' }}>{t.type === 'Credit' ? '+' : '−'} {inr(t.amount)}</td>
+                          <td className="r t-num">{t.gross != null ? inr(t.gross) : '—'}</td>
+                          <td className="r t-num">{t.tds != null ? `− ${inr(t.tds)}` : '—'}</td>
+                          <td className="r" style={{ fontWeight: 700, color: t.type === 'Credit' ? 'var(--green-deep)' : 'var(--ink)' }}>{t.type === 'Credit' ? '+' : '−'} {inr(t.amount)}</td>
                           <td><span className={`status ${statusClass(t.status)}`}>{t.type === 'Debit'
                             ? (t.status === 'Completed' ? 'Paid' : t.status === 'Rejected' ? 'Failed' : t.payout?.state === 'processing' ? 'On its way' : 'Requested')
                             : (t.status === 'Pending' ? 'Clearing' : t.status === 'Rejected' ? 'Cancelled' : t.kind === 'adjustment' ? 'Correction' : 'Credited')}</span></td>
                         </tr>
                       ))}
                       {wallet.data && !wallet.data.transactions.length ? (
-                        <tr><td colSpan={5} className="empty-row">No transactions yet. Commissions show up here when a case reaches its payout step.</td></tr>
+                        <tr><td colSpan={7} className="empty-row">No transactions yet. Commissions show up here when a case reaches its payout step.</td></tr>
                       ) : null}
                     </tbody>
                   </table>
@@ -688,6 +704,8 @@ export default function Dashboard() {
                 </div>
               </div>
 
+              {isOwner ? <KycPanel autoSign={new URLSearchParams(window.location.search).get('sign') === '1'} onChanged={() => { api.me().then((a) => setAgent({ ...a, member: null })).catch(() => {}); wallet.reload(); }} /> : null}
+
               <NotificationSettings />
 
               <div className="panel" style={{ marginTop: '1.4rem' }}>
@@ -697,13 +715,13 @@ export default function Dashboard() {
                   </span></div>
                 <div className="panel-b">
                   <div className="agree-card" style={{ position: 'relative' }}>
-                    <span className="agree-stamp">SIGNED</span>
+                    {agent.agreementSigned ? <span className="agree-stamp">SIGNED</span> : null}
                     <span className="agree-ic"><Svg html={I.doc} /></span>
                     <div style={{ flex: 1 }}>
                       <h4>Channel Partner Agreement: {agent.agency || agent.name}</h4>
                       <div className="agree-meta">
                         <span>Agreement No. <b>{agent.agreement.number || '—'}</b></span>
-                        <span>Signed on <b>{fmtDate(agent.agreement.signedAt)}</b></span>
+                        <span>{agent.agreementSigned ? 'Signed on' : 'Partner since'} <b>{fmtDate(agent.agreement.signedAt)}</b></span>
                         <span>Valid till <b>{agent.agreement.validTill ? fmtDate(agent.agreement.validTill) : '—'}</b></span>
                         <span>Auto-renewal <b>{agent.agreement.autoRenew ? 'On' : 'Off'}</b></span>
                       </div>
@@ -758,7 +776,7 @@ export default function Dashboard() {
       {/* ===== DIALOGS ===== */}
       <ReferModal open={refer.open} presetService={refer.svc} onClose={() => setRefer({ open: false })} onDone={(c) => { refreshCases(); setPanelId(c.id); }} />
       <WithdrawModal open={withdrawOpen} wallet={wallet.data} isOwner={isOwner}
-        onClose={() => setWithdrawOpen(false)} onDone={() => { wallet.reload(); dash.reload(); }} onAddMethod={() => setMethodOpen(true)} />
+        onClose={() => setWithdrawOpen(false)} onDone={() => { wallet.reload(); dash.reload(); }} onAddMethod={() => setMethodOpen(true)} onKyc={() => go('profile')} />
       <PayoutMethodModal open={methodOpen} onClose={() => setMethodOpen(false)} onDone={wallet.reload} />
       <AddStudentModal open={addStudentOpen} onClose={() => setAddStudentOpen(false)} onDone={() => { students.reload(); dash.reload(); }} />
       <ImportStudentsModal open={importOpen} onClose={() => setImportOpen(false)} onDone={() => { students.reload(); dash.reload(); }} />

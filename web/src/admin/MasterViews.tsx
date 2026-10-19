@@ -467,6 +467,28 @@ export function SettingsView() {
           <div className="field"><label htmlFor="setRmEmail">Email</label><input id="setRmEmail" type="email" value={f.defaultRm.email} onChange={(e) => setF({ ...f, defaultRm: { ...f.defaultRm, email: e.target.value } })} /></div>
           <div className="field"><label htmlFor="setRmPhone">Phone</label><input id="setRmPhone" value={f.defaultRm.phone} onChange={(e) => setF({ ...f, defaultRm: { ...f.defaultRm, phone: e.target.value } })} /></div>
           <p className="full hint" style={{ fontSize: '.78rem' }}>Existing partners keep their current RM. Change it for one partner from Partners.</p>
+
+          <p className="full adm-h" style={{ marginTop: '.8rem' }}>Tax on commission</p>
+          <div className="field"><label htmlFor="setTds">TDS on commission (%)</label><input id="setTds" type="number" step="0.1" min={0} max={40} value={f.tdsRate} onChange={(e) => setF({ ...f, tdsRate: Number(e.target.value) })} /></div>
+          <div className="field"><label htmlFor="setGst">GST on partner invoices (%)</label><input id="setGst" type="number" step="0.1" min={0} max={40} value={f.gstRate} onChange={(e) => setF({ ...f, gstRate: Number(e.target.value) })} /></div>
+          <div className="field"><label htmlFor="setSac">SAC printed on partner invoices</label><input id="setSac" value={f.sac} onChange={(e) => setF({ ...f, sac: e.target.value })} /></div>
+          <div className="field"><label htmlFor="setVer">Agreement version</label><input id="setVer" value={f.agreementVersion} onChange={(e) => setF({ ...f, agreementVersion: e.target.value })} /></div>
+          <p className="full hint" style={{ fontSize: '.78rem' }}>TDS is deducted when a commission is credited (currently 2% under section 393 of the Income-tax Act, 2025). Confirm the SAC with your CA. Change the agreement version when you revise the agreement text or commission structure, then send the revised agreement from Onboarding.</p>
+
+          <p className="full adm-h" style={{ marginTop: '.8rem' }}>UniVerse company details (first party in agreements, "bill to" on invoices)</p>
+          {([
+            ['legalName', 'Legal name', 'UniVerse LLP'], ['constitution', 'Constitution', 'a limited liability partnership incorporated under the LLP Act, 2008'],
+            ['cin', 'LLPIN / CIN', 'AAA-1234'], ['pan', 'PAN', 'AAAFU1234L'], ['gstin', 'GSTIN', '24AAAFU1234L1Z5'],
+            ['address', 'Registered office address', '5th Floor, …, Vadodara, Gujarat 390007'], ['state', 'State', 'Gujarat'], ['stateCode', 'GST state code', '24'],
+            ['city', 'City (seat of arbitration and courts)', 'Vadodara'], ['signatory', 'Signatory name', 'Mr. …'],
+            ['designation', 'Signatory designation', 'Designated Partner'], ['signatoryId', 'DPIN / DIN', '08123456'], ['email', 'Legal / compliance email', 'legal@universe.com'],
+          ] as const).map(([k, label, ph]) => (
+            <div key={k} className={`field${k === 'address' || k === 'constitution' ? ' full' : ''}`}>
+              <label htmlFor={`co-${k}`}>{label}</label>
+              <input id={`co-${k}`} placeholder={ph} value={f.company[k]} onChange={(e) => setF({ ...f, company: { ...f.company, [k]: e.target.value } })} />
+            </div>
+          ))}
+          <p className="full hint" style={{ fontSize: '.78rem' }}>Agreements can only be sent once the legal name, PAN, registered address and signatory are filled in.</p>
         </div>
       </form>
     </section>

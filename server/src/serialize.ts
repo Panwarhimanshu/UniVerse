@@ -26,6 +26,9 @@ export const publicAgent = (a: any) => ({
     fileName: a.agreement?.fileName ?? '',
   },
   partnerSince: a.createdAt,
+  // KYC and agreement signature, for the "complete your onboarding" prompts
+  kyc: { status: a.kyc?.status ?? 'none', type: a.kyc?.type ?? null, gstin: a.kyc?.gstin ?? '' },
+  agreementSigned: !!a.agreement?.esign?.at,
 });
 
 export const publicStudent = (s: any, requests: any[] = []) => ({
@@ -98,4 +101,13 @@ export const publicTx = (t: any) => ({
   date: t.date,
   method: t.method?.label ? { type: t.method.type, label: t.method.label } : null,
   payout: t.payout?.state ? { state: t.payout.state, utr: t.payout.utr ?? '', reason: t.payout.reason ?? '', paidAt: t.payout.paidAt ?? null } : null,
+  // commission: gross before TDS, the TDS deducted, and the rate (amount is the net)
+  gross: t.gross ?? null,
+  tds: t.tds ?? null,
+  tdsRate: t.tdsRate ?? null,
+  invoice: t.invoice?.number ? {
+    number: t.invoice.number, date: t.invoice.date, gstin: t.invoice.supplier?.gstin ?? '', legalName: t.invoice.supplier?.legalName ?? '',
+    taxable: t.invoice.taxable, gst: Math.round(((t.invoice.cgst ?? 0) + (t.invoice.sgst ?? 0) + (t.invoice.igst ?? 0)) * 100) / 100,
+    payable: t.invoice.payable, verified: !!t.invoice.verified,
+  } : null,
 });

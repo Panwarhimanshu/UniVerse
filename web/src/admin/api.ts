@@ -1,5 +1,5 @@
 import { json, makeRequest, tokenStore } from '../lib/api';
-import type { Agent, Case, CaseStatus, Message, PayoutMethod, TeamMember, Transaction } from '../lib/api';
+import type { Agent, Case, CaseStatus, Message, Onboarding, PayoutMethod, TeamMember, Transaction } from '../lib/api';
 import type { Article, ServiceOverride } from '../lib/content';
 
 export type Section = 'cases' | 'partners' | 'messages' | 'payouts' | 'agreements';
@@ -9,6 +9,11 @@ export interface StaffUser {
 export interface MasterSettings {
   minWithdrawal: number; supportEmail: string; supportPhone: string; commissionEffective: string;
   defaultRm: { name: string; email: string; phone: string }; articlesImported: boolean;
+  tdsRate: number; gstRate: number; sac: string; agreementVersion: string; company: Company;
+}
+export interface Company {
+  legalName: string; constitution: string; gstin: string; pan: string; cin: string; address: string; state: string; stateCode: string; city: string;
+  signatory: string; signatoryId: string; designation: string; email: string;
 }
 export interface PartnerFull extends Omit<Agent, 'member'> {
   suspended: boolean; wallet: { balance: number; pending: number; lifetime: number }; students: number;
@@ -39,7 +44,7 @@ export interface Stats {
 export interface Activity { id: string; admin: string | null; name: string; action: string; at: string }
 export interface Overview {
   partners: number; unverified: number; openCases: number; docsToReview: number; pendingPayouts: number;
-  openAgreementRequests: number; casesAwaitingReply: number; rmAwaitingReply: number;
+  openAgreementRequests: number; casesAwaitingReply: number; rmAwaitingReply: number; kycToReview: number; tdsRate: number;
 }
 export interface PartnerRef { id: string; name: string; agency: string }
 export interface AdminCase extends Case { partner: PartnerRef; awaitingReply: boolean; docsToReview: number; updatedAt: string }
@@ -57,6 +62,20 @@ export interface Thread { partnerId: string; name: string; agency: string; rm: s
 export interface AdminTx extends Transaction {
   partner: PartnerRef;
   payTo: { type: 'upi'; upi: string } | { type: 'bank'; holder: string; accountNumber: string; ifsc: string; bankName: string; branch: string } | null;
+  invoiceDetail: {
+    supplier: { legalName: string; gstin: string; address: string; state: string }; taxable: number; tdsAdjusted: number; gstRate: number;
+    cgst: number; sgst: number; igst: number; payable: number; signedName: string; signedAt: string; verifiedBy: string;
+  } | null;
+}
+export type OnboardingStage = 'review' | 'sent_back' | 'verified' | 'agreement_sent' | 'done' | 'not_started';
+export interface OnboardingRow {
+  id: string; name: string; agency: string; email: string; phone: string; city: string; zone: string; applicant: boolean; stage: OnboardingStage;
+  kycType: 'individual' | 'entity' | null; legalName: string; submittedAt: string | null; agreementSentAt: string | null; signedAt: string | null; createdAt: string;
+}
+export interface OnboardingDetail extends Omit<Onboarding, 'stage'> {
+  id: string; name: string; agency: string; email: string; phone: string; city: string; zone: string; applicant: boolean; stage: string;
+  kyc: Onboarding['kyc'] & { verifiedBy: string };
+  agreements: { id: string; number: string; version: string; status: 'sent' | 'signed'; sentAt: string; sentBy: string; signedAt: string | null; signer: string }[];
 }
 export interface AgreementReq {
   id: string; type: 'download' | 'discussion' | 'termination'; status: 'Open' | 'Closed'; createdAt: string;
@@ -106,7 +125,15 @@ export const adminApi = {
   sendRm: (partnerId: string, text: string) => request<Message>(`/admin/partners/${partnerId}/messages`, json('POST', { text })),
 
   transactions: (status: string) => request<{ instantPayouts: boolean; items: AdminTx[] }>(`/admin/transactions${qs({ status })}`),
-  settle: (id: string, action: 'clear' | 'pay' | 'payout' | 'reject', extra: { reason?: string; utr?: string } = {}) => request<Transaction>(`/admin/transactions/${id}`, json('PATCH', { action, ...extra })),
+  downloadInvoice: (id: string, name: string) => download(`/admin/transactions/${id}/invoice`, name),
+  onboardingList: () => request<OnboardingRow[]>('/admin/onboarding'),
+  onboardingDetail: (id: string) => request<OnboardingDetail>(`/admin/onboarding/${id}`),
+  kycDoc: (id: string, docId: string, name: string) => download(`/admin/onboarding/${id}/docs/${docId}`, name),
+  verifyKyc: (id: string) => request<{ ok: boolean }>(`/admin/onboarding/${id}/verify`, json('POST')),
+  rejectKyc: (id: string, reason: string) => request<{ ok: boolean }>(`/admin/onboarding/${id}/reject`, json('POST', { reason })),
+  sendAgreement: (id: string) => request<{ ok: boolean; link: string }>(`/admin/onboarding/${id}/agreement`, json('POST')),
+  agreementPdf: (id: string, docId: string, name: string) => download(`/admin/onboarding/${id}/agreements/${docId}/pdf`, name),
+  settle: (id: string, action: 'clear' | 'pay' | 'payout' | 'reject' | 'verify-invoice', extra: { reason?: string; utr?: string } = {}) => request<Transaction>(`/admin/transactions/${id}`, json('PATCH', { action, ...extra })),
 
   agreementRequests: (status: string) => request<AgreementReq[]>(`/admin/agreement-requests${qs({ status })}`),
   reopenAgreementRequest: (id: string) => request<{ ok: boolean }>(`/admin/agreement-requests/${id}`, json('PATCH', { status: 'Open' })),

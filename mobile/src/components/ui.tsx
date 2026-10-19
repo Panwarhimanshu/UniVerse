@@ -12,13 +12,15 @@ export { Feather };
 /* ---------- layout ---------- */
 
 export function Screen({
-  children, scroll = true, onRefresh, refreshing = false, edges = ['top'], padded = true, keyboardOffset = 0, header,
+  children, scroll = true, onRefresh, refreshing = false, edges = ['top'], padded = true, keyboardOffset = 0, header, scrollEnabled = true,
 }: {
   children: ReactNode; scroll?: boolean; onRefresh?: () => void; refreshing?: boolean; edges?: Edge[]; padded?: boolean;
   /** stays fixed at the top while the content scrolls underneath */
   header?: ReactNode;
   /** height of any header above the screen (stack screens), so the keyboard offset is right */
   keyboardOffset?: number;
+  /** false while drawing a signature, so the page doesn't scroll under the finger */
+  scrollEnabled?: boolean;
 }) {
   const pad = padded ? styles.pad : undefined;
   return (
@@ -30,6 +32,7 @@ export function Screen({
         <ScrollView
           contentContainerStyle={[pad, { paddingBottom: space.xxl }]}
           keyboardShouldPersistTaps="handled"
+          scrollEnabled={scrollEnabled}
           refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.muted} /> : undefined}
         >
           {children}

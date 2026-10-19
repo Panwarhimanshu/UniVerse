@@ -8,7 +8,7 @@ import { ToastProvider } from './lib/toast';
 import { loadSiteContent } from './lib/content';
 import Home from './pages/Home';
 import ServicePage from './pages/ServicePage';
-import { AgentLogin, PartnerLogin, ResetPassword } from './pages/Auth';
+import { AgentLogin, PartnerLogin, ResetPassword, SignAgreement } from './pages/Auth';
 import Dashboard from './dashboard/Dashboard';
 import AdminApp from './admin/AdminApp';
 
@@ -39,6 +39,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="/partner-login" element={<PartnerLogin />} />
             <Route path="/agent-login" element={<AgentLogin />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/sign-agreement" element={<SignAgreement />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/dashboard/:view" element={<Dashboard />} />
             <Route path="/admin" element={<AdminApp />} />

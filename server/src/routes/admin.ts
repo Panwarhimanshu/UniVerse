@@ -1,3 +1,5 @@
+import { getSettings } from '../content.js';
+import { deskOnboarding } from './onboarding.js';
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
@@ -71,6 +73,7 @@ router.use('/inbox', requireSection('messages'));
 router.use('/partners', (req, res, next) => requireSection(/\/messages$/.test(req.path) ? 'messages' : 'partners')(req, res, next));
 router.use('/transactions', requireSection('payouts'));
 router.use('/agreement-requests', requireSection('agreements'));
+router.use('/onboarding', requireSection('partners'), deskOnboarding);
 
 /* ---------- CSV exports (open in Excel). A UTF-8 BOM keeps ₹ and names readable. ---------- */
 const csv = (rows: (string | number | boolean | null | undefined)[][]) =>
@@ -142,8 +145,8 @@ async function awaitingThreads(field: 'request' | 'agent', match: Record<string,
 /* ---------- overview ---------- */
 router.get('/overview', async (_req, res) => {
   const [partners, unverified, open, review, payouts, agreements, caseWaiting, rmWaiting] = await Promise.all([
-    Agent.countDocuments(),
-    Agent.countDocuments({ verified: false }),
+    Agent.countDocuments({ onboarding: { $nin: ['applied', 'agreement_sent'] } }),
+    Agent.countDocuments({ verified: false, onboarding: { $nin: ['applied', 'agreement_sent'] } }),
     ServiceRequest.countDocuments({ status: { $ne: 'Completed' } }),
     ServiceRequest.countDocuments({ 'docs.status': 'review' }),
     Transaction.countDocuments({ status: 'Pending' }),
@@ -151,9 +154,11 @@ router.get('/overview', async (_req, res) => {
     awaitingThreads('request', { request: { $ne: null } }),
     awaitingThreads('agent', { request: null }),
   ]);
+  const kycToReview = await Agent.countDocuments({ 'kyc.status': 'submitted' });
   res.json({
     partners, unverified, openCases: open, docsToReview: review, pendingPayouts: payouts,
     openAgreementRequests: agreements, casesAwaitingReply: caseWaiting.size, rmAwaitingReply: rmWaiting.size,
+    kycToReview, tdsRate: getSettings().tdsRate,
   });
 });
 
@@ -414,25 +419,29 @@ router.get('/cases/:id/docs/:docId/file', async (req, res) => {
 /* Credit a commission to the partner's wallet for this case */
 router.post('/cases/:id/credit', async (req, res) => {
   const r = await loadCase(req.params.id);
-  const amount = Math.round(Number(req.body?.amount));
-  if (!(amount > 0)) throw new HttpError(400, 'Enter the commission amount in rupees');
+  const gross = Math.round(Number(req.body?.amount));
+  if (!(gross > 0)) throw new HttpError(400, 'Enter the commission amount in rupees');
   const cleared = !!req.body?.cleared;
   const svc = serviceByKey(r.service)?.name ?? r.service;
   const student: any = r.student;
+  // TDS on commission (Income-tax Act 2025 s.393, earlier s.194H) comes off before it reaches the wallet
+  const tdsRate = getSettings().tdsRate;
+  const tds = Math.round((gross * tdsRate) / 100);
+  const amount = gross - tds;
   await Transaction.create({
-    agent: r.agent, request: r._id, type: 'Credit', kind: 'commission', amount, status: cleared ? 'Completed' : 'Pending',
+    agent: r.agent, request: r._id, type: 'Credit', kind: 'commission', amount, gross, tds, tdsRate, status: cleared ? 'Completed' : 'Pending',
     description: `${svc} commission · ${student?.name ?? ''} (${r.ref})`,
   });
   await syncWallet(r.agent);
   await Message.create({
     agent: r.agent, request: r._id, from: 'system',
-    text: `Commission of ₹${amount.toLocaleString('en-IN')} ${cleared ? 'credited to your wallet' : 'added as pending clearance'}`,
+    text: `Commission of ₹${gross.toLocaleString('en-IN')} less ${tdsRate}% TDS (₹${tds.toLocaleString('en-IN')}): ₹${amount.toLocaleString('en-IN')} ${cleared ? 'credited to your wallet' : 'added as pending clearance'}`,
   });
-  res.locals.audit = `${r.ref}: credited ₹${amount.toLocaleString('en-IN')} commission${cleared ? '' : ' (pending)'}`;
+  res.locals.audit = `${r.ref}: credited ₹${gross.toLocaleString('en-IN')} commission (₹${tds.toLocaleString('en-IN')} TDS, ₹${amount.toLocaleString('en-IN')} net)${cleared ? '' : ' (pending)'}`;
   await notify({
     agent: r.agent, category: 'payment', type: cleared ? 'payment.commission_credited' : 'payment.commission_pending',
     title: cleared ? `₹${amount.toLocaleString('en-IN')} commission credited` : `₹${amount.toLocaleString('en-IN')} commission on its way`,
-    body: `${svc} for ${student?.name ?? r.ref}: ${cleared ? 'credited to your wallet. You can withdraw it any time.' : 'added as pending. It moves to your balance once cleared.'}`,
+    body: `${svc} for ${student?.name ?? r.ref}: ₹${gross.toLocaleString('en-IN')} less ₹${tds.toLocaleString('en-IN')} TDS. ${cleared ? 'Credited to your wallet. You can withdraw it any time.' : 'Added as pending. It moves to your balance once cleared.'}`,
     link: { kind: 'wallet' }, audience: 'wallet',
   });
   res.status(201).json(await caseDetail(r));
@@ -441,7 +450,7 @@ router.post('/cases/:id/credit', async (req, res) => {
 /* ---------- partners ---------- */
 router.get('/partners', async (_req, res) => {
   const [agents, counts, members] = await Promise.all([
-    Agent.find().sort({ createdAt: -1 }),
+    Agent.find({ onboarding: { $nin: ['applied', 'agreement_sent'] } }).sort({ createdAt: -1 }),
     ServiceRequest.aggregate([{ $group: { _id: '$agent', total: { $sum: 1 }, open: { $sum: { $cond: [{ $ne: ['$status', 'Completed'] }, 1, 0] } } } }]),
     TeamMember.aggregate([{ $group: { _id: '$agent', n: { $sum: 1 } } }]),
   ]);
@@ -539,9 +548,20 @@ router.get('/transactions', async (req, res) => {
         ...publicTx(t),
         partner: { id: String(t.agent), name: a?.name ?? '', agency: a?.agency ?? '' },
         payTo: m ? (m.type === 'upi' ? { type: 'upi', upi: m.upi } : { type: 'bank', holder: m.holder, accountNumber: m.accountNumber, ifsc: m.ifsc, bankName: m.bankName, branch: m.branch }) : null,
+        invoiceDetail: t.invoice?.number ? {
+          supplier: t.invoice.supplier, taxable: t.invoice.taxable, tdsAdjusted: t.invoice.tdsAdjusted, gstRate: t.invoice.gstRate,
+          cgst: t.invoice.cgst, sgst: t.invoice.sgst, igst: t.invoice.igst, payable: t.invoice.payable, signedName: t.invoice.signedName,
+          signedAt: t.invoice.signedAt, verifiedBy: t.invoice.verifiedBy ?? '',
+        } : null,
       };
     }),
   });
+});
+
+router.get('/transactions/:id/invoice', async (req, res) => {
+  const t = await Transaction.findById(oid(req.params.id, 'Transaction'));
+  if (!t?.invoice?.file) throw new HttpError(404, 'Invoice not found');
+  await sendDocFile(res, t.invoice.file, `Invoice ${t.invoice.number} ${t.invoice.supplier?.gstin ?? ''}.pdf`);
 });
 
 /* clear: pending commission → available · payout: send through RazorpayX · pay: paid by hand (with bank reference)
@@ -553,7 +573,17 @@ router.patch('/transactions/:id', async (req, res) => {
   const action = req.body?.action;
   const amt = `₹${t.amount.toLocaleString('en-IN')}`;
   const to = t.method?.label ?? 'your account';
+  const gstInvoice = !!t.invoice?.number;
+  if (gstInvoice && (action === 'pay' || action === 'payout') && !t.invoice?.verified) throw new HttpError(409, 'Verify the GST invoice before paying this withdrawal');
 
+  if (t.type === 'Debit' && action === 'verify-invoice') {
+    if (!gstInvoice) throw new HttpError(400, 'This withdrawal has no GST invoice');
+    t.set('invoice.verified', true);
+    t.set('invoice.verifiedBy', adminOf(req).name);
+    await t.save();
+    res.locals.audit = `Withdrawal of ${amt}: GST invoice ${t.invoice?.number} verified`;
+    return res.json(publicTx(t));
+  }
   if (t.type === 'Credit' && action === 'clear') {
     t.status = 'Completed';
     await t.save();

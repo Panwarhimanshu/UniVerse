@@ -1,3 +1,4 @@
+import { isApplicant } from '../onboard.js';
 import { Router } from 'express';
 import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
@@ -24,36 +25,9 @@ export const emailTaken = async (email: string) => {
   return !!((await Agent.exists({ email: e })) || (await TeamMember.exists({ email: e })));
 };
 
-router.post('/register', async (req, res) => {
-  const { name, email, phone, zone, city, password } = req.body ?? {};
-  if (!name?.trim()) throw new HttpError(400, 'Name is required');
-  if (!EMAIL_RE.test(email ?? '')) throw new HttpError(400, 'Enter a valid email address');
-  if (!ZONES.includes(zone)) throw new HttpError(400, 'Select your zone');
-  if (typeof password !== 'string' || password.length < 8) throw new HttpError(400, 'Password must be at least 8 characters');
-  if (await emailTaken(email)) throw new HttpError(409, 'An account with this email already exists');
-
-  const now = new Date();
-  const validTill = new Date(now);
-  validTill.setFullYear(validTill.getFullYear() + 2);
-  validTill.setDate(validTill.getDate() - 1);
-  const seq = String((await Agent.countDocuments()) + 1001).padStart(5, '0');
-  const agent = await Agent.create({
-    name: name.trim(), email, phone, zone, city, agency: name.trim(),
-    passwordHash: await bcrypt.hash(password, 10),
-    rm: getSettings().defaultRm,
-    agreement: { number: `UV/AGR/${now.getFullYear()}/${seq}`, signedAt: now, validTill, autoRenew: true },
-  });
-  track(req, agent.id, null, 'sign_up');
-  await notify({ agent: agent._id, category: 'account', type: 'account.welcome', title: 'Welcome to UniVerse', body: `Your partner account is ready. Your agreement number is ${agent.agreement?.number}. Request your first service with the + button.`, link: { kind: 'profile' }, email: false });
-  await sendMail(agent.email, 'Welcome to UniVerse', layout({
-    greeting: `Welcome, ${agent.name.split(' ')[0]}!`,
-    paragraphs: [
-      'Your UniVerse partner account is ready. You can now request services for your students, track every case, upload documents and receive your commission in your wallet.',
-      `Your partner agreement number is ${agent.agreement?.number}. Your relationship manager will be in touch shortly.`,
-    ],
-    button: { label: 'Open your dashboard', url: `${siteUrl()}/dashboard/overview` },
-  }));
-  res.status(201).json({ token: signToken(agent.id), agent: { ...publicAgent(agent), member: null } });
+/* Open sign-up is replaced by the onboarding application (POST /api/onboarding/apply) */
+router.post('/register', (_req, _res) => {
+  throw new HttpError(410, 'Sign-up now goes through a short application with your KYC details. Please update the app or apply on the website.');
 });
 
 router.post('/login', async (req, res) => {
@@ -67,6 +41,11 @@ router.post('/login', async (req, res) => {
 
   const agent = await Agent.findOne({ email }).select('+passwordHash');
   if (agent) {
+    if (isApplicant(agent)) {
+      throw new HttpError(403, agent.onboarding === 'agreement_sent'
+        ? 'Your agreement is waiting for your signature. Open the link in your email to sign it; you can set your password right after.'
+        : 'Your application is being reviewed. We will email your agreement within 48 hours of applying.');
+    }
     if (!(await bcrypt.compare(password, agent.passwordHash))) throw await fail();
     await clearAttempts('partner', email);
     if (agent.suspended) throw new HttpError(403, SUSPENDED);
@@ -167,7 +146,7 @@ router.post('/forgot', async (req, res) => {
 
   const agent = await Agent.findOne({ email });
   const member = agent ? null : await TeamMember.findOne({ email });
-  const user = agent ?? member;
+  const user = agent && isApplicant(agent) ? null : agent ?? member;
   if (user) {
     const token = crypto.randomBytes(32).toString('base64url');
     await PasswordReset.updateMany({ user: user._id, used: false }, { used: true });

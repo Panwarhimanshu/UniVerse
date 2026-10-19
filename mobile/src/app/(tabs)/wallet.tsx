@@ -85,6 +85,17 @@ export default function Wallet() {
             ) : null}
           </View>
 
+          {!data.canWithdraw ? (
+            <Pressable onPress={isOwner ? () => router.push('/kyc') : undefined} style={styles.block}>
+              <Feather name="alert-circle" size={18} color={colors.warning} />
+              <Text style={[type.small, { flex: 1, color: colors.text }]}>{data.withdrawBlock}</Text>
+              {isOwner ? <Feather name="chevron-right" size={18} color={colors.muted} /> : null}
+            </Pressable>
+          ) : null}
+          <Text style={[type.small, { marginTop: space.md }]}>
+            Commission is credited after {data.tdsRate}% TDS. Registered under GST? Withdraw "with GST" and we pay {data.gstRate}% GST on top against your signed invoice.
+          </Text>
+
           <View style={{ marginTop: space.xl }}>
             <View style={styles.sectionHead}>
               <Text style={type.label}>Receive money to</Text>
@@ -121,7 +132,7 @@ export default function Wallet() {
             <View key={g.month} style={{ marginTop: space.xl }}>
               <Text style={type.label}>{g.month}</Text>
               <View style={styles.card}>
-                {g.items.map((t, i) => <TxRow key={t.id} t={t} first={i === 0} />)}
+                {g.items.map((t, i) => <TxRow key={t.id} t={t} first={i === 0} tdsRate={data.tdsRate} />)}
               </View>
             </View>
           )) : (
@@ -135,7 +146,7 @@ export default function Wallet() {
   );
 }
 
-function TxRow({ t, first }: { t: Transaction; first: boolean }) {
+function TxRow({ t, first, tdsRate }: { t: Transaction; first: boolean; tdsRate: number }) {
   const credit = t.type === 'Credit';
   const rejected = t.status === 'Rejected';
   const [title, detail] = t.description.split(' · ');
@@ -154,11 +165,20 @@ function TxRow({ t, first }: { t: Transaction; first: boolean }) {
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={[type.body, { fontWeight: '600' }]} numberOfLines={1}>{credit ? title : 'Withdrawal'}</Text>
         <Text style={type.small} numberOfLines={1}>{sub.filter(Boolean).join(' · ')}</Text>
+        {t.gross != null ? (
+          <Text style={type.small}>Gross {inr(t.gross)} · TDS {t.tdsRate ?? tdsRate}% −{inr(t.tds ?? 0)}</Text>
+        ) : null}
+        {t.invoice ? (
+          <Text style={type.small} onPress={() => api.downloadInvoice(t.id, `Invoice ${t.invoice!.number}.pdf`).catch((e) => notify('Could not open', errorText(e)))}>
+            Invoice {t.invoice.number} · + GST {inr(t.invoice.gst)} · <Text style={{ color: colors.primary, fontWeight: '700' }}>View</Text>
+          </Text>
+        ) : null}
       </View>
       <View style={{ alignItems: 'flex-end', gap: 2 }}>
         <Text style={{ fontSize: 15, fontWeight: '700', color: rejected ? colors.faint : credit ? colors.positive : colors.text, textDecorationLine: rejected ? 'line-through' : 'none' }}>
           {credit ? '+' : '−'}{inr(t.amount)}
         </Text>
+        {t.invoice ? <Text style={[styles.state, { color: colors.positive }]}>you get {inr(t.invoice.payable)}</Text> : null}
         <Text style={[styles.state, { color: stateColor }]}>{state}</Text>
       </View>
     </View>
@@ -189,4 +209,5 @@ const styles = StyleSheet.create({
   sep: { borderTopWidth: StyleSheet.hairlineWidth, borderColor: colors.line },
   txIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   state: { fontSize: 11, fontWeight: '600', color: colors.muted },
+  block: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginTop: space.lg, padding: space.md, borderRadius: radius.lg, backgroundColor: colors.warningTint },
 });

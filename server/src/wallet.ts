@@ -111,9 +111,9 @@ export async function razorpayPayout(txId: string) {
   const p = await rzp<{ id: string; status: string }>('/payouts', {
     account_number: process.env.RAZORPAYX_ACCOUNT_NUMBER,
     fund_account_id: m.razorpay!.fundAccountId,
-    amount: t.amount * 100, // paise
+    amount: Math.round((t.invoice?.payable ?? t.amount) * 100), // paise; invoiced withdrawals include GST
     currency: 'INR',
-    mode: m.type === 'upi' ? 'UPI' : t.amount > 200000 ? 'NEFT' : 'IMPS',
+    mode: m.type === 'upi' ? 'UPI' : (t.invoice?.payable ?? t.amount) > 200000 ? 'NEFT' : 'IMPS',
     purpose: 'payout',
     queue_if_low_balance: true,
     reference_id: String(t._id),

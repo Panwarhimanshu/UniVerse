@@ -1,3 +1,4 @@
+import { OnboardingView } from './Onboarding';
 import { useCallback, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
@@ -30,15 +31,16 @@ const ICON = {
   usage: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><line x1="10" y1="18" x2="14" y2="18"/><polyline points="9 12 11 10 13 12 15 8"/></svg>',
   announcements: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>',
   activity: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>',
+  onboarding: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></svg>',
   check: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
 };
 
-type View = 'overview' | Section | 'usage' | 'announcements' | 'staff' | 'services' | 'insights' | 'settings' | 'activity';
+type View = 'overview' | Section | 'onboarding' | 'usage' | 'announcements' | 'staff' | 'services' | 'insights' | 'settings' | 'activity';
 const TITLES: Record<View, string> = {
-  overview: 'Dashboard', cases: 'Cases', partners: 'Partners', messages: 'RM messages', payouts: 'Payouts', agreements: 'Agreement requests',
+  overview: 'Dashboard', cases: 'Cases', partners: 'Partners', onboarding: 'Onboarding & KYC', messages: 'RM messages', payouts: 'Payouts', agreements: 'Agreement requests',
   usage: 'App usage', announcements: 'Announcements', staff: 'Staff accounts', services: 'Services', insights: 'Insights', settings: 'Settings', activity: 'Activity log',
 };
-const DESK: View[] = ['overview', 'cases', 'partners', 'messages', 'payouts', 'agreements'];
+const DESK: View[] = ['overview', 'cases', 'partners', 'onboarding', 'messages', 'payouts', 'agreements'];
 const MASTER: View[] = ['usage', 'announcements', 'staff', 'services', 'insights', 'settings', 'activity'];
 const STATUSES: CaseStatus[] = ['Pending', 'In Progress', 'On Hold', 'Completed'];
 const AGR_LABEL = { download: 'Copy of signed agreement', discussion: 'Discuss the agreement', termination: 'Terminate the agreement' } as const;
@@ -118,7 +120,7 @@ function AdminLogin({ onSignedIn }: { onSignedIn: (s: StaffUser) => void }) {
 function Console({ staff, signOut }: { staff: StaffUser; signOut: () => void }) {
   const { view: viewParam } = useParams();
   const isMaster = staff.role === 'master';
-  const canUse = (v: View) => v === 'overview' || isMaster || (!MASTER.includes(v) && staff.sections.includes(v as Section));
+  const canUse = (v: View) => v === 'overview' || isMaster || (!MASTER.includes(v) && staff.sections.includes((v === 'onboarding' ? 'partners' : v) as Section));
   const view: View = viewParam && viewParam in TITLES && canUse(viewParam as View) ? (viewParam as View) : 'overview';
   const navigate = useNavigate();
   const toast = useToast();
@@ -140,7 +142,7 @@ function Console({ staff, signOut }: { staff: StaffUser; signOut: () => void }) 
   const go = (v: View, filter: { queue?: string; partner?: string } = {}) => { setCaseFilter(filter); navigate(`/admin/${v}`); };
   const o = overview.data;
   const badge: Partial<Record<View, number>> = o ? {
-    cases: o.casesAwaitingReply + o.docsToReview, messages: o.rmAwaitingReply, payouts: o.pendingPayouts, agreements: o.openAgreementRequests,
+    cases: o.casesAwaitingReply + o.docsToReview, messages: o.rmAwaitingReply, payouts: o.pendingPayouts, agreements: o.openAgreementRequests, onboarding: o.kycToReview,
   } : {};
 
   return (
@@ -183,6 +185,7 @@ function Console({ staff, signOut }: { staff: StaffUser; signOut: () => void }) 
           {view === 'overview' && <AdminDashboard go={(v, f) => go(v as View, f)} canUse={(v) => canUse(v as View)} isMaster={isMaster} name={staff.name} overview={o ?? null} />}
           {view === 'cases' && <CasesView initial={caseFilter} onChanged={overview.reload} />}
           {view === 'partners' && <PartnersView isMaster={isMaster} openCases={canUse('cases') ? (id) => go('cases', { partner: id }) : undefined} />}
+          {view === 'onboarding' && <OnboardingView onChanged={overview.reload} />}
           {view === 'messages' && <MessagesView onChanged={overview.reload} />}
           {view === 'payouts' && <PayoutsView onChanged={overview.reload} />}
           {view === 'agreements' && <AgreementsView onChanged={overview.reload} />}
@@ -271,6 +274,7 @@ function CaseDesk({ id, fallbackRef, onChanged }: { id: string; fallbackRef?: st
   const [extraDoc, setExtraDoc] = useState('');
   const [credit, setCredit] = useState({ amount: '', cleared: false });
   const [busy, setBusy] = useState(false);
+  const tdsRate = useApi(adminApi.overview, []).data?.tdsRate ?? 2;
   const chatRef = useAutoScroll(d?.messages.length);
 
   const load = useCallback(() => adminApi.case(id).then(setD).catch((e) => toast(errMsg(e))), [id, toast]);
@@ -362,17 +366,18 @@ function CaseDesk({ id, fallbackRef, onChanged }: { id: string; fallbackRef?: st
         <h4 className="adm-h">Commission</h4>
         {d.credits.length ? (
           <ul className="adm-credits">
-            {d.credits.map((t) => <li key={t.id}><span>{fmtDate(t.date)} · {inr(t.amount)}</span><span className={`status ${statusClass(t.status)}`}>{t.status}</span></li>)}
+            {d.credits.map((t) => <li key={t.id}><span>{fmtDate(t.date)} · {t.gross != null ? `${inr(t.gross)} − TDS ${inr(t.tds ?? 0)} = ` : ''}{inr(t.amount)}</span><span className={`status ${statusClass(t.status)}`}>{t.status}</span></li>)}
           </ul>
         ) : <p className="adm-meta">Nothing credited for this case yet.</p>}
         <form className="adm-inline" onSubmit={async (e) => {
           e.preventDefault();
           const amount = Math.round(Number(credit.amount));
           if (!(amount > 0)) return toast('Enter the commission in rupees');
-          if (!confirm(`Credit ${inr(amount)} to ${p?.agency || p?.name}${credit.cleared ? ' as available balance' : ' as pending clearance'}?`)) return;
+          const tdsAmt = Math.round((amount * tdsRate) / 100);
+          if (!confirm(`Credit commission of ${inr(amount)} to ${p?.agency || p?.name}?\n${tdsRate}% TDS ${inr(tdsAmt)} is deducted: ${inr(amount - tdsAmt)} goes to the wallet${credit.cleared ? ' as available balance' : ' as pending clearance'}.`)) return;
           if (await act(() => adminApi.credit(c.id, amount, credit.cleared), 'Commission credited')) setCredit({ amount: '', cleared: false });
         }}>
-          <input type="number" min={1} placeholder="Amount (₹)" value={credit.amount} onChange={(e) => setCredit({ ...credit, amount: e.target.value })} />
+          <input type="number" min={1} placeholder="Gross commission (₹)" value={credit.amount} onChange={(e) => setCredit({ ...credit, amount: e.target.value })} />
           <label className="remember"><input type="checkbox" checked={credit.cleared} onChange={(e) => setCredit({ ...credit, cleared: e.target.checked })} /> Available now</label>
           <button className="btn btn-green btn-sm" disabled={!credit.amount || busy}>Credit</button>
         </form>
@@ -560,23 +565,26 @@ function PayoutsView({ onChanged }: { onChanged: () => void }) {
   const [status, setStatus] = useState('Pending');
   const list = useApi(() => adminApi.transactions(status), [status]);
   const [busyId, setBusyId] = useState('');
-  const settle = async (t: AdminTx, action: 'clear' | 'pay' | 'payout' | 'reject') => {
+  const settle = async (t: AdminTx, action: 'clear' | 'pay' | 'payout' | 'reject' | 'verify-invoice') => {
     const extra: { reason?: string; utr?: string } = {};
+    const due = t.invoice ? t.invoice.payable : t.amount;
     if (action === 'reject') {
       const r = prompt(t.type === 'Debit' ? 'Why is this withdrawal being rejected? The partner will see this.' : 'Why is this commission being cancelled?', '');
       if (r === null) return;
       extra.reason = r;
     } else if (action === 'pay') {
-      const utr = prompt(`Enter the bank reference (UTR) for the ${inr(t.amount)} you sent to ${t.method?.label ?? 'the partner'}:`, '');
+      const utr = prompt(`Enter the bank reference (UTR) for the ${inr(due)} you sent to ${t.method?.label ?? 'the partner'}:`, '');
       if (!utr) return;
       extra.utr = utr.trim();
-    } else if (action === 'payout' && !confirm(`Send ${inr(t.amount)} to ${t.method?.label ?? 'the partner'} through Razorpay now?`)) {
+    } else if (action === 'payout' && !confirm(`Send ${inr(due)} to ${t.method?.label ?? 'the partner'} through Razorpay now?`)) {
+      return;
+    } else if (action === 'verify-invoice' && !confirm(`Confirm GSTIN ${t.invoice?.gstin} is active and the invoice ${t.invoice?.number} is correct?`)) {
       return;
     }
     setBusyId(t.id);
     try {
       await adminApi.settle(t.id, action, extra);
-      toast({ clear: 'Moved to available balance', pay: 'Marked as paid', payout: 'Sent to Razorpay. It settles automatically.', reject: 'Rejected' }[action]);
+      toast({ clear: 'Moved to available balance', pay: 'Marked as paid', payout: 'Sent to Razorpay. It settles automatically.', reject: 'Rejected', 'verify-invoice': 'Invoice verified. You can pay it now.' }[action]);
       list.reload();
       onChanged();
     } catch (e) { toast(errMsg(e)); } finally { setBusyId(''); }
@@ -614,18 +622,34 @@ function PayoutsView({ onChanged }: { onChanged: () => void }) {
                             </>
                           )}
                           {t.payout?.utr ? <span className="t-sub">Bank reference {t.payout.utr}</span> : t.payout?.reason ? <span className="t-sub">{t.payout.reason}</span> : null}
+                          {t.invoice && t.invoiceDetail ? (
+                            <div className="inv-mini">
+                              <span><b>GST invoice {t.invoice.number}</b> · {t.invoiceDetail.supplier.legalName} · GSTIN <b>{t.invoice.gstin}</b> <button className="link-btn" onClick={() => copy(t.invoice!.gstin)}>copy</button></span>
+                              <span>Taxable {inr(t.invoiceDetail.taxable)} · {t.invoiceDetail.igst ? `IGST ${inr(t.invoiceDetail.igst)}` : `CGST ${inr(t.invoiceDetail.cgst)} + SGST ${inr(t.invoiceDetail.sgst)}`} · TDS adjusted {inr(t.invoiceDetail.tdsAdjusted)}</span>
+                              <span>Signed by {t.invoiceDetail.signedName}{t.invoice.verified ? ` · verified by ${t.invoiceDetail.verifiedBy}` : ''} · <button className="link-btn" onClick={() => adminApi.downloadInvoice(t.id, `Invoice ${t.invoice!.number}.pdf`).catch((e) => toast(errMsg(e)))}>download invoice</button></span>
+                            </div>
+                          ) : null}
                         </div>
                       ) : <span className="t-sub">{t.method?.label ?? t.description}</span>
                     ) : t.description}
                   </td>
-                  <td style={{ fontWeight: 700, color: t.type === 'Credit' ? 'var(--green-deep)' : 'var(--ink)', whiteSpace: 'nowrap' }}>{t.type === 'Credit' ? '+' : '−'} {inr(t.amount)}</td>
+                  <td style={{ fontWeight: 700, color: t.type === 'Credit' ? 'var(--green-deep)' : 'var(--ink)', whiteSpace: 'nowrap' }}>
+                    {t.type === 'Credit' ? '+' : '−'} {inr(t.amount)}
+                    {t.invoice ? <div className="t-sub">Pay {inr(t.invoice.payable)} (incl. GST {inr(t.invoice.gst)})</div> : null}
+                    {t.gross != null ? <div className="t-sub">Gross {inr(t.gross)} · TDS {inr(t.tds ?? 0)}</div> : null}
+                  </td>
                   <td><span className={`status ${statusClass(t.status)}`}>{t.type === 'Debit' && t.status === 'Pending' && t.payout?.state === 'processing' ? 'With Razorpay' : t.status}</span></td>
                   <td>
                     {t.status === 'Pending' ? (
                       <div className="um-actions">
                         {t.type === 'Debit' ? (
                           t.payout?.state === 'processing' ? <span className="t-sub">Settles automatically</span> : (
-                            <>
+                            t.invoice && !t.invoice.verified ? (
+                              <>
+                                <button className="btn btn-primary btn-sm" disabled={busyId === t.id} onClick={() => settle(t, 'verify-invoice')}>Verify invoice</button>
+                                <button className="btn btn-ghost btn-sm" disabled={busyId === t.id} onClick={() => settle(t, 'reject')}>Reject</button>
+                              </>
+                            ) : <>
                               {list.data?.instantPayouts && t.payTo ? <button className="btn btn-green btn-sm" disabled={busyId === t.id} onClick={() => settle(t, 'payout')}>Pay via Razorpay</button> : null}
                               <button className={`btn ${list.data?.instantPayouts ? 'btn-ghost' : 'btn-green'} btn-sm`} disabled={busyId === t.id} onClick={() => settle(t, 'pay')}>Mark paid</button>
                               <button className="btn btn-ghost btn-sm" disabled={busyId === t.id} onClick={() => settle(t, 'reject')}>Reject</button>

@@ -45,6 +45,19 @@ export default function Home() {
 
       {error && !data ? <ErrorNote message={error} onRetry={refresh} /> : null}
 
+      {!member && agent && (agent.kyc?.status !== 'verified' || !agent.agreementSigned) ? (
+        <Pressable onPress={() => router.push('/kyc')} style={({ pressed }) => [styles.kyc, pressed && { opacity: 0.85 }]}>
+          <Feather name="alert-circle" size={18} color={colors.warning} />
+          <Text style={[type.small, { flex: 1, color: colors.text }]}>
+            {agent.kyc?.status === 'submitted' ? 'Your KYC is being verified. We send your agreement within 48 hours.'
+              : agent.kyc?.status === 'verified' ? 'Your partner agreement is ready. Sign it to keep withdrawing.'
+                : agent.kyc?.status === 'rejected' ? 'We need a change to your KYC details. Tap to update.'
+                  : 'Complete your KYC (PAN, GST or MSME) to keep withdrawing your commission.'}
+          </Text>
+          <Feather name="chevron-right" size={18} color={colors.muted} />
+        </Pressable>
+      ) : null}
+
       {data ? (
         <>
           {/* the one dark card: where the cases stand and what needs doing (money lives on the Wallet tab) */}
@@ -219,4 +232,5 @@ const styles = StyleSheet.create({
   rm: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginTop: space.lg, padding: space.lg, borderRadius: radius.lg + 2, backgroundColor: colors.surface },
   chat: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, height: 34, borderRadius: radius.pill, backgroundColor: colors.bg },
   chatText: { fontSize: 13, fontWeight: '700', color: colors.accent },
+  kyc: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: radius.lg, backgroundColor: colors.warningTint, marginBottom: space.lg },
 });

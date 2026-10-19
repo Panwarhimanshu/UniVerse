@@ -137,6 +137,11 @@ export default function Profile() {
 
       <Section title="Account">
         <List>
+          {isOwner ? (
+            <Row icon="shield" title="KYC & agreement"
+              subtitle={agent.kyc?.status === 'verified' && agent.agreementSigned ? 'Verified and signed' : agent.kyc?.status === 'submitted' ? 'KYC being verified' : agent.kyc?.status === 'verified' ? 'Agreement ready to sign' : 'Action needed'}
+              onPress={() => router.push('/kyc')} />
+          ) : null}
           {isOwner ? <Row icon="file-text" title="Partner agreement" subtitle={agent.agreement.number || 'Your signed agreement'} onPress={() => router.push('/agreement')} /> : null}
           {isOwner ? <Row icon="users" title="Team members" subtitle="Logins and permissions for your staff" onPress={() => router.push('/team')} /> : null}
           <Row icon="key" title="Change password" onPress={() => router.push('/password')} />

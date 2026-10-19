@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Button, List, Row, Screen, Section, StatusPill } from '../components/ui';
 import { api } from '../lib/api';
 import type { AgreementRequest } from '../lib/api';
@@ -69,6 +69,9 @@ export default function Agreement() {
         <Row title={a.autoRenew ? 'On' : 'Off'} subtitle="Auto-renewal" />
       </List>
 
+      {!agent.agreementSigned ? (
+        <Button label="Sign the new Channel Partner Agreement" icon="edit-3" style={{ marginTop: space.lg }} onPress={() => router.push('/kyc')} />
+      ) : null}
       {a.hasFile ? (
         <Button
           label="Download signed agreement"

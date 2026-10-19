@@ -10,7 +10,17 @@ export interface SiteSettings {
   commissionEffective: string;
   defaultRm: { name: string; email: string; phone: string };
   articlesImported: boolean;
+  tdsRate: number;
+  gstRate: number;
+  sac: string;
+  agreementVersion: string;
+  company: Company;
 }
+export interface Company {
+  legalName: string; constitution: string; gstin: string; pan: string; cin: string; address: string; state: string; stateCode: string; city: string;
+  signatory: string; signatoryId: string; designation: string; email: string;
+}
+export const COMPANY_KEYS = ['legalName', 'constitution', 'gstin', 'pan', 'cin', 'address', 'state', 'stateCode', 'city', 'signatory', 'signatoryId', 'designation', 'email'] as const;
 
 let settings: SiteSettings;
 const hidden = new Set<string>();
@@ -32,7 +42,13 @@ export async function loadSettings() {
     commissionEffective: o.commissionEffective,
     defaultRm: { name: o.defaultRm?.name ?? '', email: o.defaultRm?.email ?? '', phone: o.defaultRm?.phone ?? '' },
     articlesImported: !!o.articlesImported,
+    tdsRate: o.tdsRate ?? 2,
+    gstRate: o.gstRate ?? 18,
+    sac: o.sac ?? '998599',
+    agreementVersion: o.agreementVersion ?? '2026.1',
+    company: Object.fromEntries(COMPANY_KEYS.map((k) => [k, String((o.company as Record<string, unknown> | undefined)?.[k] ?? '')])) as unknown as Company,
   };
+  if (!settings.company.legalName) settings.company.legalName = 'UniVerse LLP';
   return settings;
 }
 

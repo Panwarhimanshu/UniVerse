@@ -60,3 +60,13 @@ export async function sendAvatar(res: Response, id: string) {
     bucket('avatars').openDownloadStream(file._id).on('error', reject).on('end', () => resolve()).pipe(res);
   });
 }
+
+/** Reads a stored upload into memory (agreements and invoices, a few hundred KB) */
+export async function getFileBuffer(id: string) {
+  if (!mongo.ObjectId.isValid(id)) throw new HttpError(404, 'File not found');
+  const chunks: Buffer[] = [];
+  await new Promise<void>((resolve, reject) => {
+    bucket().openDownloadStream(new mongo.ObjectId(id)).on('data', (c: Buffer) => chunks.push(c)).on('error', reject).on('end', () => resolve());
+  });
+  return Buffer.concat(chunks);
+}

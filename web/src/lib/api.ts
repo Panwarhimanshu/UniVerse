@@ -12,8 +12,29 @@ export interface Agent {
     status: 'Active' | 'Ending' | 'Ended'; endsOn: string | null; hasFile: boolean; fileName: string;
   };
   partnerSince: string;
+  kyc: { status: KycStatus; type: 'individual' | 'entity' | null; gstin: string };
+  agreementSigned: boolean;
   /** set when a team member (not the owner) is signed in */
   member: TeamMember | null;
+}
+export type KycStatus = 'none' | 'submitted' | 'verified' | 'rejected';
+/** KYC and agreement-signature state for the signed-in partner */
+export interface Onboarding {
+  stage: 'applied' | 'agreement_sent' | 'active';
+  kyc: {
+    status: KycStatus; type: 'individual' | 'entity' | null; legalName: string; pan: string; entityType: string; gstin: string; udyam: string; cin: string;
+    signatory: string; designation: string; authority: string; address: string; state: string; pincode: string; note: string;
+    submittedAt: string | null; verifiedAt: string | null; docs: { id: string; kind: 'pan' | 'gst' | 'msme' | 'other'; name: string; mime: string }[];
+  };
+  agreement: { signed: boolean; signedAt: string | null; version: string; pending: { id: string; number: string; version: string; sentAt: string } | null };
+  canWithdraw: boolean;
+}
+export interface GstEntity { id: string; legalName: string; gstin: string; address: string; state: string; isDefault: boolean }
+export interface InvoicePreview {
+  number: string; date: string; description: string; sac: string; payTo: string;
+  supplier: { legalName: string; gstin: string; address: string; state: string; pan?: string };
+  recipient: { legalName: string; gstin: string; address: string; state: string; pan: string };
+  amount: number; taxable: number; tdsAdjusted: number; tdsRate: number; gstRate: number; cgst: number; sgst: number; igst: number; gst: number; payable: number; interState: boolean;
 }
 export interface CaseDoc { id: string; name: string; size: number; status: 'missing' | 'review' | 'verified'; hasFile: boolean; updatedAt: string }
 export interface TimelineStep { title: string; sub: string; done: boolean; now: boolean; at: string | null }
@@ -40,6 +61,10 @@ export interface Transaction {
   amount: number; status: 'Pending' | 'Completed' | 'Rejected'; date: string;
   method: { type: 'upi' | 'bank'; label: string } | null;
   payout: { state: 'requested' | 'processing' | 'processed' | 'failed' | 'reversed'; utr: string; reason: string; paidAt: string | null } | null;
+  /** commission credits: gross before TDS and the TDS deducted (amount is the net) */
+  gross: number | null; tds: number | null; tdsRate: number | null;
+  /** withdrawals with GST: the signed tax invoice */
+  invoice: { number: string; date: string; gstin: string; legalName: string; taxable: number; gst: number; payable: number; verified: boolean } | null;
 }
 export interface PayoutMethod {
   id: string; type: 'upi' | 'bank'; label: string; isDefault: boolean;
@@ -47,7 +72,8 @@ export interface PayoutMethod {
 }
 export interface Wallet {
   balance: number; pending: number; lifetime: number; minWithdrawal: number; instantPayouts: boolean;
-  methods: PayoutMethod[]; transactions: Transaction[];
+  tdsRate: number; gstRate: number; canWithdraw: boolean; withdrawBlock: string;
+  methods: PayoutMethod[]; gstEntities: GstEntity[]; transactions: Transaction[];
 }
 export interface Dashboard {
   stats: { activeCases: number; students: number; balance: number | null; monthEarnings: number | null };
@@ -141,7 +167,9 @@ export function makeRequest(store: ReturnType<typeof tokenStore>, onUnauthorized
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   };
-  return { request, download };
+  /** A protected file as an object URL, for showing a PDF in the page */
+  const blobUrl = async (path: string) => URL.createObjectURL(await (await send(path)).blob());
+  return { request, download, blobUrl };
 }
 
 const store = tokenStore('uv_token');
@@ -150,15 +178,24 @@ export const getToken = store.get;
 /** remember=false keeps the session only until the browser is closed */
 export const setToken = store.set;
 export const setUnauthorizedHandler = (fn: () => void) => { onUnauthorized = fn; };
-const { request, download } = makeRequest(store, () => onUnauthorized);
+const { request, download, blobUrl } = makeRequest(store, () => onUnauthorized);
 
+export interface SignInput { name: string; signature: string; accept: true }
 export type MemberInput = Pick<TeamMember, 'name' | 'email' | 'role' | 'menus' | 'perms'>;
 export const json = (method: string, body?: unknown): RequestInit => ({ method, body: body === undefined ? undefined : JSON.stringify(body) });
 
 export const api = {
   login: (email: string, password: string) => request<{ token: string; agent: Agent }>('/auth/login', json('POST', { email, password })),
-  register: (b: { name: string; email: string; phone: string; zone: string; city: string; password: string }) =>
-    request<{ token: string; agent: Agent }>('/auth/register', json('POST', b)),
+  /* onboarding: application, KYC, agreement signature */
+  onboardingMeta: () => request<{ states: string[]; entityTypes: string[]; sla: string }>('/onboarding/meta'),
+  apply: (form: FormData) => request<{ ok: boolean; email: string; sla: string }>('/onboarding/apply', { method: 'POST', body: form }),
+  agreementByToken: (token: string) => request<{ number: string; version: string; sentAt: string; expiresAt: string; party: { type: string; legalName: string; signatory: string; email: string } }>(`/onboarding/agreement?token=${encodeURIComponent(token)}`),
+  agreementPdfByToken: (token: string) => blobUrl(`/onboarding/agreement/pdf?token=${encodeURIComponent(token)}`),
+  signByToken: (token: string, b: SignInput) => request<{ ok: boolean; email: string; setPasswordToken: string }>('/onboarding/agreement/sign', json('POST', { token, ...b })),
+  onboarding: () => request<Onboarding>('/onboarding'),
+  submitKyc: (form: FormData) => request<Onboarding>('/kyc', { method: 'POST', body: form }),
+  pendingAgreementPdf: () => blobUrl('/agreement/pending/pdf'),
+  signPending: (b: SignInput) => request<Onboarding>('/agreement/pending/sign', json('POST', b)),
   me: () => request<Agent>('/auth/me'),
   updateMe: (b: Partial<Pick<Agent, 'name' | 'phone' | 'agency' | 'city' | 'bankAccount'>>) => request<Agent>('/auth/me', json('PATCH', b)),
   changePassword: (current: string, next: string) => request<{ ok: boolean }>('/auth/password', json('POST', { current, next })),
@@ -203,7 +240,15 @@ export const api = {
   raiseRequests: (id: string, services: string[]) => request<Student>(`/students/${id}/requests`, json('POST', { services })),
 
   wallet: () => request<Wallet>('/wallet'),
-  withdraw: (amount: number, methodId: string) => request<{ balance: number; transaction: Transaction }>('/wallet/withdraw', json('POST', { amount, methodId })),
+  withdraw: (amount: number, methodId: string, gst?: { gstEntityId: string; invoiceNumber: string; signedName: string; signature: string }) =>
+    request<{ balance: number; transaction: Transaction }>('/wallet/withdraw', json('POST', gst ? { amount, methodId, gst: true, accept: true, ...gst } : { amount, methodId })),
+  invoicePreview: (b: { amount: number; methodId: string; gstEntityId: string; invoiceNumber: string }) => request<InvoicePreview>('/wallet/invoice/preview', json('POST', b)),
+  nextInvoiceNumber: () => request<{ suggestion: string }>('/wallet/invoice/next'),
+  downloadInvoice: (txId: string, name: string) => download(`/wallet/transactions/${txId}/invoice`, name),
+  gstEntities: () => request<GstEntity[]>('/wallet/gst'),
+  addGstEntity: (b: { gstin: string; legalName: string; address: string; isDefault?: boolean }) => request<GstEntity>('/wallet/gst', json('POST', b)),
+  updateGstEntity: (id: string, b: Partial<Pick<GstEntity, 'legalName' | 'address' | 'isDefault'>>) => request<GstEntity>(`/wallet/gst/${id}`, json('PATCH', b)),
+  removeGstEntity: (id: string) => request<void>(`/wallet/gst/${id}`, json('DELETE')),
   addPayoutMethod: (b: { type: 'upi'; upi: string } | { type: 'bank'; holder: string; accountNumber: string; ifsc: string }) => request<PayoutMethod>('/wallet/methods', json('POST', b)),
   setDefaultPayoutMethod: (id: string) => request<PayoutMethod[]>(`/wallet/methods/${id}/default`, json('POST', {})),
   removePayoutMethod: (id: string) => request<void>(`/wallet/methods/${id}`, json('DELETE')),

@@ -4,7 +4,8 @@ import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { SITE, STATS } from '../lib/content';
-import { useToast } from '../lib/toast';
+import { AgreementSigner, emptyKyc, KycFields, kycForm, kycProblem, useOnboardingMeta } from '../components/onboarding';
+import type { KycFiles, KycValues } from '../components/onboarding';
 
 const LOGO = '/img/universe-logo.png';
 const CHECK = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>;
@@ -101,55 +102,147 @@ function SignInForm({ cta }: { cta: string }) {
   );
 }
 
+/** Partner application: contact details, then KYC (individual or entity) with certificates. No password yet:
+    the agreement is emailed within 48 hours and the password is set after signing it. */
 function SignUpForm() {
-  const { signIn } = useAuth();
-  const toast = useToast();
-  const navigate = useNavigate();
-  const [f, setF] = useState({ name: '', email: '', phone: '', zone: '', city: '', password: '', confirm: '' });
+  const meta = useOnboardingMeta();
+  const [step, setStep] = useState<1 | 2>(1);
+  const [f, setF] = useState({ name: '', email: '', phone: '', zone: '', city: '', agency: '' });
+  const [k, setK] = useState<KycValues>(emptyKyc);
+  const [files, setFiles] = useState<KycFiles>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF((s) => ({ ...s, [k]: e.target.value }));
+  const [done, setDone] = useState<{ email: string; sla: string } | null>(null);
+  const set = (key: keyof typeof f) => (e: { target: { value: string } }) => setF((x) => ({ ...x, [key]: e.target.value }));
 
+  const next = (e: FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (!f.name.trim() || !f.email.trim() || !f.phone.trim() || !f.zone || !f.city.trim()) return setError('Fill in all required fields');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim())) return setError('Enter a valid email address');
+    if (!/^\+?[\d\s-]{10,16}$/.test(f.phone.trim())) return setError('Enter a valid mobile number');
+    setStep(2);
+  };
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
-    if (!f.name.trim() || !f.email.trim() || !f.phone.trim() || !f.zone) return setError('Fill in all required fields');
-    if (f.password.length < 8) return setError('Password must be at least 8 characters');
-    if (f.password !== f.confirm) return setError('Passwords do not match');
+    const problem = kycProblem(k, files);
+    if (problem) return setError(problem);
     setBusy(true);
     try {
-      const { token, agent } = await api.register({ name: f.name, email: f.email.trim(), phone: f.phone, zone: f.zone, city: f.city, password: f.password });
-      signIn(token, agent);
-      toast('Your partner account is ready.');
-      navigate('/dashboard');
+      const form = new FormData();
+      for (const [key, val] of Object.entries(f)) form.append(key, val.trim());
+      const r = await api.apply(kycForm(k, files, form));
+      setDone({ email: r.email, sla: r.sla });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign up failed');
+      setError(err instanceof Error ? err.message : 'Could not submit your application');
+    } finally {
       setBusy(false);
     }
   };
 
+  if (done) {
+    return (
+      <div className="apply-done" role="dialog" aria-labelledby="applyDoneTitle">
+        <div className="apply-done-ic">{CHECK}</div>
+        <h3 id="applyDoneTitle">Thank you, your details are received</h3>
+        <p>We have recorded your application. Our team will verify your details and email your partner agreement to <b>{done.email}</b> for review within <b>{done.sla}</b>.</p>
+        <ol className="apply-steps">
+          <li>We verify your PAN, GST / MSME details and documents.</li>
+          <li>You receive the agreement by email and sign it online.</li>
+          <li>We email you a link to set your password and sign in.</li>
+        </ol>
+        <p className="muted" style={{ fontSize: '.85rem' }}>Didn't get an email in {done.sla}? Check your spam folder or write to <a href={`mailto:${SITE.supportEmail}`}>{SITE.supportEmail}</a>.</p>
+        <Link to="/" className="btn btn-primary btn-block" style={{ marginTop: '1rem' }}>Back to home</Link>
+      </div>
+    );
+  }
+
   return (
-    <form onSubmit={submit} noValidate>
-      <div className="field">
-        <label htmlFor="signupName">Full name / agency name *</label>
-        <div className="ctl">{USER}<input type="text" id="signupName" placeholder="e.g. Horizon Overseas" value={f.name} onChange={set('name')} /></div>
+    <>
+      <div className="apply-progress" aria-label={`Step ${step} of 2`}>
+        <span className={step >= 1 ? 'on' : ''}>1 · Your details</span>
+        <span className={step >= 2 ? 'on' : ''}>2 · KYC & documents</span>
       </div>
-      <div className="field-grid">
-        <div className="field"><label htmlFor="signupEmail">Email address *</label><input type="email" id="signupEmail" placeholder="you@agency.com" autoComplete="email" value={f.email} onChange={set('email')} /></div>
-        <div className="field"><label htmlFor="signupPhone">Phone number *</label><input type="tel" id="signupPhone" placeholder="+91 98XXX XXXXX" autoComplete="tel" value={f.phone} onChange={set('phone')} /></div>
-        <div className="field">
-          <label htmlFor="signupZone">Zone *</label>
-          <select id="signupZone" value={f.zone} onChange={set('zone')}>
-            <option value="">Select zone</option><option value="NORTH">North</option><option value="SOUTH">South</option><option value="EAST">East</option><option value="WEST">West</option>
-          </select>
-        </div>
-        <div className="field"><label htmlFor="signupCity">City</label><input type="text" id="signupCity" placeholder="e.g. Vadodara" value={f.city} onChange={set('city')} /></div>
-        <div className="field"><label htmlFor="signupPassword">Create password *</label><input type="password" id="signupPassword" placeholder="Min. 8 characters" autoComplete="new-password" value={f.password} onChange={set('password')} /></div>
-        <div className="field"><label htmlFor="signupConfirmPassword">Confirm password *</label><input type="password" id="signupConfirmPassword" placeholder="Repeat password" autoComplete="new-password" value={f.confirm} onChange={set('confirm')} /></div>
-      </div>
-      {error ? <p className="form-error">{error}</p> : null}
-      <button type="submit" className="btn btn-green btn-block btn-lg" style={{ marginTop: '.4rem' }} disabled={busy}>{busy ? 'Creating account…' : 'Create Account'}</button>
-    </form>
+      {step === 1 ? (
+        <form onSubmit={next} noValidate>
+          <div className="field">
+            <label htmlFor="signupName">Your full name *</label>
+            <div className="ctl">{USER}<input type="text" id="signupName" placeholder="e.g. Manish Shah" value={f.name} onChange={set('name')} /></div>
+          </div>
+          <div className="field-grid">
+            <div className="field"><label htmlFor="signupEmail">Email address *</label><input type="email" id="signupEmail" placeholder="you@agency.com" autoComplete="email" value={f.email} onChange={set('email')} /></div>
+            <div className="field"><label htmlFor="signupPhone">Mobile number *</label><input type="tel" id="signupPhone" placeholder="+91 98XXX XXXXX" autoComplete="tel" value={f.phone} onChange={set('phone')} /></div>
+            <div className="field"><label htmlFor="signupAgency">Agency / trade name</label><input id="signupAgency" placeholder="e.g. Horizon Overseas" value={f.agency} onChange={set('agency')} /></div>
+            <div className="field"><label htmlFor="signupCity">City *</label><input type="text" id="signupCity" placeholder="e.g. Vadodara" value={f.city} onChange={set('city')} /></div>
+            <div className="field">
+              <label htmlFor="signupZone">Zone *</label>
+              <select id="signupZone" value={f.zone} onChange={set('zone')}>
+                <option value="">Select zone</option><option value="NORTH">North</option><option value="SOUTH">South</option><option value="EAST">East</option><option value="WEST">West</option>
+              </select>
+            </div>
+          </div>
+          {error ? <p className="form-error">{error}</p> : null}
+          <button type="submit" className="btn btn-green btn-block btn-lg" style={{ marginTop: '.4rem' }}>Continue</button>
+          <p className="muted" style={{ fontSize: '.8rem', marginTop: '.6rem' }}>No password yet: you'll set one after signing your partner agreement.</p>
+        </form>
+      ) : (
+        <form onSubmit={submit} noValidate>
+          <p className="muted" style={{ marginBottom: '.8rem' }}>How do you work with UniVerse?</p>
+          <KycFields v={k} set={setK} files={files} setFiles={setFiles} states={meta.states} entityTypes={meta.entityTypes} />
+          {error ? <p className="form-error">{error}</p> : null}
+          <div className="apply-actions">
+            <button type="button" className="btn btn-ghost btn-lg" onClick={() => { setError(''); setStep(1); }}>Back</button>
+            <button type="submit" className="btn btn-green btn-lg" disabled={busy || !k.type}>{busy ? 'Submitting…' : 'Submit application'}</button>
+          </div>
+        </form>
+      )}
+    </>
+  );
+}
+
+/** Opened from the agreement email: /sign-agreement?token=… */
+export function SignAgreement() {
+  const [params] = useSearchParams();
+  const token = params.get('token') ?? '';
+  const [info, setInfo] = useState<Awaited<ReturnType<typeof api.agreementByToken>> | null>(null);
+  const [pdf, setPdf] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const [done, setDone] = useState<{ email: string; setPasswordToken: string } | null>(null);
+  useEffect(() => {
+    document.title = 'Sign your partner agreement | UniVerse';
+    if (!token) return setError('This link is incomplete. Open the link from your email again.');
+    api.agreementByToken(token).then(setInfo).catch((e) => setError(e.message));
+    api.agreementPdfByToken(token).then(setPdf).catch(() => {});
+  }, [token]);
+
+  return (
+    <div className="sign-page">
+      <header className="sign-head"><Link to="/"><img src={LOGO} alt="UniVerse" /></Link></header>
+      <main className="sign-card">
+        {done ? (
+          <div className="apply-done">
+            <div className="apply-done-ic">{CHECK}</div>
+            <h3>Agreement signed. Welcome to UniVerse!</h3>
+            <p>Your account is active. We've emailed the signed copy details and a link to set your password to <b>{done.email}</b>. You can also set it right now.</p>
+            <Link to={`/reset-password?token=${encodeURIComponent(done.setPasswordToken)}&welcome=1`} className="btn btn-primary btn-block btn-lg" style={{ marginTop: '1rem' }}>Set your password</Link>
+          </div>
+        ) : error ? (
+          <div className="apply-done"><h3>We couldn't open this agreement</h3><p className="muted">{error}</p></div>
+        ) : !info ? (
+          <div className="empty-state">Loading…</div>
+        ) : (
+          <>
+            <h1>Channel Partner Agreement</h1>
+            <p className="muted">Agreement {info.number} · version {info.version} · for {info.party.legalName}. Read it in full, then sign below. The link works until {new Date(info.expiresAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}.</p>
+            <AgreementSigner pdfUrl={pdf} defaultName={info.party.signatory} onSign={async (b) => {
+              const r = await api.signByToken(token, b);
+              setDone({ email: r.email, setPasswordToken: r.setPasswordToken });
+            }} />
+          </>
+        )}
+      </main>
+    </div>
   );
 }
 
@@ -157,12 +250,13 @@ function SignUpForm() {
 export function ResetPassword() {
   const [params] = useSearchParams();
   const token = params.get('token') ?? '';
+  const welcome = params.get('welcome') === '1';
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState(false);
-  useEffect(() => { document.title = 'Choose a new password | UniVerse'; }, []);
+  useEffect(() => { document.title = welcome ? 'Set your password | UniVerse' : 'Choose a new password | UniVerse'; }, [welcome]);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -182,15 +276,17 @@ export function ResetPassword() {
 
   return (
     <AuthShell
-      title="Choose a new password"
+      title={welcome ? 'One last step' : 'Choose a new password'}
       sub="Pick something you don't use anywhere else."
-      points={['At least 8 characters', 'Works on the website and in the app', 'The link can be used once, within 30 minutes']}
+      points={welcome
+        ? ['At least 8 characters', 'Works on the website and in the UniVerse app', 'The link can be used once, within 7 days']
+        : ['At least 8 characters', 'Works on the website and in the app', 'The link can be used once, within 30 minutes']}
     >
       <div className="top"><img src={LOGO} alt="UniVerse" /></div>
-      <h2>Reset password</h2>
+      <h2>{welcome ? 'Set your password' : 'Reset password'}</h2>
       {done ? (
         <>
-          <p className="muted">Your password has been changed. You can sign in with it on the website and in the app.</p>
+          <p className="muted">{welcome ? 'Your password is set. Sign in with your email and this password on the website and in the app.' : 'Your password has been changed. You can sign in with it on the website and in the app.'}</p>
           <Link to="/partner-login" className="btn btn-primary btn-block btn-lg" style={{ marginTop: '1rem' }}>Sign in</Link>
         </>
       ) : !token ? (
@@ -243,7 +339,7 @@ export function AgentLogin() {
     <AuthShell
       title="Your student's journey, our universe."
       sub={`${STATS.partners > 1 ? `Join ${STATS.partners} consultants earning` : 'Earn'} on ${STATS.services} study-abroad services, from loans to landing kits.`}
-      points={['Same-day partner verification', 'Dedicated relationship manager', 'Commission on every completed service']}
+      points={['Verified and agreement sent within 48 hours', 'Dedicated relationship manager', 'Commission on every completed service']}
     >
       <div className="top"><img src={LOGO} alt="UniVerse" /></div>
       <div className="auth-tabs" role="tablist">
@@ -259,9 +355,9 @@ export function AgentLogin() {
       ) : (
         <div className="auth-pane active" key="signup">
           <h2>Agent Registration</h2>
-          <p className="muted">Create your partner account in a minute</p>
+          <p className="muted">Apply in two short steps: your details, then KYC</p>
           <SignUpForm />
-          <p className="auth-alt">By signing up you agree to our partner terms &amp; data policy.</p>
+          <p className="auth-alt">You sign the Channel Partner Agreement online once we verify your details.</p>
         </div>
       )}
     </AuthShell>

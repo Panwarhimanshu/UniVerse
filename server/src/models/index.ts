@@ -12,6 +12,29 @@ const agentSchema = new Schema(
     city: { type: String, default: '' },
     verified: { type: Boolean, default: false },
     suspended: { type: Boolean, default: false }, // set by the master admin; blocks sign-in
+    // applied → agreement_sent → active. Accounts from before onboarding have no value and count as active.
+    onboarding: { type: String, enum: ['applied', 'agreement_sent', 'active'], default: undefined },
+    kyc: {
+      status: { type: String, enum: ['none', 'submitted', 'verified', 'rejected'], default: 'none' },
+      type: { type: String, enum: ['individual', 'entity'], default: undefined },
+      legalName: { type: String, default: '' }, // person's name as on PAN, or the registered entity name
+      pan: { type: String, default: '' },
+      entityType: { type: String, default: '' }, // Proprietorship, Partnership, LLP, Private Limited ...
+      gstin: { type: String, default: '' },
+      udyam: { type: String, default: '' }, // MSME registration (UDYAM-XX-00-0000000)
+      cin: { type: String, default: '' }, // CIN or LLPIN, when the entity has one
+      signatory: { type: String, default: '' }, // authorised signatory for an entity
+      authority: { type: String, default: '' }, // e.g. "board resolution dated 10 October 2026"
+      designation: { type: String, default: '' },
+      address: { type: String, default: '' },
+      state: { type: String, default: '' },
+      pincode: { type: String, default: '' },
+      docs: [{ kind: { type: String, enum: ['pan', 'gst', 'msme', 'other'] }, file: String, name: String, mime: String, at: { type: Date, default: Date.now } }],
+      note: { type: String, default: '' }, // why the desk sent it back
+      submittedAt: { type: Date, default: null },
+      verifiedAt: { type: Date, default: null },
+      verifiedBy: { type: String, default: '' },
+    },
     rm: {
       name: { type: String, default: 'UniVerse Partner Desk' },
       email: { type: String, default: 'vas@universe.com' },
@@ -27,6 +50,12 @@ const agentSchema = new Schema(
       file: { type: String, default: '' }, // GridFS id of the signed agreement PDF
       fileName: { type: String, default: '' },
       fileAt: { type: Date, default: null },
+      // in-app e-signature of the current agreement (see AgreementDoc)
+      esign: {
+        at: { type: Date, default: null },
+        name: { type: String, default: '' },
+        version: { type: String, default: '' },
+      },
     },
     wallet: {
       balance: { type: Number, default: 0 },
@@ -117,6 +146,29 @@ const txSchema = new Schema(
     method: {
       type: { type: String, enum: ['upi', 'bank'] },
       label: String, // "UPI · ravi@okaxis" or "HDFC Bank ••4821"
+    },
+    // commission credits: the amount above is net of TDS
+    gross: { type: Number, default: undefined },
+    tds: { type: Number, default: undefined },
+    tdsRate: { type: Number, default: undefined },
+    // withdrawals with GST: the partner's signed tax invoice. They are paid amount + GST.
+    gstEntity: { type: Schema.Types.ObjectId, ref: 'GstEntity', default: null },
+    invoice: {
+      number: String,
+      date: Date,
+      supplier: { legalName: String, gstin: String, address: String, state: String },
+      taxable: Number, // commission value before TDS (amount grossed up)
+      tdsAdjusted: Number, // TDS already deducted when the commission was credited
+      gstRate: Number,
+      cgst: Number,
+      sgst: Number,
+      igst: Number,
+      payable: Number, // what UniVerse pays: amount + GST
+      file: String, // GridFS id of the signed invoice PDF
+      signedName: String,
+      signedAt: Date,
+      verified: { type: Boolean, default: false },
+      verifiedBy: String,
     },
     // how a withdrawal was paid
     payout: {
@@ -249,6 +301,25 @@ const settingSchema = new Schema(
       phone: { type: String, default: '+91 63596 66055' },
     },
     articlesImported: { type: Boolean, default: false }, // insights moved from the built-in list into the database
+    tdsRate: { type: Number, default: 2 }, // % deducted from commission (Income-tax Act 2025 s.393, earlier s.194H)
+    gstRate: { type: Number, default: 18 },
+    sac: { type: String, default: '998599' }, // service code printed on partner invoices
+    agreementVersion: { type: String, default: '2026.1' },
+    company: {
+      legalName: { type: String, default: 'UniVerse LLP' },
+      constitution: { type: String, default: 'a limited liability partnership incorporated under the Limited Liability Partnership Act, 2008' },
+      gstin: { type: String, default: '' },
+      pan: { type: String, default: '' },
+      cin: { type: String, default: '' }, // CIN, or LLPIN for an LLP
+      address: { type: String, default: '' },
+      state: { type: String, default: 'Gujarat' },
+      stateCode: { type: String, default: '24' },
+      city: { type: String, default: 'Vadodara' }, // courts with jurisdiction
+      signatory: { type: String, default: '' },
+      signatoryId: { type: String, default: '' }, // DPIN / DIN
+      designation: { type: String, default: 'Designated Partner' },
+      email: { type: String, default: '' }, // legal notices
+    },
   },
   { timestamps: true },
 );
@@ -353,3 +424,39 @@ export const PasswordReset = model('PasswordReset', resetSchema);
 const attemptSchema = new Schema({ key: { type: String, required: true, index: true }, at: { type: Date, default: Date.now } }, { versionKey: false });
 attemptSchema.index({ at: 1 }, { expireAfterSeconds: 30 * 60 });
 export const LoginAttempt = model('LoginAttempt', attemptSchema);
+
+/* ---------- Partner agreements: generated from the template, sent for signature, signed in the app ---------- */
+const agreementDocSchema = new Schema(
+  {
+    agent: { type: Schema.Types.ObjectId, ref: 'Agent', required: true, index: true },
+    number: { type: String, required: true },
+    version: { type: String, required: true },
+    status: { type: String, enum: ['sent', 'signed', 'void'], default: 'sent' },
+    tokenHash: { type: String, index: true }, // signing link for applicants who can't sign in yet
+    expiresAt: { type: Date },
+    file: { type: String, default: '' }, // unsigned PDF
+    hash: { type: String, default: '' }, // sha256 of the unsigned PDF, printed on the signed copy
+    party: { type: Schema.Types.Mixed, default: {} }, // second-party details as they were when generated
+    sentBy: { type: String, default: '' },
+    signedFile: { type: String, default: '' },
+    signedAt: { type: Date, default: null },
+    signer: { name: String, ip: String, ua: String },
+  },
+  { timestamps: true },
+);
+export const AgreementDoc = model('AgreementDoc', agreementDocSchema);
+
+/* ---------- GST registrations a partner invoices from (one can be the KYC entity) ---------- */
+const gstEntitySchema = new Schema(
+  {
+    agent: { type: Schema.Types.ObjectId, ref: 'Agent', required: true, index: true },
+    legalName: { type: String, required: true, trim: true },
+    gstin: { type: String, required: true, uppercase: true, trim: true },
+    address: { type: String, default: '' },
+    state: { type: String, default: '' },
+    isDefault: { type: Boolean, default: false },
+  },
+  { timestamps: true },
+);
+gstEntitySchema.index({ agent: 1, gstin: 1 }, { unique: true });
+export const GstEntity = model('GstEntity', gstEntitySchema);

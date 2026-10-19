@@ -1,3 +1,4 @@
+import { partnerOnboarding, publicOnboarding } from './routes/onboarding.js';
 import 'dotenv/config';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import cors from 'cors';
@@ -88,10 +89,12 @@ api.get('/health', (_req, res) => res.json({ ok: true }));
 api.use('/content', contentRoutes);
 api.use('/webhooks', webhookRoutes);
 api.use('/auth', authRoutes);
+api.use('/onboarding', publicOnboarding);
 api.use('/admin', adminRoutes);
 api.use('/requests', requireAuth, requestRoutes);
 api.use('/', requireAuth, analyticsRoutes);
 api.use('/', requireAuth, notificationRoutes);
+api.use('/', requireAuth, partnerOnboarding);
 api.use('/', requireAuth, partnerRoutes);
 api.use('/', requireAuth, miscRoutes);
 app.use('/api', api);
@@ -100,7 +103,7 @@ app.use('/api', api);
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   if (err instanceof HttpError) return res.status(err.status).json({ error: err.message });
   if (err && typeof err === 'object' && 'code' in err && err.code === 'LIMIT_FILE_SIZE') {
-    return res.status(413).json({ error: `File is larger than ${MAX_UPLOAD_BYTES / 1024 / 1024} MB` });
+    return res.status(413).json({ error: `That file is too large. Use a PDF or photo under ${MAX_UPLOAD_BYTES / 1024 / 1024} MB (certificates: under 1.4 MB each).` });
   }
   console.error(err);
   res.status(500).json({ error: 'Something went wrong' });

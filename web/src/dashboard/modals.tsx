@@ -4,9 +4,9 @@ import { Svg } from '../components/site';
 import { DESTINATIONS, serviceName } from '../data/services';
 import { SITE, visibleServices } from '../lib/content';
 import { api } from '../lib/api';
-import type { Agent, Case, Commissions, Menu, Message, Perm, Student, TeamMember, Wallet } from '../lib/api';
+import type { Agent, Case, Commissions, Menu, Message, Perm, Student, TeamMember } from '../lib/api';
 import { avatarUrl } from '../lib/api';
-import { fileSize, fmtDate, fmtTime, inr, initials, statusClass, useInterval } from '../lib/hooks';
+import { fileSize, fmtDate, fmtTime, initials, statusClass, useInterval } from '../lib/hooks';
 import { useToast } from '../lib/toast';
 
 /* ---------- modal shell ---------- */
@@ -106,82 +106,6 @@ export function ReferModal({ open, presetService, onClose, onDone }: {
 }
 
 /* ---------- withdraw ---------- */
-export function WithdrawModal({ open, wallet, isOwner, onClose, onDone, onAddMethod }: {
-  open: boolean; wallet: Wallet | null; isOwner: boolean; onClose: () => void; onDone: () => void; onAddMethod: () => void;
-}) {
-  const toast = useToast();
-  const [amount, setAmount] = useState('');
-  const [methodId, setMethodId] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  useEffect(() => {
-    if (open) { setAmount(''); setError(''); setMethodId(wallet?.methods.find((m) => m.isDefault)?.id ?? wallet?.methods[0]?.id ?? ''); }
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (!wallet) return null;
-  const { balance, minWithdrawal } = wallet;
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    setError('');
-    const amt = parseInt(amount, 10);
-    if (!amt || amt < minWithdrawal) return setError(`Minimum withdrawal is ${inr(minWithdrawal)}`);
-    if (amt > balance) return setError(`You can withdraw up to ${inr(balance)}`);
-    if (!methodId) return setError('Choose where to receive the money');
-    setBusy(true);
-    try {
-      await api.withdraw(amt, methodId);
-      toast(`Withdrawal of ${inr(amt)} requested. You'll get a notification when it's paid.`);
-      onDone();
-      onClose();
-    } catch (err) {
-      setError(errMsg(err));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Modal open={open} onClose={onClose}>
-      <Hero title="Withdraw funds" sub={wallet.instantPayouts ? 'Sent by UPI or IMPS once approved, usually within minutes.' : 'Checked and paid within one working day.'} onClose={onClose} />
-      <div className="modal-body">
-        {wallet.methods.length ? (
-          <form onSubmit={submit} noValidate>
-            <div className="field"><label htmlFor="wdAmount">Amount (₹) *</label><input id="wdAmount" type="number" min={minWithdrawal} step={100} placeholder={`Minimum ₹${minWithdrawal}`} value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus /></div>
-            <p style={{ fontSize: '.8rem', color: 'var(--ink-soft)', margin: '-.3rem 0 1rem' }}>
-              Available: <b style={{ color: 'var(--navy)' }}>{inr(balance)}</b>
-              {balance >= minWithdrawal ? <> · <a href="#" onClick={(e) => { e.preventDefault(); setAmount(String(balance)); }}>Withdraw all</a></> : null}
-            </p>
-            <div className="field">
-              <label>Send to *</label>
-              <div className="pm-pick">
-                {wallet.methods.map((m) => (
-                  <label key={m.id} className={`pm-opt${methodId === m.id ? ' on' : ''}`}>
-                    <input type="radio" name="wdMethod" checked={methodId === m.id} onChange={() => setMethodId(m.id)} />
-                    <span><b>{m.type === 'upi' ? m.upi : `${m.bankName || 'Bank account'} ••${m.last4}`}</b><small>{m.type === 'upi' ? 'UPI' : `${m.holder} · ${m.ifsc}`}</small></span>
-                  </label>
-                ))}
-              </div>
-            </div>
-            {error ? <p className="form-error">{error}</p> : null}
-            <div className="m-cta">
-              <button type="submit" className="btn btn-green btn-lg" disabled={busy}>{busy ? 'Requesting…' : 'Request withdrawal'}</button>
-              <button type="button" className="btn btn-ghost btn-lg" onClick={onClose}>Cancel</button>
-            </div>
-          </form>
-        ) : (
-          <>
-            <p style={{ fontSize: '.92rem' }}>{isOwner ? 'Add a UPI ID or bank account to receive your money. You only do this once.' : 'Ask your account owner to add a UPI ID or bank account.'}</p>
-            <div className="m-cta">
-              {isOwner ? <button className="btn btn-primary" onClick={() => { onClose(); onAddMethod(); }}>Add UPI or bank account</button> : null}
-              <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-            </div>
-          </>
-        )}
-      </div>
-    </Modal>
-  );
-}
-
 const UPI_RE = /^[a-zA-Z0-9._-]{2,256}@[a-zA-Z][a-zA-Z0-9.-]{1,63}$/;
 const IFSC_RE = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 

@@ -82,6 +82,7 @@ function Navigator() {
       <Stack.Screen name="whatsnew" options={{ title: "What's New" }} />
       <Stack.Screen name="updates" options={{ title: 'Notifications' }} />
       <Stack.Screen name="agreement" options={{ title: 'Partner agreement' }} />
+      <Stack.Screen name="kyc" options={{ title: 'KYC & agreement' }} />
       <Stack.Screen name="team" options={{ title: 'Team members' }} />
       <Stack.Screen name="team-member" options={{ title: 'Team member', presentation: 'modal' }} />
       <Stack.Screen name="password" options={{ title: 'Change password' }} />
