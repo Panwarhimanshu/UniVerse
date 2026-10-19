@@ -10,6 +10,8 @@ export interface MasterSettings {
   minWithdrawal: number; supportEmail: string; supportPhone: string; commissionEffective: string;
   defaultRm: { name: string; email: string; phone: string }; articlesImported: boolean;
   tdsRate: number; gstRate: number; sac: string; agreementVersion: string; company: Company;
+  /** how the server sends email */
+  mail?: 'microsoft-graph' | 'smtp' | 'none';
 }
 export interface Company {
   legalName: string; constitution: string; gstin: string; pan: string; cin: string; address: string; state: string; stateCode: string; city: string;
@@ -189,6 +191,7 @@ export const adminApi = {
   deleteArticle: (id: string) => request<void>(`/admin/master/articles/${id}`, json('DELETE')),
 
   settings: () => request<MasterSettings>('/admin/master/settings'),
+  testEmail: (to: string) => request<{ ok: boolean; method: string }>('/admin/master/test-email', json('POST', { to })),
   saveSettings: (b: Partial<MasterSettings>) => request<MasterSettings>('/admin/master/settings', json('PATCH', b)),
   activity: () => request<Activity[]>('/admin/master/activity'),
 };

@@ -438,8 +438,21 @@ export function SettingsView() {
   const data = useApi(adminApi.settings, []);
   const [f, setF] = useState<MasterSettings | null>(null);
   const [busy, setBusy] = useState(false);
+  const [testTo, setTestTo] = useState('');
+  const [testing, setTesting] = useState(false);
   useEffect(() => { if (data.data) setF(data.data); }, [data.data]);
   if (!f) return <div className="empty-state">Loading…</div>;
+  const sendTest = async () => {
+    setTesting(true);
+    try {
+      await adminApi.testEmail(testTo.trim());
+      toast(`Test email sent to ${testTo.trim()}. Check the inbox (and spam).`);
+    } catch (err) {
+      toast(errMsg(err));
+    } finally {
+      setTesting(false);
+    }
+  };
   const save = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
@@ -491,6 +504,26 @@ export function SettingsView() {
           <p className="full hint" style={{ fontSize: '.78rem' }}>Agreements can only be sent once the legal name, PAN, registered address and signatory are filled in.</p>
         </div>
       </form>
+
+      <div className="panel" style={{ marginTop: '1.4rem' }}>
+        <div className="panel-h">
+          <h3>Email</h3>
+          <span className={`status ${f.mail && f.mail !== 'none' ? 'done' : 'hold'}`}>
+            {f.mail === 'microsoft-graph' ? 'Microsoft 365 (Graph)' : f.mail === 'smtp' ? 'SMTP' : 'Not set up'}
+          </span>
+        </div>
+        <div className="panel-b">
+          <p className="adm-meta" style={{ marginBottom: '.8rem' }}>
+            {f.mail && f.mail !== 'none'
+              ? 'Applications, agreements, password links and notifications are emailed to partners. Send yourself a test to check delivery.'
+              : 'Emails are skipped until the mail settings are added on the server. Agreement links can still be copied from Onboarding & KYC.'}
+          </p>
+          <div className="adm-inline">
+            <input type="email" placeholder="you@universe.com" value={testTo} onChange={(e) => setTestTo(e.target.value)} aria-label="Send a test email to" />
+            <button type="button" className="btn btn-primary btn-sm" disabled={testing || !testTo.trim() || !f.mail || f.mail === 'none'} onClick={sendTest}>{testing ? 'Sending…' : 'Send test email'}</button>
+          </div>
+        </div>
+      </div>
     </section>
   );
 }

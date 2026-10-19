@@ -16,6 +16,7 @@ import { publicAgent, publicTeamMember, publicTx } from '../serialize.js';
 import { publicArticle } from './content.js';
 import { deleteFile, MAX_UPLOAD_BYTES, saveFile, sendDocFile } from '../files.js';
 import { EMAIL_RE, photo, removePhoto, storePhoto } from './auth.js';
+import { mailMethod, mailReady, sendTestMail } from '../mail.js';
 import { accountNotices, notify } from '../notify.js';
 import { publicMethod, syncWallet } from '../wallet.js';
 
@@ -486,7 +487,20 @@ router.delete('/articles/:id', async (req, res) => {
 });
 
 /* ---------- site settings ---------- */
-router.get('/settings', (_req, res) => res.json(getSettings()));
+router.get('/settings', (_req, res) => res.json({ ...getSettings(), mail: mailMethod() }));
+
+router.post('/test-email', async (req, res) => {
+  const to = String(req.body?.to ?? '').trim();
+  if (!EMAIL_RE.test(to)) throw new HttpError(400, 'Enter a valid email address');
+  if (!mailReady()) throw new HttpError(400, 'Email is not set up on the server yet');
+  try {
+    await sendTestMail(to);
+  } catch (e) {
+    throw new HttpError(502, `The email was not sent: ${e instanceof Error ? e.message : 'unknown error'}`);
+  }
+  res.locals.audit = `Sent a test email to ${to}`;
+  res.json({ ok: true, method: mailMethod() });
+});
 
 router.patch('/settings', async (req, res) => {
   const b = req.body ?? {};
@@ -527,7 +541,7 @@ router.patch('/settings', async (req, res) => {
   }
   await Setting.updateOne({ key: 'site' }, { $set: set });
   res.locals.audit = 'Updated site settings';
-  res.json(await loadSettings());
+  res.json({ ...(await loadSettings()), mail: mailMethod() });
 });
 
 /* ---------- app and website usage ---------- */
