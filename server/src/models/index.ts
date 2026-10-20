@@ -40,7 +40,7 @@ const agentSchema = new Schema(
     },
     rm: {
       name: { type: String, default: 'UniVerse Partner Desk' },
-      email: { type: String, default: 'vas@universe.com' },
+      email: { type: String, default: 'admin@universepartner.co' },
       phone: { type: String, default: '+91 63596 66055' },
     },
     agreement: {
@@ -299,12 +299,12 @@ const settingSchema = new Schema(
   {
     key: { type: String, required: true, unique: true }, // always 'site'
     minWithdrawal: { type: Number, default: 500 },
-    supportEmail: { type: String, default: 'vas@universe.com' },
+    supportEmail: { type: String, default: 'admin@universepartner.co' },
     supportPhone: { type: String, default: '+91 63596 66055' },
     commissionEffective: { type: String, default: 'July 2026' },
     defaultRm: {
       name: { type: String, default: 'UniVerse Partner Desk' },
-      email: { type: String, default: 'vas@universe.com' },
+      email: { type: String, default: 'admin@universepartner.co' },
       phone: { type: String, default: '+91 63596 66055' },
     },
     articlesImported: { type: Boolean, default: false }, // insights moved from the built-in list into the database

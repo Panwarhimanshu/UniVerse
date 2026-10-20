@@ -70,7 +70,7 @@ const mailer = () => {
 
 export const mailReady = () => !!graphCreds() || !!mailer();
 export const mailMethod = () => (graphCreds() ? 'microsoft-graph' : mailer() ? 'smtp' : 'none');
-export const siteUrl = () => (process.env.SITE_URL || 'https://universeportal.vercel.app').replace(/\/$/, '');
+export const siteUrl = () => (process.env.SITE_URL || 'https://www.universepartner.co').replace(/\/$/, '');
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 

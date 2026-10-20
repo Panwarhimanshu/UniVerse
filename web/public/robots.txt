@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /reset-password
+Disallow: /sign-agreement
+Disallow: /api/
+
+Sitemap: https://www.universepartner.co/sitemap.xml

@@ -1,9 +1,9 @@
-import { useEffect } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { BlogItem, ServiceCard, SiteFooter, SiteNav, Svg } from '../components/site';
 import { BLOGS, fmtBlogDate } from '../data/blogs';
 import { monogram, serviceByKey } from '../data/services';
 import { useReveal } from '../lib/hooks';
+import { serviceSeo, useHead } from '../lib/seo';
 
 const KPI_ICONS = [
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="9 12 11 14 15 10"/></svg>',
@@ -21,17 +21,10 @@ export default function ServicePage() {
   const { key = '' } = useParams();
   const s = serviceByKey(key);
   useReveal([key]);
-
-  useEffect(() => {
-    if (!s) return;
-    window.scrollTo(0, 0);
-    document.title = `${s.name} for Study Abroad | UniVerse VAS Marketplace`;
-    document.querySelector('meta[name="description"]')?.setAttribute(
-      'content', `${s.short} UniVerse helps immigration consultants deliver ${s.name}: ${s.tat} turnaround, ${s.countries}.`,
-    );
-  }, [s]);
+  useHead(`/services/${key}`, [s?.name]);
 
   if (!s || s.hidden) return <Navigate to="/" replace />;
+  const seo = serviceSeo(s.key);
   const blogs = BLOGS[s.key] ?? [];
 
   return (
@@ -49,7 +42,7 @@ export default function ServicePage() {
                 <span className="here">{s.name}</span>
               </nav>
               <span className="svc-cat reveal">Value Added Services · {s.sub} · {s.tat}</span>
-              <h1 className="reveal grad-text" data-d="1" style={{ margin: '1rem 0 1rem' }}>{s.name}</h1>
+              <h1 className="reveal grad-text" data-d="1" style={{ margin: '1rem 0 1rem' }}>{seo?.h1 ?? s.name}</h1>
               <p className="hero-sub reveal" data-d="2" style={{ marginBottom: '1.4rem' }}>{s.about}</p>
               <ul className="h-points reveal" data-d="3">{s.feats.slice(0, 3).map((f) => <li key={f}>{f}</li>)}</ul>
               <div className="hero-cta reveal" data-d="4">
@@ -92,6 +85,19 @@ export default function ServicePage() {
             </div>
           </div>
         </section>
+
+        {/* ===== GUIDE ===== */}
+        {seo ? (
+          <section className="section" id="guide">
+            <div className="container">
+              <div className="seo-article reveal">
+                <span className="eyebrow">Guide · updated October 2026</span>
+                <h2>{seo.guideHeading}</h2>
+                {seo.guide.map((p, i) => <p key={i}>{p}</p>)}
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         {/* ===== PROCESS ===== */}
         <section className="section" id="journey">
@@ -140,6 +146,26 @@ export default function ServicePage() {
               <div className="blog-list">
                 {blogs.map((b, i) => (
                   <BlogItem key={b.t} tag={s.name} date={fmtBlogDate(b.d)} mins={b.mins} title={b.t} teaser={b.teaser} body={b.body} open={i === 0} foot d={i} />
+                ))}
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {/* ===== FAQ ===== */}
+        {seo ? (
+          <section className="section alt" id="faq">
+            <div className="container">
+              <div className="sec-head reveal">
+                <span className="eyebrow">FAQ</span>
+                <h2>{s.name}: frequently asked questions</h2>
+              </div>
+              <div className="faq-wrap">
+                {seo.faqs.map((f, i) => (
+                  <details className="faq reveal" data-d={i % 3 || undefined} key={f.q} open={i === 0}>
+                    <summary>{f.q}<span className="x">＋</span></summary>
+                    <div className="faq-body">{f.a}</div>
+                  </details>
                 ))}
               </div>
             </div>

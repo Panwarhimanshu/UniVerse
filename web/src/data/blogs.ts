@@ -6,30 +6,30 @@ export interface Blog { id?: string; t: string; d: string; mins: number; teaser:
 export const BLOGS: Record<string, Blog[]> = {
   'canada-gic': [
     {
-      t: 'GIC minimum rises to CAD 23,448: what agents must tell students now',
+      t: 'GIC amount rises to CAD 23,448: what agents must tell students now',
       d: '2026-09-30', mins: 4,
-      teaser: 'IRCC has revised the proof-of-funds floor for the Student Direct Stream. Here is the exact wording to share with applicants and parents.',
+      teaser: 'IRCC has raised the living-expense amount for study permit applications from 1 September 2026. Here is what to tell applicants and parents.',
       body: [
-        'For 2026-27 intakes, the Guaranteed Investment Certificate amount that underpins SDS study-permit applications stands at CAD 23,448, up from CAD 22,895. The figure tracks Canada’s revised cost-of-living benchmark and applies to new GIC purchases: students who funded earlier at the older amount are not required to top up, but fresh applications filed with the old number risk document-based refusals.',
-        'Practical advice for partner agents: collect the revised amount evidence before lodgement, keep the Investment Declaration (not just the wire receipt) in the visa file, and remind students that the GIC is returned to them in instalments after landing: it is parked money, not a fee. Our GIC desk re-verifies every certificate against the CAD 23,448 floor before your case moves to filing.',
+        'For study permit applications submitted on or after 1 September 2026, IRCC requires a single applicant outside Quebec to show CAD 23,448 for living expenses, up from CAD 22,895. First-year tuition and travel costs come on top. The amount depends on the date the application is submitted, not the date the GIC was bought: a student who bought a CAD 22,895 GIC but applies on or after 1 September must show the extra CAD 553 another way, for example with a bank statement or a top-up.',
+        'Practical advice for partner agents: check the application date before the student funds the GIC, keep the bank’s investment confirmation (not just the wire receipt) in the visa file, and remind students that the GIC is paid back to them in instalments after landing. It is their own money, not a fee. Our GIC desk checks every certificate against the amount in force before your case moves to filing.',
       ],
     },
     {
-      t: 'CIBC vs BMO vs ICICI Bank Canada: which GIC issues fastest in 2026?',
-      d: '2026-09-15', mins: 5,
-      teaser: 'We timed 120 recent GIC files across the four partner banks. The gap between fastest and slowest is bigger than most agents assume.',
+      t: 'CIBC vs BMO vs ICICI Bank Canada: choosing the GIC bank in 2026',
+      d: '2026-09-15', mins: 4,
+      teaser: 'Issuance speed, the account the student lands with, and refund handling: how to pick the GIC bank for each file.',
       body: [
-        'Median certificate issuance ran 4 working days at CIBC, 5 at ICICI Bank Canada and 6 at BMO, with Beacon Money completing wallet-based alternatives in under 3 days where a traditional GIC is not mandatory. Weekends and Indian wire cut-offs, not bank processing, caused most of the variance, so the real lever is when the student remits, not only where.',
-        'Our recommendation remains file-specific: CIBC for speed-critical SDS files, ICICI Bank Canada for students who prefer an Indian ecosystem familiar to parents, and BMO where branch access after landing matters. Whichever bank you choose, identical agent payout applies, so optimising purely for the student’s timeline costs you nothing.',
+        'All the partner banks issue the certificate once the student’s funds arrive, so in practice the biggest delay is the transfer itself: Indian bank cut-off times, weekends and holidays, and names that do not match between the passport and the sender’s account. The fastest files are the ones where the student remits early in the week with the exact reference the bank asked for.',
+        'The choice between banks is about the student. CIBC and BMO suit students who want a large branch network after landing; ICICI Bank Canada suits families who prefer a bank they already know from India; Beacon Money offers an alternative route. Your payout is the same whichever bank the student picks, so choose on the student’s needs.',
       ],
     },
     {
       t: 'Visa refused? How the GIC refund process actually works',
       d: '2026-08-29', mins: 4,
-      teaser: 'Refunds are real, documented and faster than the rumours suggest, as long as the refusal letter reaches the bank in the right format.',
+      teaser: 'Refunds are real and documented, as long as the refusal letter and forms reach the bank in the format it asks for.',
       body: [
-        'Every partner bank refunds a GIC on visa refusal, but each wants a specific pack: refusal letter copy, refund form signed by the student, and a cancelled-cheque equivalent for the return account. CIBC and BMO settle in 8–15 business days once the pack is complete; delays almost always trace back to unsigned forms or name mismatches between passport and account.',
-        'Flag refusal cases to your UniVerse dashboard within 48 hours: the desk prepares the bank-specific refund pack, validates it against that bank’s checklist and couriers it the same week. Re-applicants can re-use a fresh GIC at the current CAD 23,448 amount; the refunded file does not count against a new SDS application.',
+        'Every partner bank refunds a GIC when the study permit is refused, but each asks for its own set of documents: usually a copy of the refusal letter, a refund form signed by the student and details of the account to return the money to. Most delays come from unsigned forms or names that do not match between the passport and the account.',
+        'Flag refusal cases on your UniVerse dashboard as soon as the letter arrives: the desk prepares the bank-specific refund pack, checks it against that bank’s list and sends it on. Students who reapply need a GIC, or other proof of funds, at the amount in force on the date of the new application.',
       ],
     },
   ],
@@ -111,12 +111,12 @@ export const BLOGS: Record<string, Blog[]> = {
       ],
     },
     {
-      t: 'Secured vs unsecured: approval data from 500 recent files',
-      d: '2026-08-26', mins: 6,
-      teaser: 'What sanction rates say about profile matching, and why “just apply everywhere” wastes four weeks.',
+      t: 'Secured vs unsecured education loans: how lenders decide',
+      d: '2026-08-26', mins: 4,
+      teaser: 'Collateral, co-applicant income and the admit decide the lender segment. Get the segment right first and save weeks.',
       body: [
-        'Across 500 files routed this season, well-matched secured applications cleared at 96% with a median 9-day sanction; unsecured files cleared at 84% where the co-applicant income crossed ₹6 lakh annually and the admit ranked within the lender’s internal tier list. The single biggest rejection cause was not academic profile: it was applying to the wrong lender segment first and burning enquiry marks.',
-        'The actionable takeaway is to use lending-match data before committing: admit tier, co-applicant profile and property availability define the segment, and the segment defines the lender. Cases logged through the marketplace carry this matching by default: the first shortlist you receive is already the one with the highest sanction probability.',
+        'Lenders sort applications into segments. Public-sector banks focus on secured loans against property or fixed deposits and usually offer the lowest rates. NBFCs and private lenders lend without collateral against the university’s standing, the course and the co-applicant’s income and credit score, at higher rates. A profile that is strong for one segment can be weak for another.',
+        'The costly mistake is applying everywhere at once, or to the wrong segment first: every application adds a credit enquiry and every rejection adds weeks. Decide the segment from three facts (the admit, the co-applicant’s income and credit history, and whether collateral is available), then apply to the few lenders that fit. Cases you log through UniVerse are matched this way by default.',
       ],
     },
   ],

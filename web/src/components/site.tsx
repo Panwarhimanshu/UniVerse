@@ -182,7 +182,7 @@ export function ServiceQuickModal({ svcKey, onClose }: { svcKey: string | null; 
 /* ---------- animated count-up ---------- */
 export function Counter({ to, suffix = '' }: { to: number; suffix?: string }) {
   const ref = useRef<HTMLSpanElement>(null);
-  const [val, setVal] = useState(0);
+  const [val, setVal] = useState(typeof window === 'undefined' ? to : 0);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;

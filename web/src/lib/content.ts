@@ -15,7 +15,7 @@ export interface SiteStats { partners: number; students: number; completedCases:
 export const STATS: SiteStats = { partners: 0, students: 0, completedCases: 0, services: 9, deliveryPartners: 0, destinations: [] };
 
 export const SITE: SiteSettings = {
-  supportEmail: 'vas@universe.com', supportPhone: '+91 63596 66055', commissionEffective: 'July 2026', minWithdrawal: 500,
+  supportEmail: 'admin@universepartner.co', supportPhone: '+91 63596 66055', commissionEffective: 'July 2026', minWithdrawal: 500,
 };
 
 const BASE_SERVICES: Service[] = structuredClone(SERVICES);

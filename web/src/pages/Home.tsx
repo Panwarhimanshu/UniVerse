@@ -5,6 +5,8 @@ import { destinationFlags } from '../data/flags';
 import { ICONS } from '../data/services';
 import { SITE, STATS, visibleServices } from '../lib/content';
 import { useReveal } from '../lib/hooks';
+import { useHead } from '../lib/seo';
+import { HOME_FAQ, HOME_GUIDE } from '../data/seoContent';
 
 /* ---------- hero typewriter ---------- */
 const WORDS = ['Student Finance', 'Study Visas', 'Student Banking', 'Student Travel', 'Student Housing', 'Student Wellness'];
@@ -94,26 +96,6 @@ const MARQUEE_1 = [['CIBC', 'Canada GIC'], ['BMO', 'Canada GIC'], ['ICICI Bank C
 const MARQUEE_2 = [['IDFC First Bank', 'Education Loan'], ['HDFC Credila', 'Education Loan'], ['Avanse', 'Education Loan'], ['Auxilo', 'Education Loan'], ['Tata Capital', 'Education Loan'], ['Prodigy Finance', 'Education Loan'], ['EbixCash', 'Forex Card'], ['Thomas Cook', 'Forex Card'], ['Allianz Care', 'Insurance'], ['ICICI Lombard', 'Insurance'], ['Tata AIG', 'Insurance'], ['Medibank', 'OSHC'], ['nib', 'OSHC'], ['Vodafone', 'SIM Card'], ['Rogers', 'SIM Card'], ['Telus', 'SIM Card']];
 const MONO: Record<string, string> = { CIBC: 'CI', BMO: 'BM', 'ICICI Bank Canada': 'IC', 'Beacon Money': 'BE', Expatrio: 'EX', Flywire: 'FL', Convera: 'CO', PayMyTuition: 'PM', TransferMate: 'TM', SBI: 'SB', 'Bank of Baroda': 'BB', 'Punjab National Bank': 'PN', 'Union Bank': 'UB', 'Axis Bank': 'AX', 'ICICI Bank': 'IB', 'IDFC First Bank': 'ID', 'HDFC Credila': 'HC', Avanse: 'AV', Auxilo: 'AU', 'Tata Capital': 'TC', 'Prodigy Finance': 'PF', EbixCash: 'EB', 'Thomas Cook': 'TH', 'Allianz Care': 'AL', 'ICICI Lombard': 'IL', 'Tata AIG': 'TA', Medibank: 'ME', nib: 'NI', Vodafone: 'VO', Rogers: 'RO', Telus: 'TE' };
 
-function CountryAnswer() {
-  const list = STATS.destinations;
-  const names = list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}` : list.join('');
-  return (
-    <>
-      {list.length} study destinations: <strong>{names}.</strong> Individual services vary by destination: GIC is Canada-only and OSHC
-      is Australia-only, while loans, remittance and insurance cover every destination.
-    </>
-  );
-}
-
-const FAQ: [string, React.ReactNode][] = [
-  ['What exactly is UniVerse?', <>UniVerse is a <strong>B2B value added services marketplace</strong> for immigration consultants and education agents. It consolidates nine student services (education loans, Canada GIC, German blocked accounts, forex remittance, forex cards, insurance, OSHC, accommodation and international SIM cards) into a single platform, so you deal with one partner instead of nine vendors.</>],
-  ['Will my student data be shared with competing consultants?', <>No. This is the core design principle of the platform. Student records submitted by you are <strong>ring-fenced to your account</strong> and are never visible to, or shared with, another consultant on the platform. UniVerse is a service provider, not a recruitment competitor.</>],
-  ['Which countries does UniVerse support?', <CountryAnswer />],
-  ['How do I earn from UniVerse?', <>You earn a commission on every completed service. Payouts trigger on defined events (a funded account, a disbursed loan, an activated SIM, a paid premium) and are credited to your in-platform wallet, withdrawable to your bank account at any time.</>],
-  ['How do I become a partner?', <>Register through the partner portal with your agency name, contact details, zone and city. Once verified, you get dashboard access to submit student service requests, track applications live and view your commission wallet.</>],
-  ['How long do services take to process?', <>It varies by service: <strong>same day</strong> for insurance and OSHC certificates, <strong>2–3 working days</strong> for fee remittance, <strong>3–5 days</strong> for blocked accounts and SIM delivery, <strong>5–7 days</strong> for Canada GIC, and <strong>7–14 days</strong> for education loan sanction.</>],
-];
-
 const MAIL = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>';
 const PHONE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>';
 
@@ -128,7 +110,7 @@ export default function Home() {
   const [quick, setQuick] = useState<string | null>(null);
   useReveal([cat, q]);
 
-  useEffect(() => { document.title = 'UniVerse | Your Student’s Journey, Our Universe | B2B VAS Marketplace'; }, []);
+  useHead('/');
 
   const term = q.trim().toLowerCase();
   const vas = visibleServices().filter((s) => (cat === 'all' || cat === 'vas') && (!term || `${s.name} ${s.cardText} ${s.tat}`.toLowerCase().includes(term)));
@@ -147,13 +129,13 @@ export default function Home() {
         <section className="hero">
           <div className="container hero-grid">
             <div>
-              <span className="hero-badge reveal"><span className="pulse"></span>{STATS.partners > 1 ? `B2B MARKETPLACE · ${STATS.partners} PARTNER CONSULTANTS` : 'B2B MARKETPLACE FOR STUDY-ABROAD SERVICES'}</span>
+              <span className="hero-badge reveal"><span className="pulse"></span>B2B STUDY ABROAD SERVICES MARKETPLACE FOR CONSULTANTS</span>
               <h1 className="reveal" data-d="1">
-                <span className="hl-line">One universe for every</span>
+                <span className="hl-line">One platform for every</span>
                 <span className="hl-line hl-dyn"><Typewriter /><span className="type-caret" aria-hidden="true"></span></span>
-                <span className="hl-line">your students need.</span>
+                <span className="hl-line">service your students need.</span>
               </h1>
-              <p className="hero-sub reveal" data-d="2">Loans, GIC, blocked accounts, remittance, insurance, housing and connectivity: every value added service on one secure platform. Your student data stays yours; never shared with a competing consultant.</p>
+              <p className="hero-sub reveal" data-d="2">UniVerse is the B2B study abroad services platform for education consultants and immigration agents in India. Education loans, Canada GIC, German blocked accounts, fee remittance, forex, insurance, OSHC, housing and SIM cards, with commission on every completed service. Your student data stays yours and is never shared with a competing consultant.</p>
               <div className="hero-cta reveal" data-d="3">
                 <Link to="/agent-login?tab=signup" className="btn btn-primary btn-lg">Start Partnering <span className="arr">→</span></Link>
                 <a href="#services" className="btn btn-light btn-lg">Explore Services</a>
@@ -300,18 +282,38 @@ export default function Home() {
           </div>
         </section>
 
+        {/* ============ GUIDE ============ */}
+        <section className="section alt" id="guide">
+          <div className="container">
+            <div className="sec-head reveal">
+              <span className="eyebrow">For Consultants</span>
+              <h2>Study abroad value added services, explained</h2>
+              <p>What students need between the offer letter and arrival, and how your consultancy earns on each service.</p>
+            </div>
+            <div className="seo-guide">
+              {HOME_GUIDE.map((g, i) => (
+                <article className="seo-guide-card reveal" data-d={i || undefined} key={g.h}>
+                  <h3>{g.h}</h3>
+                  <p>{g.p}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* ============ FAQ ============ */}
         <section className="section" id="faq">
           <div className="container">
             <div className="sec-head reveal">
               <span className="eyebrow">FAQ</span>
               <h2>Questions consultants ask first</h2>
+              <p>Partnering with UniVerse, and the 2026 rules your students ask about.</p>
             </div>
             <div className="faq-wrap">
-              {FAQ.map(([qq, a], i) => (
-                <details className="faq reveal" data-d={i % 3 || undefined} key={i}>
-                  <summary>{qq}<span className="x">＋</span></summary>
-                  <div className="faq-body">{a}</div>
+              {HOME_FAQ.map((f, i) => (
+                <details className="faq reveal" data-d={i % 3 || undefined} key={f.q} open={i === 0}>
+                  <summary>{f.q}<span className="x">＋</span></summary>
+                  <div className="faq-body">{f.a}</div>
                 </details>
               ))}
             </div>
