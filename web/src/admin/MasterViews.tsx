@@ -486,7 +486,7 @@ export function SettingsView() {
           <div className="field"><label htmlFor="setGst">GST on partner invoices (%)</label><input id="setGst" type="number" step="0.1" min={0} max={40} value={f.gstRate} onChange={(e) => setF({ ...f, gstRate: Number(e.target.value) })} /></div>
           <div className="field"><label htmlFor="setSac">SAC printed on partner invoices</label><input id="setSac" value={f.sac} onChange={(e) => setF({ ...f, sac: e.target.value })} /></div>
           <div className="field"><label htmlFor="setVer">Agreement version</label><input id="setVer" value={f.agreementVersion} onChange={(e) => setF({ ...f, agreementVersion: e.target.value })} /></div>
-          <p className="full hint" style={{ fontSize: '.78rem' }}>TDS is deducted when a commission is credited (currently 2% under section 393 of the Income-tax Act, 2025). Confirm the SAC with your CA. Change the agreement version when you revise the agreement text or commission structure, then send the revised agreement from Onboarding.</p>
+          <p className="full hint" style={{ fontSize: '.78rem' }}>Commission is credited at full value; TDS is deducted on the entries a partner withdraws (currently 2% under section 393 of the Income-tax Act, 2025). Confirm the SAC with your CA. Change the agreement version when you revise the agreement text or commission structure, then send the revised agreement from Onboarding.</p>
 
           <p className="full adm-h" style={{ marginTop: '.8rem' }}>UniVerse company details (first party in agreements, "bill to" on invoices)</p>
           {([

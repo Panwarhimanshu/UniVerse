@@ -101,10 +101,13 @@ export const publicTx = (t: any) => ({
   date: t.date,
   method: t.method?.label ? { type: t.method.type, label: t.method.label } : null,
   payout: t.payout?.state ? { state: t.payout.state, utr: t.payout.utr ?? '', reason: t.payout.reason ?? '', paidAt: t.payout.paidAt ?? null } : null,
-  // commission: gross before TDS, the TDS deducted, and the rate (amount is the net)
+  // credits: whether a withdrawal has taken this entry · withdrawals: TDS on the entries and what is paid out
+  redeemed: !!t.redeemedBy,
   gross: t.gross ?? null,
   tds: t.tds ?? null,
   tdsRate: t.tdsRate ?? null,
+  netPayout: t.type === 'Debit' ? (t.netPayout ?? t.invoice?.payable ?? t.amount) : null,
+  entryCount: t.entries?.length ?? 0,
   invoice: t.invoice?.number ? {
     number: t.invoice.number, date: t.invoice.date, gstin: t.invoice.supplier?.gstin ?? '', legalName: t.invoice.supplier?.legalName ?? '',
     taxable: t.invoice.taxable, gst: Math.round(((t.invoice.cgst ?? 0) + (t.invoice.sgst ?? 0) + (t.invoice.igst ?? 0)) * 100) / 100,

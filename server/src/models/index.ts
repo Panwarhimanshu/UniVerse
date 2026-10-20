@@ -14,11 +14,14 @@ const agentSchema = new Schema(
     suspended: { type: Boolean, default: false }, // set by the master admin; blocks sign-in
     // applied → agreement_sent → active. Accounts from before onboarding have no value and count as active.
     onboarding: { type: String, enum: ['applied', 'agreement_sent', 'active'], default: undefined },
+    passwordSet: { type: Boolean, default: undefined }, // applicants who chose a password when applying
     kyc: {
       status: { type: String, enum: ['none', 'submitted', 'verified', 'rejected'], default: 'none' },
       type: { type: String, enum: ['individual', 'entity'], default: undefined },
       legalName: { type: String, default: '' }, // person's name as on PAN, or the registered entity name
       pan: { type: String, default: '' },
+      aadhaarLast4: { type: String, default: '' }, // individuals: only the last 4 digits are kept (Aadhaar Act)
+      consentAt: { type: Date, default: null }, // confirmed the details and agreed to execute the agreement
       entityType: { type: String, default: '' }, // Proprietorship, Partnership, LLP, Private Limited ...
       gstin: { type: String, default: '' },
       udyam: { type: String, default: '' }, // MSME registration (UDYAM-XX-00-0000000)
@@ -29,7 +32,7 @@ const agentSchema = new Schema(
       address: { type: String, default: '' },
       state: { type: String, default: '' },
       pincode: { type: String, default: '' },
-      docs: [{ kind: { type: String, enum: ['pan', 'gst', 'msme', 'other'] }, file: String, name: String, mime: String, at: { type: Date, default: Date.now } }],
+      docs: [{ kind: { type: String, enum: ['pan', 'aadhaar', 'gst', 'msme', 'other'] }, file: String, name: String, mime: String, at: { type: Date, default: Date.now } }],
       note: { type: String, default: '' }, // why the desk sent it back
       submittedAt: { type: Date, default: null },
       verifiedAt: { type: Date, default: null },
@@ -147,10 +150,14 @@ const txSchema = new Schema(
       type: { type: String, enum: ['upi', 'bank'] },
       label: String, // "UPI · ravi@okaxis" or "HDFC Bank ••4821"
     },
-    // commission credits: the amount above is net of TDS
-    gross: { type: Number, default: undefined },
+    // credits: the withdrawal that redeemed this entry (TDS is taken when an entry is withdrawn)
+    redeemedBy: { type: Schema.Types.ObjectId, ref: 'Transaction', default: undefined, index: true },
+    // withdrawals: the credit entries redeemed, the TDS deducted on them, and what is actually paid out
+    entries: [{ type: Schema.Types.ObjectId, ref: 'Transaction' }],
     tds: { type: Number, default: undefined },
     tdsRate: { type: Number, default: undefined },
+    netPayout: { type: Number, default: undefined }, // amount - TDS (+ GST for invoiced withdrawals)
+    gross: { type: Number, default: undefined }, // older commission credits that had TDS taken at credit
     // withdrawals with GST: the partner's signed tax invoice. They are paid amount + GST.
     gstEntity: { type: Schema.Types.ObjectId, ref: 'GstEntity', default: null },
     invoice: {

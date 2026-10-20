@@ -94,13 +94,13 @@ export async function shrinkImage(file: File): Promise<File> {
 /* ---------- KYC fields: individual (PAN) or entity (GSTIN / Udyam + certificates) ---------- */
 export interface KycValues {
   type: 'individual' | 'entity' | '';
-  legalName: string; pan: string; entityType: string; gstin: string; udyam: string; cin: string;
+  legalName: string; pan: string; aadhaar: string; entityType: string; gstin: string; udyam: string; cin: string;
   signatory: string; designation: string; authority: string; address: string; state: string; pincode: string;
 }
 export const emptyKyc: KycValues = {
-  type: '', legalName: '', pan: '', entityType: '', gstin: '', udyam: '', cin: '', signatory: '', designation: '', authority: '', address: '', state: '', pincode: '',
+  type: '', legalName: '', pan: '', aadhaar: '', entityType: '', gstin: '', udyam: '', cin: '', signatory: '', designation: '', authority: '', address: '', state: '', pincode: '',
 };
-export type KycFiles = Partial<Record<'pan' | 'gst' | 'msme', File>>;
+export type KycFiles = Partial<Record<'pan' | 'aadhaar' | 'gst' | 'msme', File>>;
 
 const PAN_RE = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
 const GSTIN_RE = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
@@ -108,11 +108,15 @@ const UDYAM_RE = /^UDYAM-[A-Z]{2}-\d{2}-\d{7}$/;
 
 /** The first problem with the KYC form, or '' when it's ready. `onFile` kinds already uploaded count as present. */
 export function kycProblem(v: KycValues, files: KycFiles, onFile: string[] = []) {
-  const has = (k: 'pan' | 'gst' | 'msme') => !!files[k] || onFile.includes(k);
+  const has = (k: 'pan' | 'aadhaar' | 'gst' | 'msme') => !!files[k] || onFile.includes(k);
   if (!v.type) return 'Choose whether you work as an individual or as an entity';
   if (!v.legalName.trim()) return v.type === 'individual' ? 'Enter your name as it appears on your PAN' : 'Enter the registered name of the entity';
   if (!PAN_RE.test(v.pan)) return 'Enter a valid PAN, like ABCDE1234F';
-  if (v.type === 'individual' && !has('pan')) return 'Upload a copy of your PAN card';
+  if (v.type === 'individual') {
+    if (!/^[2-9]\d{11}$/.test(v.aadhaar.replace(/\s/g, ''))) return 'Enter your 12-digit Aadhaar number';
+    if (!has('pan')) return 'Upload a copy of your PAN card';
+    if (!has('aadhaar')) return 'Upload your Aadhaar card (a masked Aadhaar is fine)';
+  }
   if (v.type === 'entity') {
     if (!v.entityType) return 'Choose the type of entity';
     if (!v.gstin && !v.udyam) return 'Enter a GST number or an MSME (Udyam) number';
@@ -161,7 +165,7 @@ function FileField({ id, label, file, onFile, uploaded, hint }: { id: string; la
 
 export function KycFields({ v, set, files, setFiles, states, entityTypes, uploaded = {} }: {
   v: KycValues; set: (v: KycValues) => void; files: KycFiles; setFiles: (f: KycFiles) => void; states: string[]; entityTypes: string[];
-  uploaded?: Partial<Record<'pan' | 'gst' | 'msme', string>>;
+  uploaded?: Partial<Record<'pan' | 'aadhaar' | 'gst' | 'msme', string>>;
 }) {
   const f = (k: keyof KycValues, upper = false) => ({
     value: v[k], onChange: (e: { target: { value: string } }) => set({ ...v, [k]: upper ? e.target.value.toUpperCase().replace(/\s/g, '') : e.target.value }),
@@ -179,7 +183,13 @@ export function KycFields({ v, set, files, setFiles, states, entityTypes, upload
         <div className="field-grid">
           <div className="field"><label htmlFor="kLegal">Name as on PAN *</label><input id="kLegal" {...f('legalName')} /></div>
           <div className="field"><label htmlFor="kPan">PAN *</label><input id="kPan" maxLength={10} placeholder="ABCDE1234F" {...f('pan', true)} /></div>
-          <div className="full"><FileField id="kPanFile" label="PAN card *" file={files.pan} uploaded={uploaded.pan} onFile={(x) => setFiles({ ...files, pan: x })} /></div>
+          <div className="field full">
+            <label htmlFor="kAadhaar">Aadhaar number *</label>
+            <input id="kAadhaar" inputMode="numeric" maxLength={12} placeholder="12-digit Aadhaar" value={v.aadhaar} onChange={(e) => set({ ...v, aadhaar: e.target.value.replace(/\D/g, '') })} />
+            <span className="field-hint">Only the last 4 digits are stored, as the Aadhaar Act requires.</span>
+          </div>
+          <FileField id="kPanFile" label="PAN card *" file={files.pan} uploaded={uploaded.pan} onFile={(x) => setFiles({ ...files, pan: x })} />
+          <FileField id="kAadhaarFile" label="Aadhaar card *" file={files.aadhaar} uploaded={uploaded.aadhaar} onFile={(x) => setFiles({ ...files, aadhaar: x })} hint="Masked Aadhaar is fine" />
         </div>
       ) : null}
       {v.type === 'entity' ? (

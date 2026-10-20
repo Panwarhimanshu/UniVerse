@@ -373,8 +373,8 @@ function CaseDesk({ id, fallbackRef, onChanged }: { id: string; fallbackRef?: st
           e.preventDefault();
           const amount = Math.round(Number(credit.amount));
           if (!(amount > 0)) return toast('Enter the commission in rupees');
-          const tdsAmt = Math.round((amount * tdsRate) / 100);
-          if (!confirm(`Credit commission of ${inr(amount)} to ${p?.agency || p?.name}?\n${tdsRate}% TDS ${inr(tdsAmt)} is deducted: ${inr(amount - tdsAmt)} goes to the wallet${credit.cleared ? ' as available balance' : ' as pending clearance'}.`)) return;
+          if (!confirm(`Credit commission of ${inr(amount)} to ${p?.agency || p?.name}?
+It goes to the wallet at full value${credit.cleared ? ' as available balance' : ' as pending clearance'}. ${tdsRate}% TDS is deducted when the partner withdraws it.`)) return;
           if (await act(() => adminApi.credit(c.id, amount, credit.cleared), 'Commission credited')) setCredit({ amount: '', cleared: false });
         }}>
           <input type="number" min={1} placeholder="Gross commission (₹)" value={credit.amount} onChange={(e) => setCredit({ ...credit, amount: e.target.value })} />
@@ -567,7 +567,7 @@ function PayoutsView({ onChanged }: { onChanged: () => void }) {
   const [busyId, setBusyId] = useState('');
   const settle = async (t: AdminTx, action: 'clear' | 'pay' | 'payout' | 'reject' | 'verify-invoice') => {
     const extra: { reason?: string; utr?: string } = {};
-    const due = t.invoice ? t.invoice.payable : t.amount;
+    const due = t.netPayout ?? (t.invoice ? t.invoice.payable : t.amount);
     if (action === 'reject') {
       const r = prompt(t.type === 'Debit' ? 'Why is this withdrawal being rejected? The partner will see this.' : 'Why is this commission being cancelled?', '');
       if (r === null) return;
@@ -625,7 +625,7 @@ function PayoutsView({ onChanged }: { onChanged: () => void }) {
                           {t.invoice && t.invoiceDetail ? (
                             <div className="inv-mini">
                               <span><b>GST invoice {t.invoice.number}</b> · {t.invoiceDetail.supplier.legalName} · GSTIN <b>{t.invoice.gstin}</b> <button className="link-btn" onClick={() => copy(t.invoice!.gstin)}>copy</button></span>
-                              <span>Taxable {inr(t.invoiceDetail.taxable)} · {t.invoiceDetail.igst ? `IGST ${inr(t.invoiceDetail.igst)}` : `CGST ${inr(t.invoiceDetail.cgst)} + SGST ${inr(t.invoiceDetail.sgst)}`} · TDS adjusted {inr(t.invoiceDetail.tdsAdjusted)}</span>
+                              <span>Taxable {inr(t.invoiceDetail.taxable)} · {t.invoiceDetail.igst ? `IGST ${inr(t.invoiceDetail.igst)}` : `CGST ${inr(t.invoiceDetail.cgst)} + SGST ${inr(t.invoiceDetail.sgst)}`} · TDS {inr(t.tds ?? t.invoiceDetail.tdsAdjusted ?? 0)}</span>
                               <span>Signed by {t.invoiceDetail.signedName}{t.invoice.verified ? ` · verified by ${t.invoiceDetail.verifiedBy}` : ''} · <button className="link-btn" onClick={() => adminApi.downloadInvoice(t.id, `Invoice ${t.invoice!.number}.pdf`).catch((e) => toast(errMsg(e)))}>download invoice</button></span>
                             </div>
                           ) : null}
@@ -635,8 +635,9 @@ function PayoutsView({ onChanged }: { onChanged: () => void }) {
                   </td>
                   <td style={{ fontWeight: 700, color: t.type === 'Credit' ? 'var(--green-deep)' : 'var(--ink)', whiteSpace: 'nowrap' }}>
                     {t.type === 'Credit' ? '+' : '−'} {inr(t.amount)}
-                    {t.invoice ? <div className="t-sub">Pay {inr(t.invoice.payable)} (incl. GST {inr(t.invoice.gst)})</div> : null}
-                    {t.gross != null ? <div className="t-sub">Gross {inr(t.gross)} · TDS {inr(t.tds ?? 0)}</div> : null}
+                    {t.type === 'Debit' && t.entryCount ? <div className="t-sub">{t.entryCount} {t.entryCount === 1 ? 'entry' : 'entries'} · TDS {inr(t.tds ?? 0)}{t.invoice ? ` · GST ${inr(t.invoice.gst)}` : ''}</div> : null}
+                    {t.type === 'Debit' && t.netPayout != null ? <div className="t-sub"><b>Pay {inr(t.netPayout)}</b></div> : t.invoice ? <div className="t-sub">Pay {inr(t.invoice.payable)} (incl. GST {inr(t.invoice.gst)})</div> : null}
+                    {t.type === 'Credit' && t.gross != null ? <div className="t-sub">Gross {inr(t.gross)} · TDS {inr(t.tds ?? 0)}</div> : null}
                   </td>
                   <td><span className={`status ${statusClass(t.status)}`}>{t.type === 'Debit' && t.status === 'Pending' && t.payout?.state === 'processing' ? 'With Razorpay' : t.status}</span></td>
                   <td>

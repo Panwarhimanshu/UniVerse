@@ -93,24 +93,28 @@ export async function pickCertificate(label: string): Promise<UploadFile | null>
 /* ---------- KYC form ---------- */
 export interface KycValues {
   type: 'individual' | 'entity' | '';
-  legalName: string; pan: string; entityType: string; gstin: string; udyam: string; cin: string;
+  legalName: string; pan: string; aadhaar: string; entityType: string; gstin: string; udyam: string; cin: string;
   signatory: string; designation: string; authority: string; address: string; state: string; pincode: string;
 }
 export const emptyKyc: KycValues = {
-  type: '', legalName: '', pan: '', entityType: '', gstin: '', udyam: '', cin: '', signatory: '', designation: '', authority: '', address: '', state: '', pincode: '',
+  type: '', legalName: '', pan: '', aadhaar: '', entityType: '', gstin: '', udyam: '', cin: '', signatory: '', designation: '', authority: '', address: '', state: '', pincode: '',
 };
-export type KycFiles = Partial<Record<'pan' | 'gst' | 'msme', UploadFile>>;
+export type KycFiles = Partial<Record<'pan' | 'aadhaar' | 'gst' | 'msme', UploadFile>>;
 
 const PAN_RE = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
 const GSTIN_RE = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
 const UDYAM_RE = /^UDYAM-[A-Z]{2}-\d{2}-\d{7}$/;
 
 export function kycProblem(v: KycValues, files: KycFiles, onFile: string[] = []) {
-  const has = (k: 'pan' | 'gst' | 'msme') => !!files[k] || onFile.includes(k);
+  const has = (k: 'pan' | 'aadhaar' | 'gst' | 'msme') => !!files[k] || onFile.includes(k);
   if (!v.type) return 'Choose whether you work as an individual or as an entity';
   if (!v.legalName.trim()) return v.type === 'individual' ? 'Enter your name as it appears on your PAN' : 'Enter the registered name of the entity';
   if (!PAN_RE.test(v.pan)) return 'Enter a valid PAN, like ABCDE1234F';
-  if (v.type === 'individual' && !has('pan')) return 'Add a copy of your PAN card';
+  if (v.type === 'individual') {
+    if (!/^[2-9]\d{11}$/.test(v.aadhaar)) return 'Enter your 12-digit Aadhaar number';
+    if (!has('pan')) return 'Add a copy of your PAN card';
+    if (!has('aadhaar')) return 'Add your Aadhaar card (a masked Aadhaar is fine)';
+  }
   if (v.type === 'entity') {
     if (!v.entityType) return 'Choose the type of entity';
     if (!v.gstin && !v.udyam) return 'Enter a GST number or an MSME (Udyam) number';
@@ -156,7 +160,7 @@ function FileRow({ label, file, uploaded, onPick }: { label: string; file?: Uplo
 }
 
 export function KycForm({ v, set, files, setFiles, uploaded = {} }: {
-  v: KycValues; set: (v: KycValues) => void; files: KycFiles; setFiles: (f: KycFiles) => void; uploaded?: Partial<Record<'pan' | 'gst' | 'msme', string>>;
+  v: KycValues; set: (v: KycValues) => void; files: KycFiles; setFiles: (f: KycFiles) => void; uploaded?: Partial<Record<'pan' | 'aadhaar' | 'gst' | 'msme', string>>;
 }) {
   const meta = useOnboardingMeta();
   const field = (k: keyof KycValues, upper = false) => ({ value: v[k], onChangeText: (x: string) => set({ ...v, [k]: upper ? x.toUpperCase().replace(/\s/g, '') : x }) });
@@ -164,7 +168,7 @@ export function KycForm({ v, set, files, setFiles, uploaded = {} }: {
     <View>
       <Text style={[type.small, { marginBottom: 6, color: colors.text, fontWeight: '500' }]}>How do you work with UniVerse?</Text>
       <View style={styles.types}>
-        {([['individual', 'Individual', 'On my own. PAN card needed.', 'user'], ['entity', 'Entity', 'Company, LLP, firm or proprietorship. GST or MSME certificate.', 'briefcase']] as const).map(([k, t, d, icon]) => {
+        {([['individual', 'Individual', 'On my own. PAN and Aadhaar needed.', 'user'], ['entity', 'Entity', 'Company, LLP, firm or proprietorship. GST or MSME certificate.', 'briefcase']] as const).map(([k, t, d, icon]) => {
           const on = v.type === k;
           return (
             <Pressable key={k} onPress={() => set({ ...v, type: k })} style={[styles.type, on && styles.typeOn]} accessibilityRole="radio" accessibilityState={{ checked: on }}>
@@ -179,7 +183,10 @@ export function KycForm({ v, set, files, setFiles, uploaded = {} }: {
         <>
           <Field label="Name as on PAN" {...field('legalName')} />
           <Field label="PAN" placeholder="ABCDE1234F" autoCapitalize="characters" maxLength={10} {...field('pan', true)} />
+          <Field label="Aadhaar number" placeholder="12-digit Aadhaar" keyboardType="number-pad" maxLength={12} value={v.aadhaar} onChangeText={(x: string) => set({ ...v, aadhaar: x.replace(/\D/g, '') })} />
+          <Text style={[type.small, { marginTop: -10, marginBottom: space.md }]}>Only the last 4 digits are stored, as the Aadhaar Act requires.</Text>
           <FileRow label="PAN card" file={files.pan} uploaded={uploaded.pan} onPick={(f) => setFiles({ ...files, pan: f })} />
+          <FileRow label="Aadhaar card (masked is fine)" file={files.aadhaar} uploaded={uploaded.aadhaar} onPick={(f) => setFiles({ ...files, aadhaar: f })} />
         </>
       ) : null}
       {v.type === 'entity' ? (

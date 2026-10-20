@@ -1,30 +1,32 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { Button, Feather, Field, Loading, Screen } from '../components/ui';
 import { SignaturePad } from '../components/onboarding';
 import { api } from '../lib/api';
-import type { GstEntity, InvoicePreview } from '../lib/api';
+import type { GstEntity, InvoicePreview, Transaction } from '../lib/api';
 import { useAccess } from '../lib/auth';
 import { errorText } from '../lib/dialog';
 import { useApi } from '../lib/hooks';
-import { inr } from '../lib/format';
+import { inr, shortDate } from '../lib/format';
 import { colors, radius, space, type } from '../theme';
 
-/* Withdraw "without GST" straight to a payout method, or "with GST": pick the GST registration, check the tax invoice
-   the platform drafts, sign it, and it goes with the request for the UniVerse team to verify. */
+/* Withdraw by picking cleared commission entries; TDS is deducted on the entries withdrawn. "Without GST" goes straight
+   to a payout method; "with GST": pick the GST registration, check the tax invoice (one line per entry), sign it, and it
+   goes with the request for the UniVerse team to verify. */
 
 type Step = 'form' | 'invoice' | 'sign';
 const GSTIN_RE = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
 const money = (n: number) => `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const isCommission = (t: Transaction) => t.kind === 'commission' && t.gross == null;
 
 export default function Withdraw() {
   const { data, refresh } = useApi(api.wallet);
   const { isOwner } = useAccess();
   const headerHeight = useHeaderHeight();
   const [step, setStep] = useState<Step>('form');
-  const [amount, setAmount] = useState('');
+  const [sel, setSel] = useState<string[]>([]);
   const [methodId, setMethodId] = useState('');
   const [mode, setMode] = useState<'plain' | 'gst'>('plain');
   const [entities, setEntities] = useState<GstEntity[]>([]);
@@ -50,18 +52,24 @@ export default function Withdraw() {
   useEffect(() => { api.nextInvoiceNumber().then((r) => setInvNo(r.suggestion)).catch(() => {}); }, []);
   if (!data) return <Loading />;
 
-  const value = parseInt(amount.replace(/\D/g, ''), 10) || 0;
-  const tooLow = value > 0 && value < data.minWithdrawal;
-  const tooHigh = value > data.balance;
+  const available = data.transactions.filter((t) => t.type === 'Credit' && t.entryState === 'available');
+  const chosen = available.filter((t) => sel.includes(t.id));
+  const G = chosen.reduce((x, t) => x + t.amount, 0);
+  const T = Math.round((chosen.filter(isCommission).reduce((x, t) => x + t.amount, 0) * data.tdsRate) / 100);
+  const gstAdd = mode === 'gst' ? Math.round(G * data.gstRate) / 100 : 0;
+  const payout = G + gstAdd - T;
+  const tooLow = chosen.length > 0 && payout < data.minWithdrawal;
+  const allOn = available.length > 0 && chosen.length === available.length;
+  const toggle = (id: string) => setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  const ids = chosen.map((t) => t.id);
   const method = data.methods.find((m) => m.id === methodId);
-  const quick = [data.minWithdrawal, Math.floor(data.balance / 2), data.balance].filter((v, i, a) => v >= data.minWithdrawal && v <= data.balance && a.indexOf(v) === i);
   const done = () => (router.canGoBack() ? router.back() : router.replace('/wallet'));
 
   const submitPlain = async () => {
     setError('');
     setBusy(true);
     try {
-      await api.withdraw(value, methodId);
+      await api.withdraw(ids, methodId);
       done();
     } catch (e) {
       setError(errorText(e, 'Could not request the withdrawal'));
@@ -74,7 +82,7 @@ export default function Withdraw() {
     if (!/^[A-Za-z0-9/-]{1,16}$/.test(invNo.trim())) return setError('Enter your invoice number (up to 16 letters, digits, / or -)');
     setBusy(true);
     try {
-      setPreview(await api.invoicePreview({ amount: value, methodId, gstEntityId: entityId, invoiceNumber: invNo.trim() }));
+      setPreview(await api.invoicePreview({ entryIds: ids, methodId, gstEntityId: entityId, invoiceNumber: invNo.trim() }));
       setStep('invoice');
     } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
   };
@@ -98,7 +106,7 @@ export default function Withdraw() {
     if (!sig) return setError('Draw your signature');
     setBusy(true);
     try {
-      await api.withdraw(value, methodId, { gstEntityId: entityId, invoiceNumber: invNo.trim(), signedName: signer.trim(), signature: sig });
+      await api.withdraw(ids, methodId, { gstEntityId: entityId, invoiceNumber: invNo.trim(), signedName: signer.trim(), signature: sig });
       done();
     } catch (e) { setError(errorText(e)); setBusy(false); }
   };
@@ -146,14 +154,22 @@ export default function Withdraw() {
           <Text style={[type.body, { fontWeight: '600' }]}>{p.recipient.legalName}</Text>
           <Text style={type.small}>GSTIN {p.recipient.gstin || '—'} · Place of supply {p.recipient.state}</Text>
           <View style={styles.invRule} />
-          <Text style={type.small}>{p.description} · SAC {p.sac}</Text>
-          <Line label="Taxable value" value={money(p.taxable)} />
+          <Text style={type.label}>Student service commissions · SAC {p.sac}</Text>
+          {p.lines.map((l, i) => (
+            <View key={l.id} style={{ flexDirection: 'row', gap: space.sm, marginTop: 6 }}>
+              <Text style={[type.small, { width: 16 }]}>{i + 1}</Text>
+              <Text style={[type.small, { flex: 1, color: colors.text }]}>{l.desc} <Text style={{ color: colors.muted }}>({l.sub})</Text></Text>
+              <Text style={[type.small, { color: colors.text, fontWeight: '600' }]}>{money(l.amount)}</Text>
+            </View>
+          ))}
+          <View style={styles.invRule} />
+          <Line label="Taxable value" value={money(p.amount)} />
           {p.interState ? <Line label={`IGST @ ${p.gstRate}%`} value={money(p.igst)} /> : <>
             <Line label={`CGST @ ${p.gstRate / 2}%`} value={money(p.cgst)} />
             <Line label={`SGST @ ${p.gstRate / 2}%`} value={money(p.sgst)} />
           </>}
-          <Line label="Invoice total" value={money(p.taxable + p.gst)} />
-          <Line label={`Less TDS @ ${p.tdsRate}% (already deducted)`} value={`− ${money(p.tdsAdjusted)}`} />
+          <Line label="Invoice total" value={money(p.amount + p.gst)} />
+          <Line label={`Less TDS @ ${p.tdsRate}% (section 393)`} value={`− ${money(p.tds)}`} />
           <View style={styles.invRule} />
           <Line label="You receive" value={money(p.payable)} strong />
           <Text style={[type.small, { marginTop: space.sm }]}>Wallet debited {money(p.amount)} · GST paid on top by UniVerse {money(p.gst)} · to {p.payTo}</Text>
@@ -182,40 +198,56 @@ export default function Withdraw() {
 
   return (
     <Screen edges={['bottom']} keyboardOffset={headerHeight} onRefresh={refresh}>
-      <Text style={type.label}>Amount</Text>
-      <View style={[styles.amountBox, (tooLow || tooHigh) && { borderColor: colors.danger }]}>
-        <Text style={styles.rupee}>₹</Text>
-        <TextInput
-          value={amount}
-          onChangeText={(v) => setAmount(v.replace(/\D/g, ''))}
-          keyboardType="number-pad"
-          placeholder="0"
-          placeholderTextColor={colors.faint}
-          style={styles.amountInput}
-          autoFocus
-        />
-      </View>
-      <Text style={[type.small, { marginTop: 6, color: tooLow || tooHigh ? colors.danger : colors.muted }]}>
-        {tooHigh ? `You can withdraw up to ${inr(data.balance)}` : tooLow ? `Minimum withdrawal is ${inr(data.minWithdrawal)}` : `Available ${inr(data.balance)} · minimum ${inr(data.minWithdrawal)}`}
-      </Text>
-      {quick.length ? (
-        <View style={styles.quick}>
-          {quick.map((q) => (
-            <Pressable key={q} onPress={() => setAmount(String(q))} style={[styles.chip, value === q && styles.chipOn]}>
-              <Text style={[styles.chipText, value === q && { color: '#fff' }]}>{q === data.balance ? `All · ${inr(q)}` : inr(q)}</Text>
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
-
-      <Text style={[type.label, { marginTop: space.xl }]}>GST</Text>
+      <Text style={[type.small, { marginTop: space.md }]}>Pick the commission entries to redeem. TDS @{data.tdsRate}% is applied only on the entries you select.</Text>
+      <Text style={[type.label, { marginTop: space.lg }]}>Billing</Text>
       <View style={styles.seg}>
-        {([['plain', 'Without GST', 'Not registered under GST'], ['gst', 'With GST', `Invoice + ${data.gstRate}% GST paid on top`]] as const).map(([k, t, d]) => (
+        {([['plain', 'Without GST', 'Commission net of TDS'], ['gst', 'With GST', `Invoice + ${data.gstRate}% GST on top`]] as const).map(([k, t, d]) => (
           <Pressable key={k} onPress={() => setMode(k)} style={[styles.segBtn, mode === k && styles.methodOn]} accessibilityRole="radio" accessibilityState={{ checked: mode === k }}>
             <Text style={[type.body, { fontWeight: '700' }]}>{t}</Text>
             <Text style={type.small}>{d}</Text>
           </Pressable>
         ))}
+      </View>
+
+      <Text style={[type.label, { marginTop: space.xl }]}>Commission entries</Text>
+      {available.length ? (
+        <View style={styles.entries}>
+          <Pressable onPress={() => setSel(allOn ? [] : available.map((t) => t.id))} style={[styles.entry, { backgroundColor: colors.surface }]} accessibilityRole="checkbox" accessibilityState={{ checked: allOn }}>
+            <View style={[styles.check, allOn && styles.checkOn]}>{allOn ? <Feather name="check" size={14} color="#fff" /> : chosen.length ? <View style={styles.dash} /> : null}</View>
+            <View style={{ flex: 1 }}>
+              <Text style={[type.body, { fontWeight: '700' }]}>Select all cleared</Text>
+              <Text style={type.small}>{available.length} {available.length === 1 ? 'entry' : 'entries'} · {inr(available.reduce((x, t) => x + t.amount, 0))}</Text>
+            </View>
+          </Pressable>
+          {available.map((t) => {
+            const on = sel.includes(t.id);
+            const [title, detail] = t.description.split(' · ');
+            return (
+              <Pressable key={t.id} onPress={() => toggle(t.id)} style={[styles.entry, styles.entrySep, on && { backgroundColor: colors.positiveTint }]} accessibilityRole="checkbox" accessibilityState={{ checked: on }}>
+                <View style={[styles.check, on && styles.checkOn]}>{on ? <Feather name="check" size={14} color="#fff" /> : null}</View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[type.body, { fontWeight: '600' }]} numberOfLines={1}>{title}</Text>
+                  <Text style={type.small} numberOfLines={1}>{[detail, shortDate(t.date)].filter(Boolean).join(' · ')}</Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={[type.body, { fontWeight: '700' }]}>{inr(t.amount)}</Text>
+                  <Text style={type.small}>{isCommission(t) ? `TDS ${inr(Math.round((t.amount * data.tdsRate) / 100))}` : 'No TDS'}</Text>
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : <Text style={[type.small, { marginTop: space.sm }]}>No cleared commission entries to withdraw yet. Pending entries are still clearing.</Text>}
+      <View style={styles.totals}>
+        {chosen.length ? (
+          <>
+            <Line label={`Gross · ${chosen.length} ${chosen.length === 1 ? 'entry' : 'entries'}`} value={inr(G)} />
+            <Line label={`TDS (${data.tdsRate}%)`} value={`− ${inr(T)}`} />
+            {mode === 'gst' ? <Line label={`GST (${data.gstRate}%)`} value={`+ ${inr(gstAdd)}`} /> : null}
+            <Line label="Payout to account" value={inr(payout)} strong />
+            {tooLow ? <Text style={[type.small, { color: colors.danger, marginTop: 4 }]}>The minimum payout is {inr(data.minWithdrawal)}. Select more entries.</Text> : null}
+          </>
+        ) : <Text style={type.small}>Select one or more entries above to build your withdrawal.</Text>}
       </View>
 
       {mode === 'gst' ? (
@@ -297,10 +329,10 @@ export default function Withdraw() {
 
       {error ? <Text style={[type.small, { color: colors.danger, marginTop: space.md }]}>{error}</Text> : null}
       <Button
-        label={mode === 'gst' ? 'Preview invoice' : value && method ? `Withdraw ${inr(value)}` : 'Withdraw'}
+        label={mode === 'gst' ? 'Build invoice' : chosen.length && method ? `Withdraw ${inr(payout)}` : 'Withdraw'}
         onPress={mode === 'gst' ? toPreview : submitPlain}
         loading={busy}
-        disabled={!value || tooLow || tooHigh || !method}
+        disabled={!chosen.length || tooLow || !method}
         style={{ marginTop: space.lg }}
       />
     </Screen>
@@ -317,13 +349,13 @@ function Line({ label, value, strong }: { label: string; value: string; strong?:
 }
 
 const styles = StyleSheet.create({
-  amountBox: { flexDirection: 'row', alignItems: 'center', overflow: 'hidden', marginTop: space.sm, borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.lg, paddingHorizontal: space.lg, height: 68 },
-  rupee: { fontSize: 28, fontWeight: '700', color: colors.muted, marginRight: 6 },
-  amountInput: { flex: 1, minWidth: 0, width: '100%', fontSize: 32, fontWeight: '800', color: colors.text, letterSpacing: -0.5 },
-  quick: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: space.md },
-  chip: { paddingHorizontal: 14, height: 34, justifyContent: 'center', borderRadius: radius.pill, backgroundColor: colors.secondaryTint },
-  chipOn: { backgroundColor: colors.primary },
-  chipText: { fontSize: 13, fontWeight: '700', color: colors.primary },
+  entries: { marginTop: space.sm, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, overflow: 'hidden' },
+  entry: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md },
+  entrySep: { borderTopWidth: StyleSheet.hairlineWidth, borderColor: colors.line },
+  check: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
+  checkOn: { borderColor: colors.positive, backgroundColor: colors.positive },
+  dash: { width: 10, height: 2, borderRadius: 1, backgroundColor: colors.positive },
+  totals: { marginTop: space.md, padding: space.md, borderRadius: radius.lg, backgroundColor: colors.secondaryTint },
   seg: { flexDirection: 'row', gap: space.sm, marginTop: space.sm },
   segBtn: { flex: 1, gap: 2, padding: space.md, borderRadius: radius.lg, borderWidth: 1.5, borderColor: colors.line },
   method: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: radius.lg, borderWidth: 1.5, borderColor: colors.line },

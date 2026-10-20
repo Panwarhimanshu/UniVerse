@@ -25,9 +25,9 @@ type Files = Record<string, Express.Multer.File[]> | undefined;
 
 /** Saves the uploaded certificates and returns the doc list (replacing earlier ones of the same kind) */
 export async function storeKycDocs(files: Files, previous: { kind?: string | null; file?: string | null }[] = []) {
-  const docs: { kind: 'pan' | 'gst' | 'msme' | 'other'; file: string; name: string; mime: string; at: Date }[] = [];
+  const docs: { kind: 'pan' | 'aadhaar' | 'gst' | 'msme' | 'other'; file: string; name: string; mime: string; at: Date }[] = [];
   const replaced = new Set<string>();
-  for (const kind of ['pan', 'gst', 'msme', 'other'] as const) {
+  for (const kind of ['pan', 'aadhaar', 'gst', 'msme', 'other'] as const) {
     const f = files?.[kind]?.[0];
     if (!f) continue;
     docs.push({ kind, file: await saveFile(f.buffer, f.originalname || `${kind}.pdf`, f.mimetype), name: f.originalname || `${kind}.pdf`, mime: f.mimetype, at: new Date() });
@@ -43,7 +43,7 @@ export async function storeKycDocs(files: Files, previous: { kind?: string | nul
 
 export function applyKyc(a: any, v: KycInput, docs: unknown[]) {
   a.set('kyc', {
-    ...v, docs, status: 'submitted', note: '', submittedAt: new Date(), verifiedAt: null, verifiedBy: '',
+    ...v, docs, status: 'submitted', note: '', submittedAt: new Date(), verifiedAt: null, verifiedBy: '', consentAt: new Date(),
   });
 }
 
@@ -54,7 +54,7 @@ export async function onboardingJson(a: any, forDesk = false) {
   return {
     stage: a.onboarding ?? 'active',
     kyc: {
-      status: k.status ?? 'none', type: k.type ?? null, legalName: k.legalName ?? '', pan: forDesk ? k.pan ?? '' : maskPan(k.pan ?? ''),
+      status: k.status ?? 'none', type: k.type ?? null, legalName: k.legalName ?? '', pan: forDesk ? k.pan ?? '' : maskPan(k.pan ?? ''), aadhaarLast4: k.aadhaarLast4 ?? '', consentAt: k.consentAt ?? null,
       entityType: k.entityType ?? '', gstin: k.gstin ?? '', udyam: k.udyam ?? '', cin: k.cin ?? '', signatory: k.signatory ?? '', designation: k.designation ?? '', authority: k.authority ?? '',
       address: k.address ?? '', state: k.state ?? '', pincode: k.pincode ?? '', note: k.note ?? '',
       submittedAt: k.submittedAt ?? null, verifiedAt: k.verifiedAt ?? null, verifiedBy: forDesk ? k.verifiedBy ?? '' : undefined,
@@ -106,7 +106,7 @@ export async function sendAgreement(a: any, by: string) {
       `Thank you for your details. We have verified them, and your UniVerse Channel Partner Agreement (${number}) is ready for your review.`,
       'It sets out the services, the commission schedule, how commission is credited and withdrawn, TDS and GST, turnaround times, and how discrepancies and student-ownership disputes are resolved.',
       applicant
-        ? `Please read it and sign it online within ${SIGN_LINK_DAYS} days. Once it is signed, we will email you a link to set your password and sign in.`
+        ? `Please read it and sign it online within ${SIGN_LINK_DAYS} days. Once it is signed, your account is active and you can sign in.`
         : 'Please read it and sign it from your profile. Withdrawals open once it is signed.',
     ],
     button: { label: 'Review and sign the agreement', url: link },
@@ -162,7 +162,16 @@ export async function completeSigning(a: any, doc: any, input: { name: string; s
   }
 
   let setPasswordToken = '';
-  if (wasApplicant) {
+  if (wasApplicant && a.passwordSet) {
+    await sendMail(a.email, 'Welcome to UniVerse: your account is active', layout({
+      greeting: `Welcome aboard, ${a.name.split(' ')[0]}!`,
+      paragraphs: [
+        `Your agreement ${doc.number} is signed and your UniVerse partner account is now active. A signed copy is in your profile and can be downloaded at any time.`,
+        'Sign in on the website or in the UniVerse app with your email and the password you created when you applied.',
+      ],
+      button: { label: 'Sign in', url: `${siteUrl()}/partner-login` },
+    }));
+  } else if (wasApplicant) {
     setPasswordToken = crypto.randomBytes(32).toString('base64url');
     await PasswordReset.updateMany({ user: a._id, used: false }, { used: true });
     await PasswordReset.create({ kind: 'agent', user: a._id, tokenHash: hashToken(setPasswordToken), expiresAt: new Date(Date.now() + SET_PASSWORD_DAYS * 864e5) });

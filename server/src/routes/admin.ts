@@ -14,7 +14,7 @@ import { deleteFile, MAX_UPLOAD_BYTES, saveFile, sendDocFile } from '../files.js
 import multer from 'multer';
 import { checkAttempts, clearAttempts, recordFailure } from '../limits.js';
 import { accountNotices, notify } from '../notify.js';
-import { razorpayPayout, razorpayReady, syncWallet } from '../wallet.js';
+import { payoutOf, releaseEntries, razorpayPayout, razorpayReady, syncWallet } from '../wallet.js';
 
 /* Back office for the UniVerse service desk and relationship managers. */
 const router = Router();
@@ -424,24 +424,24 @@ router.post('/cases/:id/credit', async (req, res) => {
   const cleared = !!req.body?.cleared;
   const svc = serviceByKey(r.service)?.name ?? r.service;
   const student: any = r.student;
-  // TDS on commission (Income-tax Act 2025 s.393, earlier s.194H) comes off before it reaches the wallet
+  // credited at full value; TDS (Income-tax Act 2025 s.393) is deducted when the partner withdraws the entry
   const tdsRate = getSettings().tdsRate;
   const tds = Math.round((gross * tdsRate) / 100);
-  const amount = gross - tds;
+  const amount = gross;
   await Transaction.create({
-    agent: r.agent, request: r._id, type: 'Credit', kind: 'commission', amount, gross, tds, tdsRate, status: cleared ? 'Completed' : 'Pending',
+    agent: r.agent, request: r._id, type: 'Credit', kind: 'commission', amount, status: cleared ? 'Completed' : 'Pending',
     description: `${svc} commission · ${student?.name ?? ''} (${r.ref})`,
   });
   await syncWallet(r.agent);
   await Message.create({
     agent: r.agent, request: r._id, from: 'system',
-    text: `Commission of ₹${gross.toLocaleString('en-IN')} less ${tdsRate}% TDS (₹${tds.toLocaleString('en-IN')}): ₹${amount.toLocaleString('en-IN')} ${cleared ? 'credited to your wallet' : 'added as pending clearance'}`,
+    text: `Commission of ₹${gross.toLocaleString('en-IN')} ${cleared ? 'credited to your wallet' : 'added as pending clearance'} (${tdsRate}% TDS, ₹${tds.toLocaleString('en-IN')}, is deducted when you withdraw it)`,
   });
-  res.locals.audit = `${r.ref}: credited ₹${gross.toLocaleString('en-IN')} commission (₹${tds.toLocaleString('en-IN')} TDS, ₹${amount.toLocaleString('en-IN')} net)${cleared ? '' : ' (pending)'}`;
+  res.locals.audit = `${r.ref}: credited ₹${gross.toLocaleString('en-IN')} commission${cleared ? '' : ' (pending)'}`;
   await notify({
     agent: r.agent, category: 'payment', type: cleared ? 'payment.commission_credited' : 'payment.commission_pending',
     title: cleared ? `₹${amount.toLocaleString('en-IN')} commission credited` : `₹${amount.toLocaleString('en-IN')} commission on its way`,
-    body: `${svc} for ${student?.name ?? r.ref}: ₹${gross.toLocaleString('en-IN')} less ₹${tds.toLocaleString('en-IN')} TDS. ${cleared ? 'Credited to your wallet. You can withdraw it any time.' : 'Added as pending. It moves to your balance once cleared.'}`,
+    body: `${svc} for ${student?.name ?? r.ref}: ${cleared ? 'credited to your wallet. You can withdraw it any time.' : 'added as pending. It moves to your balance once cleared.'} ${tdsRate}% TDS is deducted when you withdraw it.`,
     link: { kind: 'wallet' }, audience: 'wallet',
   });
   res.status(201).json(await caseDetail(r));
@@ -571,7 +571,7 @@ router.patch('/transactions/:id', async (req, res) => {
   if (!t) throw new HttpError(404, 'Transaction not found');
   if (t.status !== 'Pending') throw new HttpError(409, 'This transaction has already been settled');
   const action = req.body?.action;
-  const amt = `₹${t.amount.toLocaleString('en-IN')}`;
+  const amt = `₹${(t.type === 'Debit' ? payoutOf(t) : t.amount).toLocaleString('en-IN')}`;
   const to = t.method?.label ?? 'your account';
   const gstInvoice = !!t.invoice?.number;
   if (gstInvoice && (action === 'pay' || action === 'payout') && !t.invoice?.verified) throw new HttpError(409, 'Verify the GST invoice before paying this withdrawal');
@@ -606,6 +606,7 @@ router.patch('/transactions/:id', async (req, res) => {
     t.status = 'Rejected';
     if (t.type === 'Debit') t.set('payout', { ...(t.payout ?? {}), state: 'failed', reason });
     await t.save();
+    if (t.type === 'Debit') await releaseEntries(t._id);
     await notify(t.type === 'Debit'
       ? { agent: t.agent, category: 'payment', type: 'payment.withdrawal_rejected', title: `${amt} withdrawal not processed`, body: `Your withdrawal of ${amt} couldn't be processed${reason ? `: ${reason}` : ''}. The amount is back in your wallet.`, link: { kind: 'wallet' }, audience: 'wallet' }
       : { agent: t.agent, category: 'payment', type: 'payment.commission_rejected', title: `${amt} commission cancelled`, body: `A pending commission of ${amt} was cancelled${reason ? `: ${reason}` : ''}. Ask your RM if you have questions.`, link: { kind: 'wallet' }, audience: 'wallet' });

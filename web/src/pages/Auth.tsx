@@ -102,12 +102,14 @@ function SignInForm({ cta }: { cta: string }) {
   );
 }
 
-/** Partner application: contact details, then KYC (individual or entity) with certificates. No password yet:
-    the agreement is emailed within 48 hours and the password is set after signing it. */
+/** Partner application: contact details and a password, then KYC (individual or entity) with certificates and consent.
+    The agreement is emailed within 48 hours; sign-in opens once it is signed. */
 function SignUpForm() {
   const meta = useOnboardingMeta();
   const [step, setStep] = useState<1 | 2>(1);
   const [f, setF] = useState({ name: '', email: '', phone: '', zone: '', city: '', agency: '' });
+  const [pw, setPw] = useState({ password: '', confirm: '' });
+  const [consent, setConsent] = useState(false);
   const [k, setK] = useState<KycValues>(emptyKyc);
   const [files, setFiles] = useState<KycFiles>({});
   const [busy, setBusy] = useState(false);
@@ -121,6 +123,8 @@ function SignUpForm() {
     if (!f.name.trim() || !f.email.trim() || !f.phone.trim() || !f.zone || !f.city.trim()) return setError('Fill in all required fields');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim())) return setError('Enter a valid email address');
     if (!/^\+?[\d\s-]{10,16}$/.test(f.phone.trim())) return setError('Enter a valid mobile number');
+    if (pw.password.length < 8) return setError('Choose a password of at least 8 characters');
+    if (pw.password !== pw.confirm) return setError('Passwords do not match');
     setStep(2);
   };
   const submit = async (e: FormEvent) => {
@@ -128,10 +132,13 @@ function SignUpForm() {
     setError('');
     const problem = kycProblem(k, files);
     if (problem) return setError(problem);
+    if (!consent) return setError('Tick the consent box to submit your application');
     setBusy(true);
     try {
       const form = new FormData();
       for (const [key, val] of Object.entries(f)) form.append(key, val.trim());
+      form.append('password', pw.password);
+      form.append('consent', 'true');
       const r = await api.apply(kycForm(k, files, form));
       setDone({ email: r.email, sla: r.sla });
     } catch (err) {
@@ -150,7 +157,7 @@ function SignUpForm() {
         <ol className="apply-steps">
           <li>We verify your PAN, GST / MSME details and documents.</li>
           <li>You receive the agreement by email and sign it online.</li>
-          <li>We email you a link to set your password and sign in.</li>
+          <li>Once signed, sign in with your email and the password you chose.</li>
         </ol>
         <p className="muted" style={{ fontSize: '.85rem' }}>Didn't get an email in {done.sla}? Check your spam folder or write to <a href={`mailto:${SITE.supportEmail}`}>{SITE.supportEmail}</a>.</p>
         <Link to="/" className="btn btn-primary btn-block" style={{ marginTop: '1rem' }}>Back to home</Link>
@@ -182,14 +189,22 @@ function SignUpForm() {
               </select>
             </div>
           </div>
+          <div className="field-grid">
+            <div className="field"><label htmlFor="signupPw">Create password *</label><div className="ctl">{LOCK}<input type="password" id="signupPw" autoComplete="new-password" placeholder="At least 8 characters" value={pw.password} onChange={(e) => setPw({ ...pw, password: e.target.value })} /></div></div>
+            <div className="field"><label htmlFor="signupPw2">Confirm password *</label><div className="ctl">{LOCK}<input type="password" id="signupPw2" autoComplete="new-password" value={pw.confirm} onChange={(e) => setPw({ ...pw, confirm: e.target.value })} /></div></div>
+          </div>
           {error ? <p className="form-error">{error}</p> : null}
           <button type="submit" className="btn btn-green btn-block btn-lg" style={{ marginTop: '.4rem' }}>Continue</button>
-          <p className="muted" style={{ fontSize: '.8rem', marginTop: '.6rem' }}>No password yet: you'll set one after signing your partner agreement.</p>
+          <p className="muted" style={{ fontSize: '.8rem', marginTop: '.6rem' }}>You can sign in with this password once your partner agreement is signed.</p>
         </form>
       ) : (
         <form onSubmit={submit} noValidate>
           <p className="muted" style={{ marginBottom: '.8rem' }}>How do you work with UniVerse?</p>
           <KycFields v={k} set={setK} files={files} setFiles={setFiles} states={meta.states} entityTypes={meta.entityTypes} />
+          <label className="consent-row">
+            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+            <span>I confirm these details are true and consent to UniVerse verifying my PAN{k.type === 'individual' ? ', Aadhaar' : ''} and documents for KYC and tax compliance (TDS / GST) under the Digital Personal Data Protection Act, 2023.</span>
+          </label>
           {error ? <p className="form-error">{error}</p> : null}
           <div className="apply-actions">
             <button type="button" className="btn btn-ghost btn-lg" onClick={() => { setError(''); setStep(1); }}>Back</button>
@@ -208,7 +223,7 @@ export function SignAgreement() {
   const [info, setInfo] = useState<Awaited<ReturnType<typeof api.agreementByToken>> | null>(null);
   const [pdf, setPdf] = useState<string | null>(null);
   const [error, setError] = useState('');
-  const [done, setDone] = useState<{ email: string; setPasswordToken: string } | null>(null);
+  const [done, setDone] = useState<{ email: string; setPasswordToken: string; canSignIn: boolean } | null>(null);
   useEffect(() => {
     document.title = 'Sign your partner agreement | UniVerse';
     if (!token) return setError('This link is incomplete. Open the link from your email again.');
@@ -224,8 +239,17 @@ export function SignAgreement() {
           <div className="apply-done">
             <div className="apply-done-ic">{CHECK}</div>
             <h3>Agreement signed. Welcome to UniVerse!</h3>
-            <p>Your account is active. We've emailed the signed copy details and a link to set your password to <b>{done.email}</b>. You can also set it right now.</p>
-            <Link to={`/reset-password?token=${encodeURIComponent(done.setPasswordToken)}&welcome=1`} className="btn btn-primary btn-block btn-lg" style={{ marginTop: '1rem' }}>Set your password</Link>
+            {done.canSignIn ? (
+              <>
+                <p>Your account is active. Sign in with <b>{done.email}</b> and the password you chose when you applied, on the website or in the app.</p>
+                <Link to="/partner-login" className="btn btn-primary btn-block btn-lg" style={{ marginTop: '1rem' }}>Sign in</Link>
+              </>
+            ) : (
+              <>
+                <p>Your account is active. We've emailed the signed copy details and a link to set your password to <b>{done.email}</b>. You can also set it right now.</p>
+                <Link to={`/reset-password?token=${encodeURIComponent(done.setPasswordToken)}&welcome=1`} className="btn btn-primary btn-block btn-lg" style={{ marginTop: '1rem' }}>Set your password</Link>
+              </>
+            )}
           </div>
         ) : error ? (
           <div className="apply-done"><h3>We couldn't open this agreement</h3><p className="muted">{error}</p></div>
@@ -237,7 +261,7 @@ export function SignAgreement() {
             <p className="muted">Agreement {info.number} · version {info.version} · for {info.party.legalName}. Read it in full, then sign below. The link works until {new Date(info.expiresAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}.</p>
             <AgreementSigner pdfUrl={pdf} defaultName={info.party.signatory} onSign={async (b) => {
               const r = await api.signByToken(token, b);
-              setDone({ email: r.email, setPasswordToken: r.setPasswordToken });
+              setDone({ email: r.email, setPasswordToken: r.setPasswordToken, canSignIn: r.canSignIn });
             }} />
           </>
         )}

@@ -6,6 +6,19 @@ export const PAN_RE = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
 export const GSTIN_RE = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
 export const UDYAM_RE = /^UDYAM-[A-Z]{2}-\d{2}-\d{7}$/;
 export const PINCODE_RE = /^[1-9]\d{5}$/;
+export const AADHAAR_RE = /^[2-9]\d{11}$/;
+
+/** Aadhaar check digit (Verhoeff) */
+const VD = [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 2, 3, 4, 0, 6, 7, 8, 9, 5], [2, 3, 4, 0, 1, 7, 8, 9, 5, 6], [3, 4, 0, 1, 2, 8, 9, 5, 6, 7], [4, 0, 1, 2, 3, 9, 5, 6, 7, 8],
+  [5, 9, 8, 7, 6, 0, 4, 3, 2, 1], [6, 5, 9, 8, 7, 1, 0, 4, 3, 2], [7, 6, 5, 9, 8, 2, 1, 0, 4, 3], [8, 7, 6, 5, 9, 3, 2, 1, 0, 4], [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]];
+const VP = [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 5, 7, 6, 2, 8, 3, 0, 9, 4], [5, 8, 0, 3, 7, 9, 6, 1, 4, 2], [8, 9, 1, 6, 0, 4, 3, 5, 2, 7], [9, 4, 5, 3, 1, 2, 6, 8, 7, 0],
+  [4, 2, 8, 6, 5, 7, 3, 9, 0, 1], [2, 7, 9, 3, 8, 0, 6, 4, 1, 5], [7, 0, 4, 6, 9, 1, 3, 2, 5, 8]];
+export function aadhaarValid(a: string) {
+  if (!AADHAAR_RE.test(a)) return false;
+  let c = 0;
+  a.split('').reverse().forEach((d, i) => { c = VD[c][VP[i % 8][Number(d)]]; });
+  return c === 0;
+}
 
 /** GSTIN check digit (mod-36 checksum used by the GST network) */
 export function gstinValid(g: string) {
@@ -40,11 +53,11 @@ export const kycUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: KYC_FILE_BYTES, files: 4 },
   fileFilter: (_req, file, cb) => cb(null, /^(application\/pdf|image\/(jpeg|png|webp))$/.test(file.mimetype)),
-}).fields([{ name: 'pan', maxCount: 1 }, { name: 'gst', maxCount: 1 }, { name: 'msme', maxCount: 1 }, { name: 'other', maxCount: 1 }]);
+}).fields([{ name: 'pan', maxCount: 1 }, { name: 'aadhaar', maxCount: 1 }, { name: 'gst', maxCount: 1 }, { name: 'msme', maxCount: 1 }, { name: 'other', maxCount: 1 }]);
 
 export interface KycInput {
   type: 'individual' | 'entity';
-  legalName: string; pan: string; entityType: string; gstin: string; udyam: string; cin: string;
+  legalName: string; pan: string; aadhaarLast4: string; entityType: string; gstin: string; udyam: string; cin: string;
   signatory: string; designation: string; authority: string; address: string; state: string; pincode: string;
 }
 
@@ -54,7 +67,7 @@ export function readKyc(b: Record<string, unknown>, files: Record<string, unknow
   const type = t('type');
   if (type !== 'individual' && type !== 'entity') return { ok: false, error: 'Choose whether you work as an individual or as an entity' };
   const v: KycInput = {
-    type, legalName: t('legalName'), pan: t('pan').toUpperCase(), entityType: t('entityType'), gstin: t('gstin').toUpperCase(),
+    type, legalName: t('legalName'), pan: t('pan').toUpperCase(), aadhaarLast4: '', entityType: t('entityType'), gstin: t('gstin').toUpperCase(),
     udyam: t('udyam').toUpperCase(), cin: t('cin').toUpperCase(), signatory: t('signatory'), designation: t('designation'), authority: t('authority'),
     address: t('address'), state: t('state'), pincode: t('pincode'),
   };
@@ -65,7 +78,11 @@ export function readKyc(b: Record<string, unknown>, files: Record<string, unknow
   if (!PINCODE_RE.test(v.pincode)) return { ok: false, error: 'Enter a valid 6-digit PIN code' };
   const has = (k: string) => Array.isArray(files[k]) && (files[k] as unknown[]).length > 0;
   if (type === 'individual') {
+    const aadhaar = t('aadhaar').replace(/\s/g, '');
+    if (!aadhaarValid(aadhaar)) return { ok: false, error: 'Enter your 12-digit Aadhaar number correctly' };
+    v.aadhaarLast4 = aadhaar.slice(-4); // the full number is never stored
     if (!has('pan')) return { ok: false, error: 'Upload a copy of your PAN card' };
+    if (!has('aadhaar')) return { ok: false, error: 'Upload your Aadhaar card (masked Aadhaar is fine)' };
     Object.assign(v, { entityType: '', gstin: '', udyam: '', cin: '', signatory: '', designation: '', authority: '' });
     return { ok: true, v };
   }

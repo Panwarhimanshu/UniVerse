@@ -22,19 +22,30 @@ export type KycStatus = 'none' | 'submitted' | 'verified' | 'rejected';
 export interface Onboarding {
   stage: 'applied' | 'agreement_sent' | 'active';
   kyc: {
-    status: KycStatus; type: 'individual' | 'entity' | null; legalName: string; pan: string; entityType: string; gstin: string; udyam: string; cin: string;
+    status: KycStatus; type: 'individual' | 'entity' | null; legalName: string; pan: string; aadhaarLast4: string; consentAt: string | null;
+    entityType: string; gstin: string; udyam: string; cin: string;
     signatory: string; designation: string; authority: string; address: string; state: string; pincode: string; note: string;
-    submittedAt: string | null; verifiedAt: string | null; docs: { id: string; kind: 'pan' | 'gst' | 'msme' | 'other'; name: string; mime: string }[];
+    submittedAt: string | null; verifiedAt: string | null; docs: { id: string; kind: 'pan' | 'aadhaar' | 'gst' | 'msme' | 'other'; name: string; mime: string }[];
   };
   agreement: { signed: boolean; signedAt: string | null; version: string; pending: { id: string; number: string; version: string; sentAt: string } | null };
   canWithdraw: boolean;
 }
 export interface GstEntity { id: string; legalName: string; gstin: string; address: string; state: string; isDefault: boolean }
+export interface WithdrawLine { id: string; desc: string; sub: string; amount: number; commission: boolean; tds?: number }
+export interface WithdrawQuote { amount: number; tds: number; tdsRate: number; gst: number; payable: number; lines: WithdrawLine[] }
+export interface TxDetail extends Transaction {
+  lines?: WithdrawLine[]; receiptNo?: string; tdsOnWithdrawal?: number;
+  redeemedIn?: { id: string; description: string; status: string; date: string } | null;
+  invoiceDetail?: {
+    supplier: { legalName: string; gstin: string; address: string; state: string }; taxable: number; gstRate: number; cgst: number; sgst: number; igst: number;
+    payable: number; signedName: string; signedAt: string; verified: boolean;
+  } | null;
+}
 export interface InvoicePreview {
-  number: string; date: string; description: string; sac: string; payTo: string;
+  number: string; date: string; sac: string; payTo: string; lines: WithdrawLine[];
   supplier: { legalName: string; gstin: string; address: string; state: string; pan?: string };
   recipient: { legalName: string; gstin: string; address: string; state: string; pan: string };
-  amount: number; taxable: number; tdsAdjusted: number; tdsRate: number; gstRate: number; cgst: number; sgst: number; igst: number; gst: number; payable: number; interState: boolean;
+  amount: number; tds: number; tdsRate: number; gstRate: number; cgst: number; sgst: number; igst: number; gst: number; payable: number; interState: boolean;
 }
 export interface CaseDoc { id: string; name: string; size: number; status: 'missing' | 'review' | 'verified'; hasFile: boolean; updatedAt: string }
 export interface TimelineStep { title: string; sub: string; done: boolean; now: boolean; at: string | null }
@@ -61,8 +72,11 @@ export interface Transaction {
   amount: number; status: 'Pending' | 'Completed' | 'Rejected'; date: string;
   method: { type: 'upi' | 'bank'; label: string } | null;
   payout: { state: 'requested' | 'processing' | 'processed' | 'failed' | 'reversed'; utr: string; reason: string; paidAt: string | null } | null;
-  /** commission credits: gross before TDS and the TDS deducted (amount is the net) */
-  gross: number | null; tds: number | null; tdsRate: number | null;
+  /** credits: older entries had TDS taken at credit (gross); newer ones are taxed when withdrawn.
+      withdrawals: tds on the entries, netPayout = what is paid (entries − TDS + GST), entryCount */
+  gross: number | null; tds: number | null; tdsRate: number | null; netPayout: number | null; entryCount: number; redeemed: boolean;
+  /** credits only: clearing → available → in_process (withdrawal pending) → redeemed */
+  entryState?: 'clearing' | 'available' | 'in_process' | 'redeemed' | 'cancelled' | null;
   /** withdrawals with GST: the signed tax invoice */
   invoice: { number: string; date: string; gstin: string; legalName: string; taxable: number; gst: number; payable: number; verified: boolean } | null;
 }
@@ -72,7 +86,7 @@ export interface PayoutMethod {
 }
 export interface Wallet {
   balance: number; pending: number; lifetime: number; minWithdrawal: number; instantPayouts: boolean;
-  tdsRate: number; gstRate: number; canWithdraw: boolean; withdrawBlock: string;
+  tdsRate: number; gstRate: number; tdsFY: number; canWithdraw: boolean; withdrawBlock: string;
   methods: PayoutMethod[]; gstEntities: GstEntity[]; transactions: Transaction[];
 }
 export interface Dashboard {
@@ -191,7 +205,7 @@ export const api = {
   apply: (form: FormData) => request<{ ok: boolean; email: string; sla: string }>('/onboarding/apply', { method: 'POST', body: form }),
   agreementByToken: (token: string) => request<{ number: string; version: string; sentAt: string; expiresAt: string; party: { type: string; legalName: string; signatory: string; email: string } }>(`/onboarding/agreement?token=${encodeURIComponent(token)}`),
   agreementPdfByToken: (token: string) => blobUrl(`/onboarding/agreement/pdf?token=${encodeURIComponent(token)}`),
-  signByToken: (token: string, b: SignInput) => request<{ ok: boolean; email: string; setPasswordToken: string }>('/onboarding/agreement/sign', json('POST', { token, ...b })),
+  signByToken: (token: string, b: SignInput) => request<{ ok: boolean; email: string; setPasswordToken: string; canSignIn: boolean }>('/onboarding/agreement/sign', json('POST', { token, ...b })),
   onboarding: () => request<Onboarding>('/onboarding'),
   submitKyc: (form: FormData) => request<Onboarding>('/kyc', { method: 'POST', body: form }),
   pendingAgreementPdf: () => blobUrl('/agreement/pending/pdf'),
@@ -240,9 +254,12 @@ export const api = {
   raiseRequests: (id: string, services: string[]) => request<Student>(`/students/${id}/requests`, json('POST', { services })),
 
   wallet: () => request<Wallet>('/wallet'),
-  withdraw: (amount: number, methodId: string, gst?: { gstEntityId: string; invoiceNumber: string; signedName: string; signature: string }) =>
-    request<{ balance: number; transaction: Transaction }>('/wallet/withdraw', json('POST', gst ? { amount, methodId, gst: true, accept: true, ...gst } : { amount, methodId })),
-  invoicePreview: (b: { amount: number; methodId: string; gstEntityId: string; invoiceNumber: string }) => request<InvoicePreview>('/wallet/invoice/preview', json('POST', b)),
+  /** withdraw the selected commission entries; TDS is deducted on them now */
+  withdraw: (entryIds: string[], methodId: string, gst?: { gstEntityId: string; invoiceNumber: string; signedName: string; signature: string }) =>
+    request<{ balance: number; transaction: Transaction }>('/wallet/withdraw', json('POST', gst ? { entryIds, methodId, gst: true, accept: true, ...gst } : { entryIds, methodId })),
+  withdrawQuote: (entryIds: string[]) => request<WithdrawQuote>('/wallet/withdraw/quote', json('POST', { entryIds })),
+  invoicePreview: (b: { entryIds: string[]; methodId: string; gstEntityId: string; invoiceNumber: string }) => request<InvoicePreview>('/wallet/invoice/preview', json('POST', b)),
+  transaction: (id: string) => request<TxDetail>(`/wallet/transactions/${id}`),
   nextInvoiceNumber: () => request<{ suggestion: string }>('/wallet/invoice/next'),
   downloadInvoice: (txId: string, name: string) => download(`/wallet/transactions/${txId}/invoice`, name),
   gstEntities: () => request<GstEntity[]>('/wallet/gst'),

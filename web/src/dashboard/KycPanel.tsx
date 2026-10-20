@@ -41,7 +41,7 @@ export function KycPanel({ autoSign, onChanged }: { autoSign?: boolean; onChange
   const uploaded = Object.fromEntries(kyc.docs.map((d) => [d.kind, d.name]));
   const startEdit = () => {
     setK({
-      type: kyc.type ?? '', legalName: kyc.legalName, pan: '', entityType: kyc.entityType, gstin: kyc.gstin, udyam: kyc.udyam, cin: kyc.cin,
+      type: kyc.type ?? '', legalName: kyc.legalName, pan: '', aadhaar: '', entityType: kyc.entityType, gstin: kyc.gstin, udyam: kyc.udyam, cin: kyc.cin,
       signatory: kyc.signatory, designation: kyc.designation, authority: kyc.authority, address: kyc.address, state: kyc.state, pincode: kyc.pincode,
     });
     setFiles({});
@@ -76,7 +76,7 @@ export function KycPanel({ autoSign, onChanged }: { autoSign?: boolean; onChange
             {kyc.status === 'rejected' && kyc.note ? <p className="ks-note">Please fix: {kyc.note}</p> : null}
             {kyc.type && !editing ? (
               <p className="ks-sum">
-                {kyc.type === 'entity' ? `${kyc.legalName} (${kyc.entityType})` : kyc.legalName} · PAN {kyc.pan}
+                {kyc.type === 'entity' ? `${kyc.legalName} (${kyc.entityType})` : kyc.legalName} · PAN {kyc.pan}{kyc.aadhaarLast4 ? ` · Aadhaar XXXX XXXX ${kyc.aadhaarLast4}` : ''}
                 {kyc.gstin ? ` · GSTIN ${kyc.gstin}` : ''}{kyc.udyam ? ` · ${kyc.udyam}` : ''}
                 {kyc.verifiedAt ? ` · verified ${fmtDate(kyc.verifiedAt)}` : kyc.submittedAt ? ` · submitted ${fmtDate(kyc.submittedAt)}` : ''}
               </p>
@@ -87,7 +87,7 @@ export function KycPanel({ autoSign, onChanged }: { autoSign?: boolean; onChange
             {editing ? (
               <div className="ks-form">
                 <KycFields v={k} set={setK} files={files} setFiles={setFiles} states={meta.states} entityTypes={meta.entityTypes} uploaded={uploaded} />
-                {kyc.status === 'rejected' ? <p className="field-hint">For your security, enter your PAN again.</p> : null}
+                {kyc.status === 'rejected' ? <p className="field-hint">For your security, enter your PAN (and Aadhaar) again.</p> : null}
                 {error ? <p className="form-error">{error}</p> : null}
                 <div className="m-cta">
                   <button className="btn btn-primary" disabled={busy || !k.type} onClick={submit}>{busy ? 'Submitting…' : 'Submit for verification'}</button>

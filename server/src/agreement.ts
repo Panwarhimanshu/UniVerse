@@ -10,7 +10,7 @@ import { drawSignature, INK, money, NAVY, plain, SOFT, Writer } from './pdf.js';
 
 export interface Party {
   type: 'individual' | 'entity';
-  legalName: string; entityType: string; pan: string; gstin: string; udyam: string; cin: string;
+  legalName: string; entityType: string; pan: string; aadhaarLast4: string; gstin: string; udyam: string; cin: string;
   signatory: string; designation: string; authority: string; address: string; state: string; pincode: string;
   email: string; phone: string; agency: string;
   bank?: { holder: string; bank: string; account: string; ifsc: string } | null;
@@ -18,7 +18,7 @@ export interface Party {
 
 export const partyOf = (a: any, bank?: Party['bank']): Party => ({
   type: a.kyc?.type === 'entity' ? 'entity' : 'individual',
-  legalName: a.kyc?.legalName || a.name, entityType: a.kyc?.entityType ?? '', pan: a.kyc?.pan ?? '', gstin: a.kyc?.gstin ?? '',
+  legalName: a.kyc?.legalName || a.name, entityType: a.kyc?.entityType ?? '', pan: a.kyc?.pan ?? '', aadhaarLast4: a.kyc?.aadhaarLast4 ?? '', gstin: a.kyc?.gstin ?? '',
   udyam: a.kyc?.udyam ?? '', cin: a.kyc?.cin ?? '', signatory: a.kyc?.signatory || a.kyc?.legalName || a.name,
   designation: a.kyc?.designation ?? '', authority: a.kyc?.authority ?? '',
   address: a.kyc?.address ?? '', state: a.kyc?.state ?? '', pincode: a.kyc?.pincode ?? '',
@@ -73,7 +73,7 @@ export async function buildAgreement(p: Party, meta: { number: string; version: 
   w.text('AND:', { size: 9.6, bold: true, color: NAVY });
   const addr = `${p.address}, ${p.state} - ${p.pincode}, India`;
   const second = p.type === 'individual'
-    ? `${p.legalName}, an individual of Indian nationality holding PAN ${p.pan}, residing at ${addr}${p.agency && p.agency !== p.legalName ? `, carrying on business as "${p.agency}"` : ''}`
+    ? `${p.legalName}, an individual of Indian nationality holding PAN ${p.pan}${p.aadhaarLast4 ? ` and Aadhaar XXXX XXXX ${p.aadhaarLast4}` : ''}, residing at ${addr}${p.agency && p.agency !== p.legalName ? `, carrying on business as "${p.agency}"` : ''}`
     : `${p.legalName}, ${CONSTITUTION[p.entityType] ?? 'an entity'}${p.cin ? `, bearing ${/-/.test(p.cin) ? 'LLPIN' : 'CIN'} ${p.cin}` : ''}, PAN ${p.pan}${p.gstin ? ` and GSTIN ${p.gstin}` : ''}${p.udyam ? `, Udyam registration ${p.udyam}` : ''}, having its principal place of business at ${addr}`;
   const rep = p.type === 'entity'
     ? `, duly represented by its authorised signatory, ${p.signatory}${p.designation ? `, ${p.designation}` : ''}${p.authority ? `, authorised vide ${p.authority}` : ''}`
@@ -142,15 +142,15 @@ export async function buildAgreement(p: Party, meta: { number: string; version: 
 
   w.heading('8. COMMISSION, WALLET AND PAYOUTS');
   cl('8.1', 'Commission Structure on the Platform. The Commission payable for each Service shall be as per the Commission Structure published by UniVerse on the Platform (accessible at all times in the "Commissions" section of the partner dashboard and app), as in force on the date the relevant Payout Trigger occurs. UniVerse shall maintain on the Platform the current Commission Structure together with a complete record of every revision, including its effective period, and such structure and revision history shall be deemed incorporated into this Agreement by reference. Commission rates are dynamic: the Commission Structure may be revised prospectively by UniVerse with not less than 30 days\' prior notice published on the Platform and sent to the Partner\'s registered email address, mobile number and in-app notifications in accordance with Clause 23; a revised structure shall not apply to Service Requests whose Payout Trigger has already occurred.');
-  cl('8.2', 'A Commission accrues only upon the Payout Trigger defined in Schedule B for that Service and is credited to the Wallet within seven (7) Business Days of the Service Provider\'s confirmation, net of tax deducted at source under Clause 9. No Commission accrues for cancelled, refunded, fraudulent or reversed transactions, or for refused cases unless the relevant Service Provider pays a refusal-case fee, in which case UniVerse shall pass through the agreed share.');
+  cl('8.2', 'A Commission accrues only upon the Payout Trigger defined in Schedule B for that Service and is credited to the Wallet at its full value within seven (7) Business Days of the Service Provider\'s confirmation. Tax is deducted at source under Clause 9 when the Commission is withdrawn. No Commission accrues for cancelled, refunded, fraudulent or reversed transactions, or for refused cases unless the relevant Service Provider pays a refusal-case fee, in which case UniVerse shall pass through the agreed share.');
   cl('8.3', 'Clawback. If a Service is cancelled, refunded, unwound, charged back or found to be fraudulent after credit, UniVerse may debit the Wallet or set off the corresponding Commission against future payouts, with an entry visible to the Partner.');
-  cl('8.4', `The Wallet is a ledger of accrued earnings; it is not a deposit and does not bear interest. Withdrawals shall be processed to the Partner's verified bank account or UPI ID (Schedule A, or as updated on the Platform) within two (2) Business Days of a valid withdrawal request being approved, subject to a minimum withdrawal of ${money(s.minWithdrawal)}.`);
+  cl('8.4', `The Wallet is a ledger of accrued earnings; it is not a deposit and does not bear interest. The Partner withdraws by selecting cleared Commission entries; each entry is withdrawn in full. Withdrawals shall be processed to the Partner's verified bank account or UPI ID (Schedule A, or as updated on the Platform) within two (2) Business Days of a valid withdrawal request being approved, subject to a minimum withdrawal of ${money(s.minWithdrawal)}.`);
   cl('8.5', 'Commissions denominated in foreign currency (e.g., CAD, EUR) shall be converted to INR at the rate applied by the relevant Service Provider at the time of its payout to UniVerse, and the converted amount shall be credited to the Wallet.');
   cl('8.6', 'On termination of this Agreement, Commissions accrued up to the effective termination date shall be honoured and settled within fifteen (15) Business Days of the later of termination and occurrence of the Payout Trigger, subject to Clauses 8.2 and 8.3.');
   cl('8.7', 'Claims. If the Partner believes a Commission has not been credited or is incorrect, it shall raise a claim on the Platform (through the Service Request chat or its relationship manager) within sixty (60) days of the Payout Trigger, with any supporting evidence. UniVerse shall respond with its findings within seven (7) Business Days.');
 
   w.heading('9. TAXES');
-  cl('9.1', `UniVerse shall deduct tax at source on Commissions under section 393 of the Income-tax Act, 2025 (corresponding to section 194H of the Income-tax Act, 1961) at the rate in force, currently ${s.tdsRate}%, and shall issue TDS certificates every quarter. The Wallet shows the gross Commission, the tax deducted and the net amount for each credit. Where the Partner fails to furnish a valid PAN, tax shall be deducted at the higher rate prescribed by law.`);
+  cl('9.1', `UniVerse shall deduct tax at source on Commissions under section 393 of the Income-tax Act, 2025 (corresponding to section 194H of the Income-tax Act, 1961) at the rate in force, currently ${s.tdsRate}%. Commissions are held in the Wallet at full value and tax is deducted on the Commission entries the Partner selects for withdrawal, at the time of withdrawal, and deposited against the Partner's PAN; UniVerse may instead deduct it at an earlier time where the law requires. TDS certificates are issued every quarter. Where the Partner fails to furnish a valid PAN, tax shall be deducted at the higher rate prescribed by law.`);
   cl('9.2', `Commissions are exclusive of GST. Where the Partner is registered (or liable to be registered) under GST, the Partner shall furnish its GSTIN, withdraw "with GST" and issue a valid tax invoice to UniVerse on the Platform for the Commission withdrawn, and GST as applicable (currently ${s.gstRate}%) shall be payable by UniVerse in addition, after verification of the invoice. The Partner shall report each such invoice in its GST returns; UniVerse may recover GST paid on an invoice whose input tax credit is denied because of the Partner's default. The Parties shall cooperate on e-invoicing and reconciliation. Each Party bears its own taxes.`);
   cl('9.3', 'A Partner not registered under GST withdraws "without GST" and confirms that it is not required to be registered. The Partner shall keep its PAN, GST and bank details in Schedule A current, and payouts may be withheld pending updated KYC where required by law or banking norms.');
 
@@ -237,7 +237,7 @@ export async function buildAgreement(p: Party, meta: { number: string; version: 
       ['Trade name on the Platform', p.agency || p.legalName], ['Email', p.email], ['Mobile', p.phone],
     ]
     : [
-      ['Name (as per PAN)', p.legalName], ['PAN', p.pan], ['Address', addr], ['Trade name on the Platform', p.agency || p.legalName],
+      ['Name (as per PAN)', p.legalName], ['PAN', p.pan], ['Aadhaar (masked)', p.aadhaarLast4 ? `XXXX XXXX ${p.aadhaarLast4}` : 'Not provided'], ['Address', addr], ['Trade name on the Platform', p.agency || p.legalName],
       ['Email', p.email], ['Mobile', p.phone],
     ];
   w.table(['Field', 'Particulars'], rowsA, [0.34, 0.66]);

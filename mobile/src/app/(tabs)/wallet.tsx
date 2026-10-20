@@ -93,7 +93,7 @@ export default function Wallet() {
             </Pressable>
           ) : null}
           <Text style={[type.small, { marginTop: space.md }]}>
-            Commission is credited after {data.tdsRate}% TDS. Registered under GST? Withdraw "with GST" and we pay {data.gstRate}% GST on top against your signed invoice.
+            Commission is credited at full value. TDS @{data.tdsRate}% is deducted on the entries you withdraw and deposited against your PAN{data.tdsFY ? ` · TDS deposited this FY: ${inr(data.tdsFY)}` : ''}. Registered under GST? Withdraw "with GST" and we pay {data.gstRate}% GST on top against your signed invoice.
           </Text>
 
           <View style={{ marginTop: space.xl }}>
@@ -150,38 +150,39 @@ function TxRow({ t, first, tdsRate }: { t: Transaction; first: boolean; tdsRate:
   const credit = t.type === 'Credit';
   const rejected = t.status === 'Rejected';
   const [title, detail] = t.description.split(' · ');
+  const ENTRY: Record<string, string> = { clearing: 'Clearing', available: 'Available', in_process: 'In process', redeemed: 'Redeemed', cancelled: 'Cancelled' };
   const state = credit
-    ? (rejected ? 'Cancelled' : t.status === 'Pending' ? 'Clearing' : t.kind === 'adjustment' ? 'Correction' : 'Credited')
+    ? (ENTRY[t.entryState ?? ''] ?? (rejected ? 'Cancelled' : t.status === 'Pending' ? 'Clearing' : t.kind === 'adjustment' ? 'Correction' : 'Credited'))
     : (rejected ? (t.payout?.state === 'reversed' ? 'Returned' : 'Failed') : t.status === 'Completed' ? 'Paid' : t.payout?.state === 'processing' ? 'On its way' : 'Requested');
-  const stateColor = rejected ? colors.danger : t.status === 'Pending' ? colors.warning : colors.muted;
+  const stateColor = rejected ? colors.danger : credit && t.entryState === 'available' ? colors.positive : t.status === 'Pending' || t.entryState === 'in_process' ? colors.warning : colors.muted;
   const sub = credit
     ? [detail, shortDate(t.date)]
     : [t.method?.label ?? title.replace(/^Withdrawal to /, ''), t.payout?.utr ? `Ref ${t.payout.utr}` : rejected && t.payout?.reason ? t.payout.reason : shortDate(t.date)];
   return (
-    <View style={[styles.tx, !first && styles.sep]}>
+    <Pressable onPress={() => router.push({ pathname: '/tx/[id]', params: { id: t.id } })} style={({ pressed }) => [styles.tx, !first && styles.sep, pressed && { backgroundColor: colors.surface }]}>
       <View style={[styles.txIcon, { backgroundColor: rejected ? colors.surface : credit ? colors.positiveTint : colors.accentTint }]}>
         <Feather name={credit ? 'arrow-down-left' : 'arrow-up-right'} size={17} color={rejected ? colors.faint : credit ? colors.positive : colors.accent} />
       </View>
       <View style={{ flex: 1, gap: 2 }}>
         <Text style={[type.body, { fontWeight: '600' }]} numberOfLines={1}>{credit ? title : 'Withdrawal'}</Text>
         <Text style={type.small} numberOfLines={1}>{sub.filter(Boolean).join(' · ')}</Text>
-        {t.gross != null ? (
+        {credit && t.gross != null ? (
           <Text style={type.small}>Gross {inr(t.gross)} · TDS {t.tdsRate ?? tdsRate}% −{inr(t.tds ?? 0)}</Text>
+        ) : credit && t.kind === 'commission' && t.entryState !== 'redeemed' && t.entryState !== 'cancelled' ? (
+          <Text style={type.small}>TDS {tdsRate}% on withdrawal</Text>
         ) : null}
-        {t.invoice ? (
-          <Text style={type.small} onPress={() => api.downloadInvoice(t.id, `Invoice ${t.invoice!.number}.pdf`).catch((e) => notify('Could not open', errorText(e)))}>
-            Invoice {t.invoice.number} · + GST {inr(t.invoice.gst)} · <Text style={{ color: colors.primary, fontWeight: '700' }}>View</Text>
-          </Text>
+        {!credit ? (
+          <Text style={type.small}>{t.entryCount ? `${t.entryCount} ${t.entryCount === 1 ? 'entry' : 'entries'} · ` : ''}TDS −{inr(t.tds ?? 0)}{t.invoice ? ` · GST +${inr(t.invoice.gst)}` : ''}</Text>
         ) : null}
       </View>
       <View style={{ alignItems: 'flex-end', gap: 2 }}>
         <Text style={{ fontSize: 15, fontWeight: '700', color: rejected ? colors.faint : credit ? colors.positive : colors.text, textDecorationLine: rejected ? 'line-through' : 'none' }}>
           {credit ? '+' : '−'}{inr(t.amount)}
         </Text>
-        {t.invoice ? <Text style={[styles.state, { color: colors.positive }]}>you get {inr(t.invoice.payable)}</Text> : null}
+        {!credit && t.netPayout != null ? <Text style={[styles.state, { color: colors.positive }]}>you get {inr(t.netPayout)}</Text> : null}
         <Text style={[styles.state, { color: stateColor }]}>{state}</Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 

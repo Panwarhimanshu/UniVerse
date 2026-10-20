@@ -33,6 +33,14 @@ export async function syncWallet(agentId: Types.ObjectId | string) {
   return wallet;
 }
 
+/** A rejected or failed withdrawal gives its entries back to the wallet */
+export const releaseEntries = (withdrawalId: Types.ObjectId | string) =>
+  Transaction.updateMany({ redeemedBy: withdrawalId }, { $unset: { redeemedBy: 1 } });
+
+/** What a withdrawal actually pays: entries - TDS (+ GST when invoiced). Older withdrawals paid their amount. */
+export const payoutOf = (t: { amount: number; netPayout?: number | null; invoice?: { payable?: number | null } | null }) =>
+  t.netPayout ?? t.invoice?.payable ?? t.amount;
+
 /* ---------- payout methods ---------- */
 export const UPI_RE = /^[a-zA-Z0-9._-]{2,256}@[a-zA-Z][a-zA-Z0-9.-]{1,63}$/;
 export const IFSC_RE = /^[A-Z]{4}0[A-Z0-9]{6}$/;
@@ -111,9 +119,9 @@ export async function razorpayPayout(txId: string) {
   const p = await rzp<{ id: string; status: string }>('/payouts', {
     account_number: process.env.RAZORPAYX_ACCOUNT_NUMBER,
     fund_account_id: m.razorpay!.fundAccountId,
-    amount: Math.round((t.invoice?.payable ?? t.amount) * 100), // paise; invoiced withdrawals include GST
+    amount: Math.round(payoutOf(t) * 100), // paise: entries - TDS (+ GST)
     currency: 'INR',
-    mode: m.type === 'upi' ? 'UPI' : (t.invoice?.payable ?? t.amount) > 200000 ? 'NEFT' : 'IMPS',
+    mode: m.type === 'upi' ? 'UPI' : payoutOf(t) > 200000 ? 'NEFT' : 'IMPS',
     purpose: 'payout',
     queue_if_low_balance: true,
     reference_id: String(t._id),

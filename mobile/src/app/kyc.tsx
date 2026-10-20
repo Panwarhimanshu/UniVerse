@@ -40,7 +40,7 @@ export default function Kyc() {
 
   const startEdit = () => {
     setK({
-      type: kyc.type ?? '', legalName: kyc.legalName, pan: '', entityType: kyc.entityType, gstin: kyc.gstin, udyam: kyc.udyam, cin: kyc.cin,
+      type: kyc.type ?? '', legalName: kyc.legalName, pan: '', aadhaar: '', entityType: kyc.entityType, gstin: kyc.gstin, udyam: kyc.udyam, cin: kyc.cin,
       signatory: kyc.signatory, designation: kyc.designation, authority: kyc.authority, address: kyc.address, state: kyc.state, pincode: kyc.pincode,
     });
     setFiles({});

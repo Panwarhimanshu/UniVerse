@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { Types } from 'mongoose';
 import { Agent, AgreementDoc, TeamMember } from '../models/index.js';
@@ -48,10 +47,13 @@ publicOnboarding.post('/apply', kycUpload, async (req, res) => {
   if (!/^\+?[\d\s-]{10,16}$/.test(phone)) throw new HttpError(400, 'Enter a valid mobile number');
   if (!ZONES.includes(b.zone)) throw new HttpError(400, 'Select your zone');
   if (!city) throw new HttpError(400, 'Enter your city');
+  const password = String(b.password ?? '');
+  if (password.length < 8) throw new HttpError(400, 'Create a password of at least 8 characters');
+  if (b.consent !== 'true' && b.consent !== true) throw new HttpError(400, 'Confirm that the details are true and that you agree to execute the Channel Partner Agreement');
   const k = readKyc(b, files(req) ?? {});
   if (!k.ok) throw new HttpError(400, k.error);
 
-  // an applicant whose details were sent back can apply again with the same email
+  // an applicant whose details were sent back can apply again with the same email (the old record is updated)
   let a = await Agent.findOne({ email });
   if (a && !(isApplicant(a) && a.kyc?.status === 'rejected')) throw new HttpError(409, 'An account with this email already exists. Sign in instead, or use another email.');
   if (!a && (await TeamMember.exists({ email }))) throw new HttpError(409, 'This email is used by a team member of another partner');
@@ -61,13 +63,13 @@ publicOnboarding.post('/apply', kycUpload, async (req, res) => {
     const s = getSettings();
     a = new Agent({
       name, email, phone, zone: b.zone, city, agency: agency || (k.v.type === 'entity' ? k.v.legalName : name),
-      // no usable password until the agreement is signed; the set-password email follows signing
-      passwordHash: await bcrypt.hash(crypto.randomBytes(24).toString('hex'), 10),
+      // the password works only once the agreement is signed (sign-in checks the onboarding stage)
+      passwordHash: await bcrypt.hash(password, 10), passwordSet: true,
       rm: s.defaultRm, onboarding: 'applied',
       agreement: { number: '', autoRenew: true },
     });
   } else {
-    Object.assign(a, { name, phone, zone: b.zone, city, agency: agency || a.agency });
+    Object.assign(a, { name, phone, zone: b.zone, city, agency: agency || a.agency, passwordHash: await bcrypt.hash(password, 10), passwordSet: true });
   }
   applyKyc(a, k.v, docs);
   await a.save();
@@ -77,7 +79,7 @@ publicOnboarding.post('/apply', kycUpload, async (req, res) => {
     greeting: `Hello ${name.split(' ')[0]},`,
     paragraphs: [
       'Thank you for applying to become a UniVerse partner. We have received your details and documents.',
-      `Our team will verify them and email you your partner agreement for review within ${SLA}. Once you sign it, we will send you a link to set your password and sign in.`,
+      `Our team will verify them and email you your partner agreement for review within ${SLA}. Once you sign it, your account is active and you can sign in with the password you created.`,
     ],
   }));
   res.status(201).json({ ok: true, email, sla: SLA });
@@ -109,7 +111,7 @@ publicOnboarding.post('/agreement/sign', async (req, res) => {
   const a = await Agent.findById(doc.agent);
   if (!a) throw new HttpError(404, 'Account not found');
   const { setPasswordToken } = await completeSigning(a, doc, input, req);
-  res.json({ ok: true, email: a.email, setPasswordToken });
+  res.json({ ok: true, email: a.email, setPasswordToken, canSignIn: !setPasswordToken });
 });
 
 /* ================= partner: KYC and signature from inside the app ================= */

@@ -613,3 +613,29 @@
 @media(max-width:520px){.seg2{grid-template-columns:1fr}.inv-title{text-align:left}}
 .inv-mini{display:flex;flex-direction:column;gap:.15rem;margin-top:.45rem;padding:.5rem .6rem;border-radius:10px;background:var(--blue-tint);font-size:.78rem;color:var(--navy)}
 .chip-n{font-style:normal;font-size:.7rem;opacity:.7;margin-left:.2rem}
+
+/* Withdraw: pick commission entries (demo V9) */
+.wd-entries{border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:.4rem 0 .8rem;max-height:300px;overflow-y:auto}
+.wd-erow{display:flex;align-items:center;gap:.75rem;padding:.7rem .9rem;border-top:1px solid var(--line);cursor:pointer;transition:background .15s}
+.wd-erow:first-child{border-top:0}
+.wd-erow:hover{background:var(--bg-soft,#F7F8FB)}
+.wd-erow.sel{background:var(--green-tint)}
+.wd-erow input{width:18px;height:18px;flex:none;accent-color:var(--green-deep)}
+.wd-selall{background:var(--bg-soft,#F7F8FB);position:sticky;top:0;z-index:1}
+.wd-einfo{flex:1;min-width:0;display:flex;flex-direction:column}
+.wd-einfo b{font-size:.9rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wd-einfo span,.wd-eamt span{font-size:.76rem;color:var(--ink-soft)}
+.wd-eamt{text-align:right;display:flex;flex-direction:column;flex:none}
+.wd-eamt b{font-size:.92rem}
+.wd-totals{display:flex;flex-wrap:wrap;justify-content:space-between;gap:.4rem 1rem;align-items:center;padding:.8rem 1rem;border-radius:12px;background:var(--blue-tint);font-size:.86rem;margin-bottom:1.1rem}
+.wd-totals .pay{font-weight:800;color:var(--green-deep);font-size:1rem}
+.tbl tr.tx-click{cursor:pointer}
+.tbl tr.tx-click:hover td{background:var(--bg-soft,#F7F8FB)}
+.consent-row{display:flex;gap:.6rem;align-items:flex-start;font-size:.82rem;line-height:1.45;color:var(--ink-soft);margin:1rem 0 .4rem;cursor:pointer}
+.consent-row input{width:17px;height:17px;flex:none;margin-top:.15rem;accent-color:var(--green-deep)}
+.inv-sum.txd{max-width:none;grid-template-columns:auto 1fr;margin-top:.6rem}
+.inv-sum.txd dt{white-space:nowrap}
+.pm-opt input{width:auto!important;flex:none;margin:0;padding:0;box-shadow:none}
+.modal .form-sec-title{font-weight:700;color:var(--navy);font-size:.92rem;margin:1.1rem 0 .5rem}
+.modal .form-sec-title .hint{font-weight:400;color:var(--ink-soft);font-size:.78rem;margin-left:.3rem}
+.field .pm-opt{display:flex;margin:0}

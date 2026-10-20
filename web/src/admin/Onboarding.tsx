@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fmtDate, useApi } from '../lib/hooks';
+import { fmtDate, fmtTime, useApi } from '../lib/hooks';
 import { useToast } from '../lib/toast';
 import { errMsg, Hero, Modal } from '../dashboard/modals';
 import { adminApi } from './api';
@@ -16,7 +16,7 @@ const TABS: [string, OnboardingStage[] | null][] = [
   ['To review', ['review']], ['Send agreement', ['verified']], ['Awaiting signature', ['agreement_sent']], ['Sent back', ['sent_back']],
   ['Not started', ['not_started']], ['Signed', ['done']], ['All', null],
 ];
-const DOC_LABEL = { pan: 'PAN card', gst: 'GST certificate', msme: 'Udyam (MSME) certificate', other: 'Other document' } as const;
+const DOC_LABEL = { pan: 'PAN card', aadhaar: 'Aadhaar card', gst: 'GST certificate', msme: 'Udyam (MSME) certificate', other: 'Other document' } as const;
 
 export function OnboardingView({ onChanged }: { onChanged: () => void }) {
   const list = useApi(adminApi.onboardingList, []);
@@ -98,6 +98,7 @@ function OnboardingModal({ id, onClose, onChanged }: { id: string | null; onClos
                   {row('Works as', k.type === 'entity' ? `Entity · ${k.entityType}` : 'Individual')}
                   {row(k.type === 'entity' ? 'Registered name' : 'Name as on PAN', k.legalName)}
                   {row('PAN', k.pan)}
+                  {row('Aadhaar', k.aadhaarLast4 ? `XXXX XXXX ${k.aadhaarLast4}` : '')}
                   {row('GSTIN', k.gstin)}
                   {row('Udyam', k.udyam)}
                   {row('CIN / LLPIN', k.cin)}
@@ -106,6 +107,7 @@ function OnboardingModal({ id, onClose, onChanged }: { id: string | null; onClos
                   {row('Address', `${k.address}, ${k.state} ${k.pincode}`)}
                   {row('Location', `${d.city} · ${d.zone[0]}${d.zone.slice(1).toLowerCase()} zone`)}
                   {row('Submitted', k.submittedAt ? fmtDate(k.submittedAt) : '')}
+                  {row('Consent', k.consentAt ? `Confirmed details and agreed to execute the agreement, ${fmtTime(k.consentAt)}` : '')}
                   {row('Verified', k.verifiedAt ? `${fmtDate(k.verifiedAt)}${k.verifiedBy ? ` by ${k.verifiedBy}` : ''}` : '')}
                 </dl>
               ) : <p className="adm-meta">This partner has not submitted KYC yet. They see a prompt in the app and portal.</p>}

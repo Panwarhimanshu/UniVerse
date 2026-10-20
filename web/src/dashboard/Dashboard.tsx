@@ -1,4 +1,4 @@
-import { WithdrawModal } from './Withdraw';
+import { TxDetailModal, WithdrawModal } from './Withdraw';
 import { KycBanner, KycPanel } from './KycPanel';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
@@ -97,6 +97,7 @@ export default function Dashboard() {
   const [statusF, setStatusF] = useState('');
   const [refer, setRefer] = useState<{ open: boolean; svc?: string }>({ open: false });
   const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [txOpen, setTxOpen] = useState<string | null>(null);
   const [caseId, setCaseId] = useState<string | null>(null);
   const [panelId, setPanelId] = useState<string | null>(null);
   const [commEntry, setCommEntry] = useState<Commissions['history'][number] | null>(null);
@@ -565,7 +566,7 @@ export default function Dashboard() {
               {wallet.data && !wallet.data.canWithdraw ? (
                 <div className="kyc-banner" style={{ marginBottom: '1.4rem' }}><span>{wallet.data.withdrawBlock}</span>{isOwner ? <button className="btn btn-primary btn-sm" onClick={() => go('profile')}>Open KYC & agreement</button> : null}</div>
               ) : null}
-              <p className="adm-meta" style={{ margin: '-.6rem 0 1.2rem' }}>Commission is credited after {wallet.data?.tdsRate ?? 2}% TDS (Income-tax Act 2025, s.393). Registered under GST? Withdraw "with GST" and we pay {wallet.data?.gstRate ?? 18}% GST on top against your signed invoice.</p>
+              <p className="adm-meta" style={{ margin: '-.6rem 0 1.2rem' }}>Commission is credited at full value. TDS @ {wallet.data?.tdsRate ?? 2}% (Income-tax Act 2025, s.393) is deducted on the entries you withdraw and deposited against your PAN{wallet.data?.tdsFY ? <> · <b>TDS deposited this FY: {inr(wallet.data.tdsFY)}</b></> : null}. Registered under GST? Withdraw "with GST" and we pay {wallet.data?.gstRate ?? 18}% GST on top against your signed invoice.</p>
               <div className="panel" style={{ marginBottom: '1.4rem' }}>
                 <div className="panel-h">
                   <h3>Receive money to</h3>
@@ -598,32 +599,31 @@ export default function Dashboard() {
                 <div className="panel-h"><h3>Transaction history</h3></div>
                 <div style={{ overflowX: 'auto' }}>
                   <table className="tbl">
-                    <thead><tr><th>Date</th><th>Description</th><th>Type</th><th className="r">Gross</th><th className="r">TDS {wallet.data?.tdsRate ?? 2}%</th><th className="r">Net amount</th><th>Status</th></tr></thead>
+                    <thead><tr><th>Date</th><th>Description</th><th>Type</th><th className="r">Amount</th><th className="r">TDS @{wallet.data?.tdsRate ?? 2}%</th><th>Status</th></tr></thead>
                     <tbody>
-                      {wallet.data?.transactions.map((t) => (
-                        <tr key={t.id}>
-                          <td>{fmtDate(t.date)}</td>
-                          <td>
-                            <div className="t-name" style={{ fontWeight: 500 }}>{t.type === 'Debit' ? `Withdrawal to ${t.method?.label ?? 'your account'}` : t.description}</div>
-                            {t.invoice ? (
-                              <div className="t-sub">
-                                GST invoice {t.invoice.number} · {inr(t.invoice.taxable)} + GST {inr(t.invoice.gst)} · you receive {inr(t.invoice.payable)}{t.invoice.verified ? ' · verified' : ''}{' '}
-                                <a href="#" onClick={(e) => { e.preventDefault(); api.downloadInvoice(t.id, `Invoice ${t.invoice!.number}.pdf`).catch((er) => toast(er.message)); }}>Download</a>
-                              </div>
-                            ) : null}
-                            {t.payout?.utr ? <div className="t-sub">Bank reference {t.payout.utr}</div> : t.payout?.reason ? <div className="t-sub">{t.payout.reason}</div> : null}
-                          </td>
-                          <td><span className={`pill${t.type === 'Credit' ? ' ctry' : ''}`}>{t.type}</span></td>
-                          <td className="r t-num">{t.gross != null ? inr(t.gross) : '—'}</td>
-                          <td className="r t-num">{t.tds != null ? `− ${inr(t.tds)}` : '—'}</td>
-                          <td className="r" style={{ fontWeight: 700, color: t.type === 'Credit' ? 'var(--green-deep)' : 'var(--ink)' }}>{t.type === 'Credit' ? '+' : '−'} {inr(t.amount)}</td>
-                          <td><span className={`status ${statusClass(t.status)}`}>{t.type === 'Debit'
-                            ? (t.status === 'Completed' ? 'Paid' : t.status === 'Rejected' ? 'Failed' : t.payout?.state === 'processing' ? 'On its way' : 'Requested')
-                            : (t.status === 'Pending' ? 'Clearing' : t.status === 'Rejected' ? 'Cancelled' : t.kind === 'adjustment' ? 'Correction' : 'Credited')}</span></td>
-                        </tr>
-                      ))}
+                      {wallet.data?.transactions.map((t) => {
+                        const debit = t.type === 'Debit';
+                        const st = debit
+                          ? (t.status === 'Completed' ? 'Paid' : t.status === 'Rejected' ? 'Failed' : t.payout?.state === 'processing' ? 'On its way' : 'Requested')
+                          : t.kind === 'adjustment' && t.entryState !== 'available' && t.entryState !== 'redeemed' && t.entryState !== 'in_process' ? 'Correction'
+                          : ({ clearing: 'Clearing', available: 'Available', in_process: 'In process', redeemed: 'Redeemed', cancelled: 'Cancelled' } as Record<string, string>)[t.entryState ?? ''] ?? (t.status === 'Pending' ? 'Clearing' : 'Credited');
+                        const cls = debit ? statusClass(t.status) : t.entryState === 'available' ? 'done' : t.entryState === 'redeemed' ? 'prog' : t.entryState === 'cancelled' ? 'hold' : 'pend';
+                        return (
+                          <tr key={t.id} className="tx-click" tabIndex={0} onClick={() => setTxOpen(t.id)} onKeyDown={(e) => { if (e.key === 'Enter') setTxOpen(t.id); }}>
+                            <td>{fmtDate(t.date)}</td>
+                            <td>
+                              <div className="t-name" style={{ fontWeight: 500 }}>{debit ? `Withdrawal to ${t.method?.label ?? 'your account'}` : t.description}</div>
+                              {debit ? <div className="t-sub">{t.entryCount ? `${t.entryCount} ${t.entryCount === 1 ? 'entry' : 'entries'} · ` : ''}{t.invoice ? `GST invoice ${t.invoice.number} · ` : ''}payout {inr(t.netPayout ?? t.amount)}{t.payout?.utr ? ` · UTR ${t.payout.utr}` : ''}</div> : null}
+                            </td>
+                            <td><span className={`pill${debit ? '' : ' ctry'}`}>{debit ? 'Debit' : 'Credit'}</span></td>
+                            <td className="r" style={{ fontWeight: 700, color: debit ? 'var(--ink)' : 'var(--green-deep)' }}>{debit ? '−' : '+'} {inr(t.amount)}</td>
+                            <td className="r t-num">{t.tds != null && t.tds > 0 ? `− ${inr(t.tds)}` : debit || t.kind !== 'commission' ? '—' : <span className="t-sub">on withdrawal</span>}</td>
+                            <td><span className={`status ${cls}`}>{st}</span></td>
+                          </tr>
+                        );
+                      })}
                       {wallet.data && !wallet.data.transactions.length ? (
-                        <tr><td colSpan={7} className="empty-row">No transactions yet. Commissions show up here when a case reaches its payout step.</td></tr>
+                        <tr><td colSpan={6} className="empty-row">No transactions yet. Commissions show up here when a case reaches its payout step.</td></tr>
                       ) : null}
                     </tbody>
                   </table>
@@ -777,6 +777,7 @@ export default function Dashboard() {
       <ReferModal open={refer.open} presetService={refer.svc} onClose={() => setRefer({ open: false })} onDone={(c) => { refreshCases(); setPanelId(c.id); }} />
       <WithdrawModal open={withdrawOpen} wallet={wallet.data} isOwner={isOwner}
         onClose={() => setWithdrawOpen(false)} onDone={() => { wallet.reload(); dash.reload(); }} onAddMethod={() => setMethodOpen(true)} onKyc={() => go('profile')} />
+      <TxDetailModal id={txOpen} onClose={() => setTxOpen(null)} />
       <PayoutMethodModal open={methodOpen} onClose={() => setMethodOpen(false)} onDone={wallet.reload} />
       <AddStudentModal open={addStudentOpen} onClose={() => setAddStudentOpen(false)} onDone={() => { students.reload(); dash.reload(); }} />
       <ImportStudentsModal open={importOpen} onClose={() => setImportOpen(false)} onDone={() => { students.reload(); dash.reload(); }} />

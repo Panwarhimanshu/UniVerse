@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { Transaction } from '../models/index.js';
 import { notify } from '../notify.js';
-import { syncWallet, validWebhook } from '../wallet.js';
+import { payoutOf, releaseEntries, syncWallet, validWebhook } from '../wallet.js';
 
 /* RazorpayX calls this when a payout finishes. Set the webhook URL to https://universeportal.vercel.app/api/webhooks/razorpay
    with the events payout.processed, payout.failed, payout.reversed and payout.rejected, and put its secret in
@@ -17,7 +17,7 @@ router.post('/razorpay', async (req, res) => {
 
   const t = await Transaction.findOne({ 'payout.id': p.id });
   if (!t || t.status !== 'Pending') return res.json({ ok: true }); // unknown, or already settled (webhooks can repeat)
-  const amt = `₹${t.amount.toLocaleString('en-IN')}`;
+  const amt = `₹${payoutOf(t).toLocaleString('en-IN')}`;
   const to = t.method?.label ?? 'your account';
 
   if (event === 'payout.processed') {
@@ -33,7 +33,8 @@ router.post('/razorpay', async (req, res) => {
     t.set('payout.state', event === 'payout.reversed' ? 'reversed' : 'failed');
     t.set('payout.reason', reason);
     await t.save();
-    await notify({ agent: t.agent, category: 'payment', type: 'payment.withdrawal_rejected', title: `${amt} withdrawal failed`, body: `${reason}. The amount is back in your wallet. Check your payout details and try again.`, link: { kind: 'wallet' }, audience: 'wallet' });
+    await releaseEntries(t._id);
+    await notify({ agent: t.agent, category: 'payment', type: 'payment.withdrawal_rejected', title: `${amt} withdrawal failed`, body: `${reason}. The entries are back in your wallet. Check your payout details and try again.`, link: { kind: 'wallet' }, audience: 'wallet' });
   } else {
     return res.json({ ok: true });
   }
