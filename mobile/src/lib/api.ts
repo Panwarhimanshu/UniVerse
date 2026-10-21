@@ -139,7 +139,7 @@ export interface SiteContent {
 /* ---------- server ---------- */
 
 /** The live UniVerse API. Override with EXPO_PUBLIC_API_URL (e.g. http://192.168.1.5:4000/api) to test against a local server. */
-export const API_URL = (process.env.EXPO_PUBLIC_API_URL || 'https://universeportal.vercel.app/api').replace(/\/$/, '');
+export const API_URL = (process.env.EXPO_PUBLIC_API_URL || 'https://universeportal-api.vercel.app/api').replace(/\/$/, '');
 
 let token: string | null = null;
 let onUnauthorized: ((message: string) => void) | null = null;

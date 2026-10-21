@@ -3,9 +3,9 @@
   "cleanUrls": true,
   "redirects": [
     {
-      "source": "/:path*",
+      "source": "/:path((?!api/).*)",
       "has": [{ "type": "host", "value": "universeportal.vercel.app" }],
-      "destination": "https://www.universepartner.co/:path*",
+      "destination": "https://www.universepartner.co/:path",
       "permanent": true
     }
   ],

@@ -15,6 +15,7 @@ export interface Head { title: string; description: string; canonical: string; i
 const org = () => ({
   '@type': 'Organization', '@id': `${ORIGIN}/#org`, name: BRAND, url: `${ORIGIN}/`,
   logo: `${ORIGIN}/img/universe-logo.png`,
+  sameAs: ['https://www.linkedin.com/company/universevas'],
   description: 'B2B marketplace for study abroad value added services, serving immigration consultants and education agents in India.',
   email: SITE.supportEmail, telephone: SITE.supportPhone,
   address: { '@type': 'PostalAddress', addressLocality: 'Vadodara', addressRegion: 'Gujarat', addressCountry: 'IN' },

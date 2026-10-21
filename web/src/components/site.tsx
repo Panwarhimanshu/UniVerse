@@ -88,9 +88,7 @@ export function SiteFooter() {
         <div className="footer-bottom">
           <p>© {new Date().getFullYear()} UniVerse Pvt. Ltd. · Your student's journey, our universe!</p>
           <div className="socials">
-            <a href="#" aria-label="LinkedIn">in</a>
-            <a href="#" aria-label="X">𝕏</a>
-            <a href="#" aria-label="Instagram" className="gn">◉</a>
+            <a href="https://www.linkedin.com/company/universevas" target="_blank" rel="noopener" aria-label="UniVerse on LinkedIn">in</a>
           </div>
         </div>
       </div>
